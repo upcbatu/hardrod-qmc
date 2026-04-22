@@ -1,0 +1,15 @@
+{
+  "system": {
+    "n_particles": 21,
+    "density": 0.30,
+    "rod_length": 0.50
+  },
+  "vmc": {
+    "n_steps": 12000,
+    "burn_in": 2000,
+    "thinning": 10,
+    "step_size": 0.75,
+    "seed": 1234
+  },
+  "output_dir": "results/smoke_vmc"
+}

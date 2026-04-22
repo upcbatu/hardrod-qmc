@@ -1,0 +1,24 @@
+[project]
+name = "hardrod-dmc-thesis"
+version = "0.1.0"
+description = "Cost-accuracy benchmarking scaffold for DMC estimators in one-dimensional hard-rod Bose gases."
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "experiments", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

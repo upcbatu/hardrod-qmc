@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+.env
+.DS_Store
+results/**/*.npy
+results/**/*.npz
+results/**/*.png
+results/**/*.json
+!results/README.md
+data/raw/
+data/processed/
+notebooks/.ipynb_checkpoints/
+operator/
