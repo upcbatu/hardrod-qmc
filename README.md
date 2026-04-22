@@ -4,14 +4,18 @@ This repository is a computational-physics thesis scaffold for benchmarking Quan
 
 ## Start here
 
-- [01_ARCHITECTURE_RATIONALE.md](01_ARCHITECTURE_RATIONALE.md)
+- [docs/00_PROPOSAL.md](docs/00_PROPOSAL.md)
+  Short thesis proposal.
+- [docs/01_ARCHITECTURE_RATIONALE.md](docs/01_ARCHITECTURE_RATIONALE.md)
   Why the code is organized the way it is.
-- [02_HIGH_LEVEL_WORKFLOW.md](02_HIGH_LEVEL_WORKFLOW.md)
+- [docs/02_HIGH_LEVEL_WORKFLOW.md](docs/02_HIGH_LEVEL_WORKFLOW.md)
   High-level workflow from benchmark setup to estimator comparison.
-- [03_EQUATION_SOURCE_MAP.md](03_EQUATION_SOURCE_MAP.md)
+- [docs/03_EQUATION_SOURCE_MAP.md](docs/03_EQUATION_SOURCE_MAP.md)
   Which equations and method ideas come from which papers.
-- [04_CURRENT_REPO_STATE.md](04_CURRENT_REPO_STATE.md)
+- [docs/04_CURRENT_REPO_STATE.md](docs/04_CURRENT_REPO_STATE.md)
   What is already implemented, what the tests cover, and what is still missing.
+- [docs/05_TIMELINE_AND_NAVIGATION.md](docs/05_TIMELINE_AND_NAVIGATION.md)
+  Tentative calendar and navigation note.
 
 ## Code layout
 
