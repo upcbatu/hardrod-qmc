@@ -46,6 +46,42 @@ class HardRodJastrowTrial:
             return 0.0
         return float(np.exp(logv))
 
+    def local_kinetic_energy(self, positions: FloatArray) -> float:
+        """Return -sum_i nabla_i^2 psi / psi for the all-pair reduced trial.
+
+        The all-pair `power=1` form is the controlled homogeneous-ring
+        validation wavefunction. For that case this local kinetic energy is
+        constant and equals the finite-N hard-rod benchmark energy.
+        """
+
+        if self.nearest_neighbor_only:
+            raise NotImplementedError("local kinetic energy is only implemented for all-pair trial")
+        if not self.system.is_valid(positions):
+            return float("inf")
+
+        x = self.system.sorted_positions(positions)
+        n_particles = self.system.n_particles
+        free_length = excluded_length(n_particles, self.system.length, self.system.rod_length)
+        alpha = np.pi / free_length
+        y = x - self.system.rod_length * np.arange(n_particles)
+
+        laplacian_over_value = 0.0
+        for i in range(n_particles):
+            grad_log = 0.0
+            lap_log = 0.0
+            for j in range(n_particles):
+                if i == j:
+                    continue
+                phase = alpha * (y[i] - y[j])
+                sin_phase = np.sin(phase)
+                if sin_phase == 0.0:
+                    return float("inf")
+                grad_log += self.power * alpha / np.tan(phase)
+                lap_log -= self.power * alpha**2 / sin_phase**2
+            laplacian_over_value += lap_log + grad_log**2
+
+        return float(-laplacian_over_value)
+
     def _log_nearest_neighbor(self, positions: FloatArray) -> float:
         gaps = self.system.nearest_neighbor_gaps(positions)
         free_gaps = gaps - self.system.rod_length

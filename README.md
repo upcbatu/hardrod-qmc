@@ -41,7 +41,8 @@ notebooks/                inspection and figure drafting
 
 - homogeneous periodic hard-rod geometry is implemented
 - exact homogeneous ring reference energies and hard-rod EOS utilities are implemented in `theory/`
+- the homogeneous ring validation benchmark compares all-pair trial local energy against exact finite-`N` references
 - a working VMC smoke pipeline exists for the homogeneous scaffold
-- observable estimators for `g(r)`, `S(k)`, and ring-based `n(x)` exist
+- observable estimators for local energy, `g(r)`, `S(k)`, and ring-based `n(x)` exist
 - DMC is scaffolded, not production-ready
 - trapped open-line geometry, harmonic trapping, and benchmark failure-map workflows are the next implementation targets

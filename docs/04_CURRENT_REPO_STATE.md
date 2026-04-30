@@ -12,8 +12,10 @@ This repository is currently at a **homogeneous hard-rod VMC scaffold stage**. I
   files: `src/hrdmc/wavefunctions/jastrow.py`
 - initial homogeneous VMC workflow;
   files: `src/hrdmc/monte_carlo/vmc.py`, `experiments/00_smoke_vmc.py`, `experiments/configs/smoke.json`
-- homogeneous energy validation table over packing fractions;
+- homogeneous ring validation benchmark over particle numbers and packing fractions;
   files: `experiments/01_uniform_hard_rods_validation.py`
+- local-energy validation for the all-pair reduced hard-rod trial;
+  files: `src/hrdmc/wavefunctions/jastrow.py`, `src/hrdmc/estimators/local_energy.py`
 - observable implementations for `g(r)`, `S(k)`, and periodic density `n(x)`;
   files: `src/hrdmc/estimators/`
 - blocking analysis and bias/MSE utilities.
@@ -49,5 +51,8 @@ files: `tests/`
 
 The VMC run is currently an end-to-end integration check for the homogeneous scaffold.
 files: `experiments/00_smoke_vmc.py`, `experiments/configs/smoke.json`
+
+The homogeneous validation benchmark checks the exact all-pair trial local energy against finite-`N` ring references and can be run with `make validate-ring`.
+files: `experiments/01_uniform_hard_rods_validation.py`
 
 It should not be read as trapped-system validation or final DMC validation.

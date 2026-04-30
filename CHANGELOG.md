@@ -14,7 +14,9 @@
 - Added `src/hrdmc/theory/` for hard-rod EOS, chemical-potential inversion, finite ring energy, and LDA density/energy predictions.
 - Added package-level README files documenting owner boundaries.
 - Added a runnable homogeneous validation table experiment.
+- Added a homogeneous ring validation benchmark with all-pair trial local-energy checks and a `make validate-ring` target.
 - Added tests for hard-rod theory formulas and LDA normalization.
+- Added tests for the all-pair local-energy estimator against finite-`N` ring references.
 
 ### Removed
 
