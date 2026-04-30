@@ -24,8 +24,3 @@ def test_min_image_pair_count() -> None:
     assert d.shape == (5 * 4 // 2,)
     assert np.all(d >= 0)
 
-
-def test_exact_energy_positive() -> None:
-    system = HardRodSystem(n_particles=21, length=70.0, rod_length=0.5)
-    assert system.exact_energy_per_particle_finite() > 0
-    assert system.exact_energy_per_particle_thermodynamic() > 0

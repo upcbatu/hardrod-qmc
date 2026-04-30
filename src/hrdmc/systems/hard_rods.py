@@ -15,7 +15,7 @@ class HardRodSystem:
 
     Physical source
     ---------------
-    The hard-rod Hamiltonian and the excluded-length mapping used here are
+    The hard-rod Hamiltonian geometry and hard-core constraint used here are
     taken from the 1D hard-rod benchmark system studied in:
 
         Mazzanti, Astrakharchik, Boronat, Casulleras,
@@ -34,6 +34,7 @@ class HardRodSystem:
     Notes
     -----
     The prototype works in units hbar^2 / (2m) = 1.
+    Analytic excluded-volume mapping and EOS formulas live in `hrdmc.theory`.
     """
 
     n_particles: int
@@ -59,13 +60,6 @@ class HardRodSystem:
         # eta = rho * a is the natural dimensionless density for hard rods.
         # Used as the density axis in [Mazzanti2008HardRods].
         return self.density * self.rod_length
-
-    @property
-    def unexcluded_length(self) -> float:
-        # Hard rods in an ordered 1D sector map to point-like particles on the
-        # reduced length L' = L - N a. This is the excluded-volume mapping used
-        # for the analytic hard-rod ground-state benchmark in [Mazzanti2008HardRods].
-        return self.length - self.n_particles * self.rod_length
 
     def wrap(self, positions: FloatArray) -> FloatArray:
         return np.mod(np.asarray(positions, dtype=float), self.length)
@@ -119,35 +113,3 @@ class HardRodSystem:
         # Periodic boundary condition on a ring: k_n = 2*pi*n/L.
         # This is standard for the hard-rod ring geometry used in [Mazzanti2008HardRods].
         return 2.0 * np.pi * modes / self.length
-
-    def exact_energy_per_particle_finite(self) -> float:
-        """Finite-N hard-rod ground-state energy per particle.
-
-        Source equation
-        ---------------
-        Uses the hard-rod mapping to free-fermion-like quasi-momenta on the
-        reduced unexcluded length L' = L - N a. This is the analytic hard-rod
-        benchmark behind the exact finite-system energy in [Mazzanti2008HardRods].
-
-        In units hbar^2/(2m)=1:
-            E/N = (1/N) * sum_i k_i^2,
-            k_i = 2*pi*I_i / (L - N*a).
-        """
-        n = self.n_particles
-        quantum_numbers = np.arange(n, dtype=float) - (n - 1) / 2.0
-        k = 2.0 * np.pi * quantum_numbers / self.unexcluded_length
-        return float(np.sum(k**2) / n)
-
-    def exact_energy_per_particle_thermodynamic(self) -> float:
-        """Thermodynamic-limit hard-rod energy per particle.
-
-        Source equation
-        ---------------
-        Hard-rod equation of state from [Mazzanti2008HardRods]. In physical units:
-            E/N = (pi^2 * hbar^2 * rho^2) / (6*m*(1-rho*a)^2).
-        In repo units hbar^2/(2m)=1:
-            E/N = pi^2 * rho^2 / (3*(1-rho*a)^2).
-        """
-        rho = self.density
-        a = self.rod_length
-        return float(np.pi**2 * rho**2 / (3.0 * (1.0 - rho * a) ** 2))

@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from hrdmc.systems.hard_rods import HardRodSystem
+from hrdmc.theory import excluded_length
 
 
 FloatArray = NDArray[np.float64]
@@ -50,7 +51,11 @@ class HardRodJastrowTrial:
         free_gaps = gaps - self.system.rod_length
         if np.any(free_gaps <= 0):
             return float("-inf")
-        free_length = self.system.unexcluded_length
+        free_length = excluded_length(
+            self.system.n_particles,
+            self.system.length,
+            self.system.rod_length,
+        )
         # Prototype-only smooth positive amplitude on the simplex of free gaps.
         # This is an engineering scaffold, not a cited hard-rod equation.
         s = np.sin(np.pi * free_gaps / free_length)
@@ -60,7 +65,11 @@ class HardRodJastrowTrial:
 
     def _log_all_pairs_reduced(self, positions: FloatArray) -> float:
         x = self.system.sorted_positions(positions)
-        free_length = self.system.unexcluded_length
+        free_length = excluded_length(
+            self.system.n_particles,
+            self.system.length,
+            self.system.rod_length,
+        )
         # In one ordering sector, reduce rods to point-like coordinates:
         #     y_i = x_i - i*a,   L' = L - N*a.
         # The sine-product form is the periodic hard-rod / free-fermion-like

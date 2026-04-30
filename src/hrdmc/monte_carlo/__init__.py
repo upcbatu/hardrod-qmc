@@ -1,5 +1,4 @@
 from hrdmc.monte_carlo.dmc import (
-    AncestryBuffer,
     DMCResult,
     DiffusionMonteCarloEngine,
     WalkerSet,
@@ -9,7 +8,6 @@ from hrdmc.monte_carlo.dmc import (
 from hrdmc.monte_carlo.vmc import MetropolisVMC, VMCResult
 
 __all__ = [
-    "AncestryBuffer",
     "DMCResult",
     "DiffusionMonteCarloEngine",
     "MetropolisVMC",

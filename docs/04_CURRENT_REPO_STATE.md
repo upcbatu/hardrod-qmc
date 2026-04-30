@@ -1,21 +1,23 @@
 # Current Repository State
 
-This repository is currently at a **homogeneous hard-rod VMC scaffold stage**. It is not yet a trapped-system QMC benchmark code.
+This repository is currently at a **homogeneous hard-rod VMC scaffold stage**. It is not yet a complete trapped-system QMC benchmark code.
 
 ## Implemented
 
 - homogeneous one-dimensional hard-rod geometry on a periodic ring;
   files: `src/hrdmc/systems/hard_rods.py`
-- finite-`N` and thermodynamic homogeneous hard-rod reference energies;
-  files: `src/hrdmc/systems/hard_rods.py`
+- homogeneous hard-rod EOS, finite ring energy, chemical potential, chemical-potential inversion, and LDA support;
+  files: `src/hrdmc/theory/`
 - Jastrow-based trial-wavefunction implementation for the ring scaffold;
   files: `src/hrdmc/wavefunctions/jastrow.py`
 - initial homogeneous VMC workflow;
   files: `src/hrdmc/monte_carlo/vmc.py`, `experiments/00_smoke_vmc.py`, `experiments/configs/smoke.json`
+- homogeneous energy validation table over packing fractions;
+  files: `experiments/01_uniform_hard_rods_validation.py`
 - observable implementations for `g(r)`, `S(k)`, and periodic density `n(x)`;
   files: `src/hrdmc/estimators/`
-- blocking analysis, bias/MSE utilities, and estimator-family support code.
-  files: `src/hrdmc/analysis/blocking.py`, `src/hrdmc/analysis/metrics.py`, `src/hrdmc/analysis/cost_accuracy.py`, `src/hrdmc/analysis/estimator_families.py`
+- blocking analysis and bias/MSE utilities.
+  files: `src/hrdmc/analysis/blocking.py`, `src/hrdmc/analysis/metrics.py`
 
 ## Not Yet Implemented
 
@@ -27,27 +29,23 @@ This repository is currently at a **homogeneous hard-rod VMC scaffold stage**. I
   expected area: `src/hrdmc/systems/`
 - non-periodic density-profile estimation for trapped coordinates;
   expected area: `src/hrdmc/estimators/density.py`
-- homogeneous hard-rod equation-of-state utilities beyond the current energy methods;
-  expected area: `src/hrdmc/systems/` or `src/hrdmc/analysis/`
-- LDA implementation for trapped hard rods;
+- benchmark-tier labeling for trapped data;
+  expected area: `src/hrdmc/analysis/` or result metadata
+- QMC versus LDA error and failure-map analysis;
   expected area: `src/hrdmc/analysis/`
 - trapped VMC smoke experiment;
   expected area: `experiments/`
 - production DMC engine;
   file: `src/hrdmc/monte_carlo/dmc.py`
-- trapped QMC benchmark versus LDA comparison workflow;
+- trapped QMC benchmark versus LDA orchestration workflow;
   expected area: `experiments/`
 
-## Reframed Infrastructure
-
-The estimator-family code remains useful for labeling VMC, mixed DMC, extrapolated, and pure estimates. It is now support infrastructure. The main thesis comparison is a trapped benchmark of excluded-volume LDA accuracy and failures, not estimator cost-accuracy ranking.
-
-The current DMC layer is a result contract and data-structure seam. It does not yet produce production DMC trajectories.
+The current DMC layer is a result contract and data-structure seam. It does not yet produce production DMC trajectories, so DMC outputs should be treated as candidate references until validated.
 
 ## Validation Status
 
-The current tests are basic checks for ring geometry, estimator output shapes, and analysis utilities.
-files: `tests/test_hard_rods.py`, `tests/test_estimators.py`, `tests/test_blocking.py`
+The current tests cover ring geometry, estimator output shapes, theory formulas, LDA normalization, and analysis utilities.
+files: `tests/`
 
 The VMC run is currently an end-to-end integration check for the homogeneous scaffold.
 files: `experiments/00_smoke_vmc.py`, `experiments/configs/smoke.json`

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
@@ -16,16 +16,13 @@ class DMCResult:
 
     Source/rationale
     ----------------
-    The eventual engine should support DMC mixed estimators plus forward-walking
-    pure estimators. The pure-estimator methodology is from
-    [BoronatCasulleras1995PureEstimators] and [SarsaBoronatCasulleras2002QuadraticDMC].
-    The physical hard-rod benchmark is [Mazzanti2008HardRods].
+    The eventual engine should emit candidate ground-state benchmark data for
+    trapped hard rods. The physical hard-rod benchmark is [Mazzanti2008HardRods].
     """
 
     snapshots: FloatArray
     local_energies: FloatArray
     weights: FloatArray
-    ancestry: FloatArray | None = None
     metadata: dict | None = None
 
 
@@ -72,44 +69,6 @@ def systematic_resample(weights: FloatArray, rng: np.random.Generator) -> IntArr
     positions = (rng.random() + np.arange(n)) / n
     cumulative = np.cumsum(w)
     return np.searchsorted(cumulative, positions).astype(np.int64)
-
-
-@dataclass
-class AncestryBuffer:
-    """Rolling ancestry buffer for forward-walking pure estimators.
-
-    Source/rationale
-    ----------------
-    The pure-estimator plan is based on forward walking as developed for QMC
-    expectation values by Casulleras and Boronat [BoronatCasulleras1995PureEstimators]
-    and used in the quadratic DMC / pure-estimator implementation of Sarsa,
-    Boronat and Casulleras [SarsaBoronatCasulleras2002QuadraticDMC].
-
-    This object is only a data-structure seam. The final DMC engine should push
-    ancestry index arrays into this object at every branching step so that
-    descendant weights can be attached to older walker observables.
-    """
-
-    max_lag: int
-    _history: list[IntArray] = field(default_factory=list)
-
-    def push(self, parent_indices: IntArray) -> None:
-        parent_indices = np.asarray(parent_indices, dtype=np.int64)
-        self._history.append(parent_indices)
-        if len(self._history) > self.max_lag:
-            self._history.pop(0)
-
-    def ready(self) -> bool:
-        return len(self._history) == self.max_lag
-
-    def compose_ancestry(self) -> IntArray:
-        if not self._history:
-            raise ValueError("ancestry history is empty")
-        ancestry = np.arange(len(self._history[-1]), dtype=np.int64)
-        for parents in reversed(self._history):
-            ancestry = parents[ancestry]
-        return ancestry
-
 
 class DiffusionMonteCarloEngine:
     """Explicit seam for the final DMC engine.

@@ -22,11 +22,12 @@ The homogeneous hard-rod system on a ring is kept as a controlled QMC validation
 ## Code layout
 
 ```text
-src/hrdmc/systems/        physical model and benchmark formulas
+src/hrdmc/systems/        physical geometry, constraints, and potentials
 src/hrdmc/wavefunctions/  trial states
 src/hrdmc/monte_carlo/    VMC and DMC
 src/hrdmc/estimators/     observables from coordinate data
-src/hrdmc/analysis/       uncertainty, comparison, and support metrics
+src/hrdmc/theory/         homogeneous EOS, excluded-volume mapping, LDA
+src/hrdmc/analysis/       errors, uncertainty, and failure maps
 src/hrdmc/io/             JSON / NPZ outputs
 src/hrdmc/plotting/       figures
 experiments/              runnable entrypoints
@@ -35,8 +36,8 @@ experiments/              runnable entrypoints
 ## Current status
 
 - homogeneous periodic hard-rod geometry is implemented
-- exact homogeneous ring reference energies are implemented
+- exact homogeneous ring reference energies and hard-rod EOS utilities are implemented in `theory/`
 - a working VMC smoke pipeline exists for the homogeneous scaffold
 - observable estimators for `g(r)`, `S(k)`, and ring-based `n(x)` exist
 - DMC is scaffolded, not production-ready
-- trapped open-line geometry, harmonic trapping, and LDA references are the next implementation targets
+- trapped open-line geometry, harmonic trapping, and benchmark failure-map workflows are the next implementation targets

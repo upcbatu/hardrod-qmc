@@ -16,7 +16,7 @@ The trapped problem is more relevant as a many-body target because real quasi-on
 
 The scope also should not claim that trapped hard rods are being solved for the first time. There are already strong trapped hard-sphere/hard-rod wavefunction results in the literature [4]. The thesis contribution is a controlled QMC and benchmark-data failure map for excluded-volume LDA, especially where finite particle number, trap-edge behavior, density profiles, and correlation observables can expose the limits of a local approximation.
 
-The former estimator-cost benchmark remains useful as infrastructure, especially for separating VMC and DMC data products and for tracking uncertainty. It is no longer the main thesis objective. The main scientific comparison is now trapped QMC benchmarks versus excluded-volume LDA, with DMC as the target production method and VMC as a baseline and diagnostic stage.
+The main scientific comparison is trapped QMC benchmarks versus excluded-volume LDA, with DMC as the target production method and VMC as a baseline and diagnostic stage.
 
 ## 2. Objective
 
@@ -104,8 +104,6 @@ choose N, a, trap strength
 
 The DMC implementation remains the target production method because the final trapped comparison should target ground-state observables. VMC provides smoke tests, trial-state diagnostics, and baseline data; it should not be presented as final trapped-system validation unless DMC or other benchmark data are unavailable.
 
-The pure-estimator and forward-walking reference [5] is method background if DMC estimator support becomes necessary. It does not define the central thesis contribution.
-
 ## 5. Comparison Criteria
 
 For homogeneous validation, the primary criteria are agreement with exact or known reference quantities:
@@ -131,7 +129,7 @@ $$
 
 The comparison should explicitly separate bulk agreement from trap-edge failure. Finite-`N` dependence is part of the target result, because LDA is expected to improve in larger, smoother systems but can fail for small or moderately sized trapped gases. Correlation observables are also important because an LDA may describe density and energy more reliably than nonlocal quantities.
 
-Uncertainty will be estimated with blocking or repeated seeds where appropriate. Runtime and estimator-family differences may be reported as supporting diagnostics, but they are not the main thesis endpoint.
+Uncertainty will be estimated with blocking or repeated seeds where appropriate. Runtime may be reported as run metadata, but it is not the main thesis endpoint.
 
 ## 6. Expected Contribution
 
@@ -149,9 +147,9 @@ Reframe the repository around trapped hard rods, then complete homogeneous ring 
 
 Add open-line hard-rod geometry, harmonic trapping, trapped initial states, and non-periodic density-profile estimation.
 
-### Stage III. LDA implementation
+### Stage III. Theory-layer LDA implementation
 
-Implement the hard-rod equation of state, chemical-potential inversion, trap normalization, and LDA observables.
+Implement the hard-rod equation of state, chemical-potential inversion, trap normalization, and LDA predictions in `theory/`.
 
 ### Stage IV. QMC benchmarks versus LDA comparison
 
@@ -170,5 +168,3 @@ Only after the trapped hard-rod comparison is complete, test whether the exclude
 [3] G. E. Astrakharchik, "Local density approximation for a perturbative equation of state," *Physical Review A* **72**, 063620 (2005). DOI: 10.1103/PhysRevA.72.063620.
 
 [4] M. D. Girardeau and G. E. Astrakharchik, "Wave functions of the super-Tonks-Girardeau gas and the trapped one-dimensional hard-sphere Bose gas," *Physical Review A* **81**, 061601(R) (2010). DOI: 10.1103/PhysRevA.81.061601.
-
-[5] J. Boronat and J. Casulleras, "Unbiased estimators in quantum Monte Carlo methods: Application to liquid helium," *Physical Review B* **52**, 3654-3661 (1995). DOI: 10.1103/PhysRevB.52.3654.

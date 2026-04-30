@@ -2,36 +2,31 @@
 
 This repository is organized around a simple principle:
 
-> physical definitions, trial states, Monte Carlo sampling, observables, and analysis references are kept separate, while experiment scripts combine them into concrete runs.
+> physical systems, trial states, Monte Carlo sampling, coordinate observables, theory approximations, and comparison analysis are separate owners.
 
-The revised thesis direction makes this separation more important. The homogeneous hard-rod ring is a validation benchmark, while the trapped hard-rod gas is the main physics target. The same codebase must support both without mixing periodic-ring assumptions into trapped observables.
+The revised thesis direction needs this boundary. The homogeneous hard-rod ring is a validation benchmark, the trapped hard-rod gas is the main sampled many-body target, the excluded-volume LDA is a theory-layer approximation, and the final thesis product is an analysis-layer accuracy and failure map.
 
-## 1. Why the Repository Is Split Into Layers
+## 1. Owner Boundaries
 
 ### `systems/`
 
 Purpose:
-define physical systems and reference formulas.
+define physical geometry and Hamiltonian ingredients.
 
-This module currently owns:
+This module owns only:
 
-- homogeneous one-dimensional hard rods on a periodic ring;
-- periodic boundary conditions;
-- hard-core exclusion;
-- derived quantities such as density, packing fraction, and excluded length;
-- exact homogeneous reference energies.
+- ring geometry;
+- open-line trapped geometry once added;
+- hard-core constraints;
+- boundary conventions;
+- external potentials.
 
-It still needs to own:
-
-- open-line trapped hard rods;
-- harmonic trap potential support;
-- trapped initial configurations;
-- homogeneous equation-of-state helpers for LDA.
+It does not own the homogeneous equation of state, chemical potential, excluded-volume LDA, or benchmark error logic.
 
 ### `wavefunctions/`
 
 Purpose:
-define the trial state `Psi_T` used by the Monte Carlo layer.
+define trial states used by the Monte Carlo layer.
 
 This module owns:
 
@@ -45,97 +40,122 @@ The current trial forms are ring-oriented. Trapped calculations may need additio
 ### `monte_carlo/`
 
 Purpose:
-generate coordinate and energy data from a physical system and a trial state.
+generate sampled data and define result contracts.
 
 This module owns:
 
-- `vmc.py` for the current Metropolis VMC implementation;
-- `dmc.py` for the DMC result contract, walker data structures, population-control support, and optional forward-walking support.
+- VMC engines;
+- DMC engines when implemented;
+- walker/result contracts;
+- population-control support;
 
-For the revised thesis, VMC is a smoke and diagnostic path. DMC is the intended production path for trapped ground-state observables.
+DMC is the target production method, but the architecture must not assume DMC is already a trusted reference. Until it is validated, trapped results should be labeled by benchmark tier: VMC diagnostic, DMC candidate reference, or external/group reference if available.
 
 ### `estimators/`
 
 Purpose:
 compute observables from sampled coordinates.
 
-This module currently owns:
+This module owns:
 
 - pair distribution function `g(r)`;
 - static structure factor `S(k)`;
-- periodic density profile `n(x)`.
+- density profile `n(x)`;
+- future trapped observables that are direct functions of sampled coordinates.
 
-It still needs to separate periodic and open-line density conventions. Trapped density estimation must not wrap coordinates onto a ring.
+It should not know how LDA is solved. Trapped density estimation must also avoid periodic wrapping.
+
+### `theory/`
+
+Purpose:
+own analytic and semi-analytic approximations.
+
+This module owns:
+
+- homogeneous hard-rod EOS;
+- chemical potential;
+- excluded-volume mapping;
+- chemical-potential inversion;
+- LDA normalization;
+- LDA density and energy predictions.
+
+The theory layer produces reference predictions. It does not compare them against sampled data.
 
 ### `analysis/`
 
 Purpose:
-turn raw observables into scientific comparisons.
+compare sampled observables against references.
 
-This module currently owns:
+This module owns:
 
-- blocking-aware uncertainty estimates;
-- bias and variance bookkeeping;
-- mean-squared error utilities;
-- estimator-family labels and combinations.
+- QMC/DMC versus LDA errors;
+- bulk-versus-edge diagnostics;
+- finite-`N` trends;
+- uncertainty summaries;
+- failure maps;
+- compact run summaries.
 
-It still needs to own or host:
+It should not solve the LDA normalization or own EOS formulas.
 
-- homogeneous hard-rod chemical potential;
-- chemical-potential inversion;
-- trapped LDA normalization;
-- QMC benchmark versus LDA comparison summaries.
+### `experiments/`
 
-The estimator-family code remains useful support infrastructure, but it no longer defines the thesis endpoint.
+Purpose:
+orchestrate concrete runs.
 
-## 2. Why This Structure Fits the Revised Thesis
+Experiments combine systems, wavefunctions, Monte Carlo, estimators, theory predictions, analysis summaries, IO, and plots. They should not own scientific equations.
 
-The thesis has two different physical roles:
+### `plotting/`
 
-- homogeneous hard rods on a ring validate the numerical machinery;
-- trapped hard rods provide the main benchmark of excluded-volume LDA accuracy and failures.
+Purpose:
+generate figures only.
 
-Separating systems, estimators, and analysis prevents a ring-specific assumption from leaking into the trapped workflow. For example, `S(k)` on a ring and `n(x)` in a trap have different coordinate conventions, even if both are computed from sampled coordinates.
+Plotting should render outputs from experiments and analysis without owning physics or comparison logic.
 
-The LDA comparison also benefits from separation:
+## 2. Main Thesis Flow
 
-- `systems/` provides the homogeneous equation of state;
-- `analysis/` evaluates the LDA normalization and comparison metrics;
-- `estimators/` computes benchmark observables;
-- `experiments/` assembles parameter sweeps.
+```text
+ring validation
+  -> validates geometry, trial state, MC, energy references
+
+trapped system
+  -> main sampled many-body target
+
+excluded-volume LDA
+  -> theory-layer approximation built from homogeneous EOS
+
+QMC/DMC vs LDA
+  -> analysis-layer benchmark and failure map
+
+Lieb-Liniger probe
+  -> optional isolated extension, not part of the main trapped-hard-rod path
+```
+
+The operational flow is:
+
+```text
+homogeneous validation -> trapped benchmark -> theory/LDA prediction -> analysis/failure map
+```
 
 ## 3. Current Implementation Status
 
 At present, the repository contains:
 
-- homogeneous ring hard-rod geometry;
-- exact homogeneous energy references;
+- homogeneous ring hard-rod geometry in `systems/`;
+- homogeneous EOS, finite ring energy, chemical-potential inversion, and LDA support in `theory/`;
 - a Jastrow-like VMC implementation;
 - observable estimators for `g(r)`, `S(k)`, and ring-based `n(x)`;
 - blocking and support metric utilities;
 - an initial homogeneous VMC smoke experiment;
 - an initial DMC result contract and support structures.
 
-The trapped system, harmonic trap, LDA implementation, and production DMC engine are not yet complete.
+The trapped system, harmonic trap, trapped density estimator, benchmark-tier labeling, and production DMC engine are not yet complete.
 
-## 4. Planned DMC Integration
-
-The final DMC implementation is expected to plug into `src/hrdmc/monte_carlo/dmc.py` and produce a result object containing:
-
-- coordinate snapshots;
-- local energies;
-- weights;
-- run metadata;
-- ancestry information only when pure-estimator support is needed.
-
-Once such a result exists, the trapped observable layer should compute density profiles, energies, and cloud-size diagnostics from DMC data without depending on DMC internals.
-
-## 5. Summary
+## 4. Summary
 
 The repository should evolve toward this progression:
 
 ```text
-homogeneous validation -> trapped system -> benchmark observables -> excluded-volume LDA -> failure map
+systems geometry -> theory predictions -> sampled observables -> analysis failure map
 ```
 
-Estimator-family and cost-analysis utilities remain available, but the main thesis comparison is trapped benchmark observables against the excluded-volume LDA reference.
+This keeps the excluded-volume LDA as a scientific approximation layer, not an analysis helper, and prevents `systems/` from accumulating EOS ownership.

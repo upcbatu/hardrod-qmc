@@ -16,9 +16,9 @@ flowchart TD
     B --> C["Trapped hard-rod setup<br/>N, a, harmonic trap"]
     C --> D["Generate QMC data<br/>DMC target, VMC baseline"]
     D --> E["Estimate trapped observables<br/>n(x), radius, energy"]
-    B --> F["Build homogeneous EOS<br/>excluded-volume equation of state"]
-    F --> G["Evaluate LDA in trap<br/>mu0 = V(x) + mu(n)"]
-    G --> H["Benchmark LDA accuracy<br/>density, radius, energy, correlations"]
+    B --> F["theory/<br/>homogeneous EOS and excluded-volume LDA"]
+    F --> G["LDA prediction<br/>mu0 = V(x) + mu(n)"]
+    G --> H["analysis/<br/>failure map and errors"]
     E --> H
 ```
 
@@ -72,13 +72,10 @@ The sampling layer should emit:
 - local energies when available;
 - weights when available;
 - runtime and configuration metadata;
-- ancestry only if pure-estimator support is needed later.
 
-Estimator-family machinery remains secondary infrastructure. It can support the comparison, but the thesis endpoint is not estimator ranking.
+## 6. Phase 4: Theory-Layer Excluded-Volume LDA
 
-## 6. Phase 4: Excluded-Volume LDA
-
-The LDA reference is evaluated from the homogeneous hard-rod equation of state:
+The `theory/` layer evaluates the LDA reference from the homogeneous hard-rod equation of state:
 
 $$
 e_{\mathrm{HR}}(\rho)
@@ -115,7 +112,7 @@ $$
 
 ## 7. Phase 5: Trapped QMC Benchmarks of LDA
 
-The main comparison is direct and observable-level:
+The `analysis/` layer compares sampled observables against theory predictions:
 
 ```text
 n_benchmark(x) versus n_LDA(x)
@@ -128,7 +125,7 @@ The parameter sweep should vary only the quantities needed to answer the thesis 
 - particle number;
 - rod length or packing scale;
 - trap strength;
-- DMC time step and walker count as numerical controls.
+- DMC time step and walker count as numerical controls once DMC exists.
 
 ## 8. Optional Extension
 

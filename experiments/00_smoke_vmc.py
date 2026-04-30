@@ -14,6 +14,11 @@ from hrdmc.io.schema import to_jsonable
 from hrdmc.monte_carlo.vmc import MetropolisVMC
 from hrdmc.plotting import plot_pair_distribution, plot_structure_factor
 from hrdmc.systems.hard_rods import HardRodSystem
+from hrdmc.theory import (
+    excluded_length,
+    hard_rod_energy_per_particle,
+    hard_rod_finite_ring_energy_per_particle,
+)
 from hrdmc.wavefunctions.jastrow import HardRodJastrowTrial
 
 
@@ -36,8 +41,13 @@ def main() -> None:
 
     g = estimate_pair_distribution(result.snapshots, system, n_bins=80)
     s = estimate_static_structure_factor(result.snapshots, system, n_modes=24)
-    e_finite = system.exact_energy_per_particle_finite()
-    e_thermo = system.exact_energy_per_particle_thermodynamic()
+    e_finite = hard_rod_finite_ring_energy_per_particle(
+        system.n_particles,
+        system.length,
+        system.rod_length,
+    )
+    e_thermo = hard_rod_energy_per_particle(system.density, system.rod_length)
+    reduced_length = excluded_length(system.n_particles, system.length, system.rod_length)
 
     # Smoke-level scalar series: first mode of S(k). This is not a final thesis error bar.
     block = blocking_standard_error(s.s_k)
@@ -64,7 +74,7 @@ def main() -> None:
             "density": system.density,
             "rod_length": system.rod_length,
             "packing_fraction": system.packing_fraction,
-            "unexcluded_length": system.unexcluded_length,
+            "excluded_length": reduced_length,
         },
         "vmc": result.metadata,
         "acceptance_rate": result.acceptance_rate,
