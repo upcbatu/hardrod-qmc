@@ -16,7 +16,7 @@ define physical geometry and Hamiltonian ingredients.
 This module owns only:
 
 - ring geometry;
-- open-line trapped geometry once added;
+- open-line trapped geometry;
 - hard-core constraints;
 - boundary conventions;
 - external potentials.
@@ -190,7 +190,7 @@ At present, the repository contains:
 - an initial homogeneous VMC smoke experiment;
 - an initial DMC result contract and support structures.
 
-The trapped system, harmonic trap, trapped density estimator, benchmark-tier labeling, and production DMC engine are not yet complete.
+The trapped system now has an initial VMC diagnostic path. Benchmark-tier expansion, systematic failure-map workflows, and the production DMC engine are not yet complete.
 
 ## 4. Summary
 

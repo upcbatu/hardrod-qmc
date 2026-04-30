@@ -17,6 +17,8 @@
 - Added a homogeneous ring validation benchmark with all-pair trial local-energy checks and a `make validate-ring` target.
 - Added tests for hard-rod theory formulas and LDA normalization.
 - Added tests for the all-pair local-energy estimator against finite-`N` ring references.
+- Added `docs/validation/` for thesis-facing validation notes.
+- Added open-line trapped hard-rod geometry, harmonic trap support, trapped density diagnostics, and a trapped VMC smoke entrypoint.
 
 ### Removed
 

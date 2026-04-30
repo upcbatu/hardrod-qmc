@@ -46,13 +46,15 @@ The validation outputs are:
 
 The main system is a one-dimensional hard-rod gas in an external trap. The immediate target is a harmonic potential.
 
-The trapped model needs:
+The trapped model requires:
 
 - open-line coordinates rather than periodic wrapping;
 - nearest-neighbor exclusion on the line;
 - a harmonic external potential;
 - valid trapped initial configurations;
 - observables that do not assume periodic boundary conditions.
+
+The repository now has initial implementations for these items sufficient for a VMC diagnostic smoke run. They still need systematic benchmark-tier expansion before thesis-level conclusions.
 
 The primary trapped observables are:
 

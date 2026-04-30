@@ -7,3 +7,8 @@
 - **July 2026**: implement the excluded-volume LDA reference and obtain first trapped QMC benchmark comparisons.
 - **August 2026**: complete trapped parameter sweeps, finalize figures and tables, and deliver the written thesis.
 - **September 2026**: prepare the presentation and defend the thesis.
+
+## Tracking Files
+
+- [validation/README.md](validation/README.md)
+  Summarizes benchmark status, interpretation, and remaining validation checks.

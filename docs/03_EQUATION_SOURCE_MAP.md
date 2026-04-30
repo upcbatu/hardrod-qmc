@@ -28,17 +28,20 @@ The proposal should cite only the thesis-backbone items. The method-background a
 | Repository location | Physics / method item | Scientific basis | Implementation note |
 |---|---|---|---|
 | [src/hrdmc/systems/hard_rods.py](src/hrdmc/systems/hard_rods.py) | Homogeneous one-dimensional hard rods on a periodic ring, including hard-core exclusion and boundary conventions | `[Mazzanti2008HardRods]` | Geometry and constraints only; EOS and LDA ownership lives in `theory/`. |
+| [src/hrdmc/systems/open_line.py](src/hrdmc/systems/open_line.py) | Open-line hard-rod geometry and non-periodic hard-core constraint | Trapped hard-rod setup; contextual anchor `[GirardeauAstrakharchik2010TrappedHardSphere]` | Geometry and constraints only; no trap potential, EOS, LDA, or comparison logic. |
+| [src/hrdmc/systems/external_potential.py](src/hrdmc/systems/external_potential.py) | Harmonic trap `V(x)=0.5 omega^2 (x-x0)^2` | Standard trapped-gas model; trapped QMC precedent `[AstrakharchikGiorgini2002TrappedCrossover]` | Potential owner only; systems layer does not solve LDA or estimate observables. |
 | [src/hrdmc/theory/hard_rods.py](src/hrdmc/theory/hard_rods.py) | Excluded-volume mapping, finite-`N` ring energy, thermodynamic EOS, energy density, chemical potential, and chemical-potential inversion | `[Mazzanti2008HardRods]`, Eq. (4), and the excluded-volume mapping | Theory-layer homogeneous reference and LDA input. |
 | [src/hrdmc/theory/lda.py](src/hrdmc/theory/lda.py) | LDA normalization, trapped density prediction, and LDA total-energy prediction | `[Astrakharchik2005LDA]` for LDA precedent; hard-rod EOS from `[Mazzanti2008HardRods]` | Theory-layer approximation, not analysis comparison logic. |
 | [src/hrdmc/wavefunctions/jastrow.py](src/hrdmc/wavefunctions/jastrow.py) | Reduced-coordinate all-pair hard-rod trial structure with `y_i = x_i - i a` and `L' = L - N a` | `[Mazzanti2008HardRods]` | Ring-oriented trial structure for homogeneous validation; reduced length comes from `theory/`. |
 | [src/hrdmc/wavefunctions/jastrow.py](src/hrdmc/wavefunctions/jastrow.py#L48-L59) | Nearest-neighbor Jastrow-like gap trial | Repository trial design informed by the same hard-rod constraint | Current smoke-test default; not a final trapped trial form. |
+| [src/hrdmc/wavefunctions/trapped.py](src/hrdmc/wavefunctions/trapped.py) | Gaussian trap factor times hard-rod contact factor | Diagnostic VMC trial design; not a claimed exact trapped wavefunction | Used for trapped smoke diagnostics before DMC or external references are trusted. |
 | [src/hrdmc/monte_carlo/vmc.py](src/hrdmc/monte_carlo/vmc.py#L27-L94) | Metropolis VMC with burn-in, thinning, and acceptance/rejection on `|Psi_T|^2` | Standard Variational Monte Carlo methodology | Current homogeneous smoke workflow. |
 | [src/hrdmc/monte_carlo/dmc.py](src/hrdmc/monte_carlo/dmc.py) | DMC result contract, walker population support, and resampling support | Standard walker Monte Carlo conventions | Contract layer only; production DMC is not implemented. |
 | [src/hrdmc/estimators/pair_distribution.py](src/hrdmc/estimators/pair_distribution.py#L22-L69) | Pair distribution function `g(r)` estimated from coordinate snapshots | `[Mazzanti2008HardRods]` for the observable; repository histogram normalization for implementation | Mainly useful for homogeneous validation unless adapted for trapped local analysis. |
 | [src/hrdmc/estimators/structure_factor.py](src/hrdmc/estimators/structure_factor.py#L21-L54) | Static structure factor `S(k) = <|rho_k|^2>/N`, with `rho_k = sum_j exp(i k x_j)` | `[Mazzanti2008HardRods]` | Ring observable for homogeneous validation. |
-| [src/hrdmc/estimators/density.py](src/hrdmc/estimators/density.py#L21-L34) | Periodic density profile estimator | Repository implementation convention | Currently wraps onto a ring; trapped density requires an open-line variant. |
+| [src/hrdmc/estimators/density.py](src/hrdmc/estimators/density.py) | Periodic and open-line density profile estimators | Repository histogram normalization convention | Periodic density wraps ring coordinates; trapped density uses raw open-line coordinates on a chosen grid. |
 | [src/hrdmc/analysis/blocking.py](src/hrdmc/analysis/blocking.py#L25-L64) | Blocking analysis for correlated Monte Carlo error bars | `[FlyvbjergPetersen1989Blocking]` | Used for QMC uncertainty estimates. |
-| [src/hrdmc/analysis/metrics.py](src/hrdmc/analysis/metrics.py) | Bias and MSE helpers | Standard statistical definitions | Small support utilities for comparison code. |
+| [src/hrdmc/analysis/metrics.py](src/hrdmc/analysis/metrics.py) | Bias, MSE, and density L2 error helpers | Standard statistical definitions | Small support utilities for comparison code. |
 
 ## LDA Benchmark Formulas
 
@@ -102,9 +105,11 @@ The literature-facing homogeneous validation code is concentrated in:
 - `wavefunctions/`;
 - `estimators/`.
 
-The trapped thesis path still needs new implementation in:
+The trapped thesis path now has an initial diagnostic route through:
 
 - `systems/` for open-line hard rods and harmonic trapping;
 - `estimators/` for non-periodic density profiles;
 - `theory/` for homogeneous EOS and excluded-volume LDA predictions;
-- `analysis/` for benchmark-versus-LDA error summaries and failure maps.
+- `analysis/` for first density-error diagnostics.
+
+It still needs parameter sweeps, stronger benchmark-tier handling, production DMC validation, and thesis-level failure-map analysis.

@@ -26,6 +26,25 @@ class ZeroPotential:
 
 
 @dataclass(frozen=True)
+class HarmonicTrap:
+    """Harmonic trap V(x)=0.5*omega^2*(x-center)^2."""
+
+    omega: float
+    center: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.omega <= 0:
+            raise ValueError("omega must be positive")
+
+    def values(self, positions: FloatArray) -> FloatArray:
+        x = np.asarray(positions, dtype=float)
+        return 0.5 * self.omega**2 * (x - self.center) ** 2
+
+    def total(self, positions: FloatArray) -> float:
+        return float(np.sum(self.values(positions)))
+
+
+@dataclass(frozen=True)
 class CosinePotential:
     """Weak periodic external potential V0 cos(2 pi x / wavelength)."""
 

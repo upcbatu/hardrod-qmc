@@ -64,6 +64,16 @@ class HardRodSystem:
     def wrap(self, positions: FloatArray) -> FloatArray:
         return np.mod(np.asarray(positions, dtype=float), self.length)
 
+    def propose_single_particle(
+        self,
+        positions: FloatArray,
+        particle_index: int,
+        displacement: float,
+    ) -> FloatArray:
+        proposal = np.asarray(positions, dtype=float).copy()
+        proposal[particle_index] = (proposal[particle_index] + displacement) % self.length
+        return proposal
+
     def sorted_positions(self, positions: FloatArray) -> FloatArray:
         return np.sort(self.wrap(positions))
 

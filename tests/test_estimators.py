@@ -4,6 +4,7 @@ import numpy as np
 
 from hrdmc.estimators import (
     estimate_local_energy,
+    estimate_open_line_density_profile,
     estimate_pair_distribution,
     estimate_static_structure_factor,
 )
@@ -42,3 +43,15 @@ def test_all_pair_local_energy_matches_finite_ring_reference() -> None:
     )
     np.testing.assert_allclose(result.values, exact_total, rtol=1e-12, atol=1e-12)
     np.testing.assert_allclose(result.mean, exact_total, rtol=1e-12, atol=1e-12)
+
+
+def test_open_line_density_profile_integrates_particle_count() -> None:
+    snapshots = np.array(
+        [
+            [-1.0, 0.0, 1.0],
+            [-1.0, 0.0, 1.0],
+        ]
+    )
+    result = estimate_open_line_density_profile(snapshots, x_min=-2.0, x_max=2.0, n_bins=40)
+    integral = np.sum(result.n_x * np.diff(result.bin_edges))
+    np.testing.assert_allclose(integral, 3.0)

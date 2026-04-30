@@ -2,15 +2,30 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
 
-from hrdmc.systems.hard_rods import HardRodSystem
-from hrdmc.wavefunctions.jastrow import HardRodJastrowTrial
-
 
 FloatArray = NDArray[np.float64]
+
+
+class MetropolisSystem(Protocol):
+    n_particles: int
+
+    def initial_lattice(self, jitter: float = 0.0, seed: int | None = None) -> FloatArray: ...
+
+    def propose_single_particle(
+        self,
+        positions: FloatArray,
+        particle_index: int,
+        displacement: float,
+    ) -> FloatArray: ...
+
+
+class TrialWavefunction(Protocol):
+    def log_value(self, positions: FloatArray) -> float: ...
 
 
 @dataclass(frozen=True)
@@ -29,8 +44,8 @@ class MetropolisVMC:
 
     def __init__(
         self,
-        system: HardRodSystem,
-        trial: HardRodJastrowTrial,
+        system: MetropolisSystem,
+        trial: TrialWavefunction,
         step_size: float,
         seed: int = 1234,
     ) -> None:
@@ -60,9 +75,9 @@ class MetropolisVMC:
         accepted = 0
 
         for step in range(n_steps):
-            proposal = current.copy()
             idx = int(self.rng.integers(0, self.system.n_particles))
-            proposal[idx] = (proposal[idx] + self.rng.uniform(-self.step_size, self.step_size)) % self.system.length
+            displacement = float(self.rng.uniform(-self.step_size, self.step_size))
+            proposal = self.system.propose_single_particle(current, idx, displacement)
 
             proposal_log = self.trial.log_value(proposal)
             if np.isfinite(proposal_log):

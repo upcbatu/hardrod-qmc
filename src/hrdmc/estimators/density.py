@@ -32,3 +32,27 @@ def estimate_density_profile(
     n_x = counts / (snapshots.shape[0] * dx)
     centers = 0.5 * (edges[:-1] + edges[1:])
     return DensityProfileResult(x=centers, n_x=n_x, bin_edges=edges)
+
+
+def estimate_open_line_density_profile(
+    snapshots: FloatArray,
+    x_min: float,
+    x_max: float,
+    n_bins: int = 100,
+) -> DensityProfileResult:
+    snapshots = np.asarray(snapshots, dtype=float)
+    if snapshots.ndim != 2:
+        raise ValueError("snapshots must have shape (n_samples, n_particles)")
+    if snapshots.shape[0] == 0:
+        raise ValueError("at least one snapshot is required")
+    if x_max <= x_min:
+        raise ValueError("x_max must be larger than x_min")
+    if n_bins <= 0:
+        raise ValueError("n_bins must be positive")
+
+    positions = snapshots.reshape(-1)
+    counts, edges = np.histogram(positions, bins=n_bins, range=(x_min, x_max))
+    dx = edges[1] - edges[0]
+    n_x = counts / (snapshots.shape[0] * dx)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    return DensityProfileResult(x=centers, n_x=n_x, bin_edges=edges)

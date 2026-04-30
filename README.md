@@ -18,6 +18,8 @@ The homogeneous hard-rod system on a ring is kept as a controlled QMC validation
   What is already implemented, what the tests cover, and what is still missing.
 - [docs/05_TIMELINE_AND_NAVIGATION.md](docs/05_TIMELINE_AND_NAVIGATION.md)
   Tentative calendar and navigation note.
+- [docs/validation/README.md](docs/validation/README.md)
+  Validation notes for benchmark status, interpretation, and remaining checks.
 
 ## Code layout
 
@@ -44,5 +46,6 @@ notebooks/                inspection and figure drafting
 - the homogeneous ring validation benchmark compares all-pair trial local energy against exact finite-`N` references
 - a working VMC smoke pipeline exists for the homogeneous scaffold
 - observable estimators for local energy, `g(r)`, `S(k)`, and ring-based `n(x)` exist
+- an initial trapped VMC diagnostic path exists for open-line hard rods, harmonic trapping, non-periodic density, and LDA density comparison
 - DMC is scaffolded, not production-ready
-- trapped open-line geometry, harmonic trapping, and benchmark failure-map workflows are the next implementation targets
+- trapped benchmark-tier expansion, DMC validation, and failure-map workflows are the next implementation targets

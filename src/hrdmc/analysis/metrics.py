@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import numpy as np
+from numpy.typing import NDArray
+
+
+FloatArray = NDArray[np.float64]
+
 
 def bias(estimate: float, reference: float) -> float:
     return float(estimate - reference)
@@ -9,3 +15,18 @@ def mean_squared_error(bias_value: float, variance: float) -> float:
     if variance < 0:
         raise ValueError("variance must be non-negative")
     return float(bias_value**2 + variance)
+
+
+def density_l2_error(x: FloatArray, estimate: FloatArray, reference: FloatArray) -> float:
+    x = np.asarray(x, dtype=float)
+    estimate = np.asarray(estimate, dtype=float)
+    reference = np.asarray(reference, dtype=float)
+    if x.ndim != 1:
+        raise ValueError("x must be one-dimensional")
+    if estimate.shape != x.shape or reference.shape != x.shape:
+        raise ValueError("density arrays must match x shape")
+    if x.size < 2:
+        raise ValueError("x must contain at least two points")
+    if not np.all(np.diff(x) > 0):
+        raise ValueError("x must be strictly increasing")
+    return float(np.trapezoid((estimate - reference) ** 2, x))
