@@ -4,7 +4,7 @@ import argparse
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Hard-rod DMC thesis scaffold")
+    parser = argparse.ArgumentParser(description="Trapped hard-rod QMC thesis scaffold")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("version", help="Print package version")
     return parser

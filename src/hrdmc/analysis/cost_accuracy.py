@@ -7,19 +7,18 @@ from hrdmc.analysis.metrics import cost_score, mean_squared_error
 
 @dataclass(frozen=True)
 class EstimatorScore:
-    """Cost-accuracy score for comparing estimators.
+    """Support score for estimator diagnostics.
 
     Source/rationale
     ----------------
-    This is the thesis benchmarking metric, not a direct equation copied from a
-    hard-rod paper. It combines the standard statistical decomposition
+    This is support infrastructure, not the main thesis objective. It combines
+    the standard statistical decomposition
 
         MSE = bias^2 + variance
 
-    with a CPU-time multiplier to compare mixed, extrapolated, and pure DMC
-    estimators at fixed observable/accuracy targets. The estimator families are
-    motivated by the DMC/pure-estimator papers
-    [BoronatCasulleras1995PureEstimators] and [Sarsa et al. 2002QuadraticDMC].
+    with a CPU-time multiplier. The estimator families are motivated by the
+    DMC/pure-estimator papers
+    [BoronatCasulleras1995PureEstimators] and [SarsaBoronatCasulleras2002QuadraticDMC].
     """
 
     observable: str

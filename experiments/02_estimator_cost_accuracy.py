@@ -1,6 +1,10 @@
-"""Planned estimator cost-accuracy benchmark.
+"""Secondary estimator-diagnostic entrypoint.
 
-Final target:
+This is no longer the main thesis workflow. The trapped hard-rod versus LDA
+comparison owns the main scientific path. This script remains reserved for
+support diagnostics if estimator-family comparisons become useful.
+
+Potential diagnostics:
 - VMC baseline
 - mixed DMC
 - extrapolated estimator
@@ -13,7 +17,7 @@ from __future__ import annotations
 
 def main() -> None:
     raise NotImplementedError(
-        "Requires DMCResult production. Keeping this script as the final benchmark entrypoint."
+        "Requires DMCResult production. This is secondary support infrastructure."
     )
 
 

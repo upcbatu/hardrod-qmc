@@ -18,7 +18,7 @@ class HardRodJastrowTrial:
     Source/rationale
     ----------------
     The all-pair reduced-coordinate variant follows the analytic hard-rod
-    ground-state structure used as the benchmark in [Mazzanti et. al. 2008HardRods]:
+    ground-state structure used as the benchmark in [Mazzanti2008HardRods]:
     within one ordered sector, hard rods are mapped to point-like coordinates
     on the reduced length L' = L - N a.
 
@@ -64,7 +64,7 @@ class HardRodJastrowTrial:
         # In one ordering sector, reduce rods to point-like coordinates:
         #     y_i = x_i - i*a,   L' = L - N*a.
         # The sine-product form is the periodic hard-rod / free-fermion-like
-        # benchmark structure discussed in [Mazzanti et. al. 2008HardRods].
+        # benchmark structure discussed in [Mazzanti2008HardRods].
         y = x - self.system.rod_length * np.arange(self.system.n_particles)
         total = 0.0
         for i in range(self.system.n_particles - 1):

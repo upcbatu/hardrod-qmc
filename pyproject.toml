@@ -1,7 +1,7 @@
 [project]
 name = "hardrod-dmc-thesis"
 version = "0.1.0"
-description = "Cost-accuracy benchmarking scaffold for DMC estimators in one-dimensional hard-rod Bose gases."
+description = "QMC scaffold for trapped one-dimensional hard-rod bosons and excluded-volume LDA benchmarks."
 requires-python = ">=3.10"
 dependencies = [
   "numpy>=1.24",

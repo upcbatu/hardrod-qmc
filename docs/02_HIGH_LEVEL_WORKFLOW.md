@@ -1,199 +1,135 @@
 # High-Level Workflow
 
-This document gives the supervisor-facing workflow of the project, from generating samples to estimating observables and comparing estimator families.
+This document gives the supervisor-facing workflow for the revised thesis direction. The homogeneous hard-rod ring is the validation benchmark. The trapped hard-rod gas is the main thesis problem.
 
-## 1. One-line summary
+## 1. One-line Summary
 
 ```text
-choose the hard-rod setup -> choose a trial state -> generate samples with VMC or DMC -> compute observables -> compare estimators by error and cost
+validate homogeneous hard rods -> build trapped QMC workflow -> evaluate excluded-volume LDA -> map accuracy and failures
 ```
 
-## 2. Main workflow
+## 2. Main Workflow
 
 ```mermaid
 flowchart TD
-    A["Choose physical setup<br/>N, L, a, rho<br/>optional weak external potential"] --> B["Choose trial wavefunction<br/>baseline and improved variants"]
-    B --> C["Choose Monte Carlo method<br/>VMC baseline or DMC projection"]
-    C --> D["Generate Monte Carlo data<br/>snapshots, energies, weights, ancestry, metadata"]
-    D --> E["Compute observables<br/>E/N, g(r), S(k), optional n(x)"]
-    E --> F["Build estimator families<br/>VMC, mixed, extrapolated, pure"]
-    F --> G["Statistical analysis<br/>blocking, variance, bias, MSE"]
-    G --> H["Cost analysis<br/>runtime and cost score"]
-    H --> I["Final comparison<br/>which estimator is preferable in each regime"]
+    A["Homogeneous hard-rod ring<br/>N, L, a, rho"] --> B["Validate known references<br/>energy, exclusion, trial structure"]
+    B --> C["Trapped hard-rod setup<br/>N, a, harmonic trap"]
+    C --> D["Generate QMC data<br/>DMC target, VMC baseline"]
+    D --> E["Estimate trapped observables<br/>n(x), radius, energy"]
+    B --> F["Build homogeneous EOS<br/>excluded-volume equation of state"]
+    F --> G["Evaluate LDA in trap<br/>mu0 = V(x) + mu(n)"]
+    G --> H["Benchmark LDA accuracy<br/>density, radius, energy, correlations"]
+    E --> H
 ```
 
-## 3. Workflow by stage
+## 3. Phase 1: Homogeneous Validation
 
-### Stage 1. Choose the physical benchmark
+The homogeneous system is the one-dimensional hard-rod Bose gas on a periodic ring. It is not the final physics target; it is the calibration problem used to confirm that the implementation respects the known excluded-volume reference.
 
-The benchmark is the one-dimensional hard-rod Bose gas on a periodic ring.
+The validation choices are:
 
-At this stage the main physical choices are:
+- particle number `N`;
+- ring length `L`;
+- rod length `a`;
+- density `rho = N/L`;
+- packing fraction `rho * a`.
 
-- number of particles `N`
-- ring length `L`
-- rod length `a`
-- density `rho = N/L`
-- density regime: low, intermediate, or high
-- optional weak external potential for later extensions
+The validation outputs are:
 
-This step fixes the physical problem that will be sampled.
+- exact finite-`N` energy per particle;
+- thermodynamic-limit equation of state;
+- hard-core exclusion checks;
+- trial-wavefunction sanity checks;
+- optional structural observables such as `g(r)` and `S(k)`.
 
-### Stage 2. Choose the trial wavefunction
+## 4. Phase 2: Trapped-System Definition
 
-The next choice is the trial state `Psi_T`.
+The main system is a one-dimensional hard-rod gas in an external trap. The immediate target is a harmonic potential.
 
-This is one of the intended comparison points of the project. The repository is designed to support more than one trial family, for example:
+The trapped model needs:
 
-- the current nearest-neighbor Jastrow-like trial
-- the reduced-coordinate all-pair hard-rod trial
-- possibly improved or supervisor-provided trial forms later on
+- open-line coordinates rather than periodic wrapping;
+- nearest-neighbor exclusion on the line;
+- a harmonic external potential;
+- valid trapped initial configurations;
+- observables that do not assume periodic boundary conditions.
 
-This matters because:
+The primary trapped observables are:
 
-- VMC samples directly from `|Psi_T|^2`
-- DMC starts from `Psi_T`
-- mixed-estimator bias depends on trial quality
+- density profile `n(x)`;
+- cloud radius or edge position;
+- total energy;
+- potential-energy contribution;
+- selected correlations if they remain useful.
 
-### Stage 3. Choose the Monte Carlo method
+## 5. Phase 3: QMC Data Production
 
-The repository is organized around two Monte Carlo workflows:
+VMC remains useful for smoke tests, trial-state diagnostics, and fast end-to-end runs. DMC is the intended ground-state production method.
 
-- `VMC` as a baseline
-- `DMC` as the ground-state projection method
+The sampling layer should emit:
 
-Within the DMC workflow, `forward walking` is used for pure-estimator construction.
+- coordinate snapshots;
+- local energies when available;
+- weights when available;
+- runtime and configuration metadata;
+- ancestry only if pure-estimator support is needed later.
 
-This is another intended variation point. In practice, comparisons may include:
+Estimator-family machinery remains secondary infrastructure. It can support the comparison, but the thesis endpoint is not estimator ranking.
 
-- VMC versus DMC
-- different DMC time steps
-- different walker populations
-- different forward-walking lags
-- repeated seeds for stability checks
+## 6. Phase 4: Excluded-Volume LDA
 
-### Stage 4. Generate Monte Carlo data
+The LDA reference is evaluated from the homogeneous hard-rod equation of state:
 
-Once the physical setup, trial state, and method are fixed, the code generates data.
+$$
+e_{\mathrm{HR}}(\rho)
+=\frac{\pi^2\rho^2}{3(1-a\rho)^2}.
+$$
 
-Depending on the method, the generated data include:
+with energy density
 
-- coordinate snapshots
-- local energies
-- weights
-- ancestry information
-- runtime
-- metadata such as seed, burn-in, thinning, time step, and walker number
+$$
+\epsilon_{\mathrm{HR}}(\rho)
+=\rho e_{\mathrm{HR}}(\rho)
+=\frac{\pi^2\rho^3}{3(1-a\rho)^2}.
+$$
 
-This is the raw numerical output from which observables are computed.
+and chemical potential
 
-### Stage 5. Compute observables
+$$
+\mu_{\mathrm{HR}}(\rho)
+=\frac{d\epsilon_{\mathrm{HR}}}{d\rho}
+=\frac{\pi^2\rho^2(3-a\rho)}{3(1-a\rho)^3}.
+$$
 
-The observable layer turns coordinate data into physically interpretable quantities.
+For a trap, the local density satisfies
 
-The main observables are:
+$$
+\mu_0 = V_{\mathrm{trap}}(x) + \mu_{\mathrm{HR}}\!\left(n_{\mathrm{LDA}}(x)\right)
+$$
 
-- energy per particle `E/N`
-- pair distribution function `g(r)`
-- static structure factor `S(k)`
-- optional density profile `n(x)`
+with `mu0` fixed by normalization:
 
-The same observable code should work regardless of whether the underlying data came from VMC, mixed DMC, or forward-walking pure estimation.
+$$
+\int n_{\mathrm{LDA}}(x)\,dx = N.
+$$
 
-### Stage 6. Build the estimator families
+## 7. Phase 5: Trapped QMC Benchmarks of LDA
 
-The project is designed to compare four estimator families:
-
-- VMC estimator
-  ```text
-  O_VMC = <Psi_T|O|Psi_T> / <Psi_T|Psi_T>
-  ```
-- mixed DMC estimator
-  ```text
-  O_mixed = <Psi_T|O|Psi_0> / <Psi_T|Psi_0>
-  ```
-- extrapolated estimator
-  ```text
-  O_ext = 2 O_mixed - O_VMC
-  ```
-- pure estimator
-  ```text
-  O_pure = <Psi_0|O|Psi_0> / <Psi_0|Psi_0>
-  ```
-
-This is a post-processing stage. The observable implementations remain in `estimators/`, while the estimator-family assignments and the extrapolated combination are assembled afterward from VMC and DMC outputs.
-
-### Stage 7. Perform the statistical analysis
-
-After the estimators are produced, their statistical quality must be assessed.
-
-The main quantities are:
-
-- blocking-aware uncertainty estimates
-- variance
-- bias relative to a benchmark or reference
-- mean-squared error
-
-The main formulas are:
+The main comparison is direct and observable-level:
 
 ```text
-bias = mean(O_hat) - O_ref
-MSE = bias^2 + variance
+n_benchmark(x) versus n_LDA(x)
+R_benchmark    versus R_LDA
+E_benchmark    versus E_LDA
 ```
 
-### Stage 8. Perform the cost analysis
+The parameter sweep should vary only the quantities needed to answer the thesis question:
 
-The thesis is not only asking which estimator is more accurate. It is asking which estimator is preferable once computational cost is included.
+- particle number;
+- rod length or packing scale;
+- trap strength;
+- DMC time step and walker count as numerical controls.
 
-For that reason, runtime is tracked and combined with the statistical analysis.
+## 8. Optional Extension
 
-The practical benchmark metric is:
-
-```text
-cost_score = MSE * runtime
-```
-
-## 4. Where the project will deliberately try alternatives
-
-The workflow is not meant to be run with only one fixed configuration. Several choices are expected to be varied systematically.
-
-### Physical variations
-
-- low, intermediate, and high density regimes
-- uniform system versus weakly inhomogeneous extension
-
-### Trial-wavefunction variations
-
-- simple baseline trial
-- more structured hard-rod trial
-- possible improved trial forms later on
-
-### Method variations
-
-- VMC versus DMC
-- different DMC time steps
-- different walker numbers
-- different forward-walking lengths
-
-### Estimator variations
-
-- mixed
-- extrapolated
-- pure
-
-The point of the thesis is to understand which combinations are worth using for which observables.
-
-## 5. Final output
-
-The intended final output is a recommendation map of the form:
-
-```text
-observable x density regime x estimator family
--> bias, variance, MSE, runtime, preferred choice
-```
-
-In practical terms, the thesis is aimed to answer questions such as:
-
-- when is the mixed estimator already accurate enough?
-- when is the extrapolated estimator the best compromise?
-- when is forward-walking pure estimation worth the extra cost?
+Only after the trapped hard-rod comparison is complete, the excluded-volume idea may be tested against selected Lieb-Liniger excited-state or correlation-function quantities. This should remain a narrow optional extension, not a second thesis.

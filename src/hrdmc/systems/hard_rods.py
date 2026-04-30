@@ -19,7 +19,7 @@ class HardRodSystem:
     taken from the 1D hard-rod benchmark system studied in:
 
         Mazzanti, Astrakharchik, Boronat, Casulleras,
-        Phys. Rev. Lett. 100, 020401 (2008). [Mazzanti et. al. 2008HardRods]
+        Phys. Rev. Lett. 100, 020401 (2008). [Mazzanti2008HardRods]
 
     Parameters
     ----------
@@ -57,14 +57,14 @@ class HardRodSystem:
     @property
     def packing_fraction(self) -> float:
         # eta = rho * a is the natural dimensionless density for hard rods.
-        # Used as the density axis in [Mazzanti et. al. 2008HardRods].
+        # Used as the density axis in [Mazzanti2008HardRods].
         return self.density * self.rod_length
 
     @property
     def unexcluded_length(self) -> float:
         # Hard rods in an ordered 1D sector map to point-like particles on the
         # reduced length L' = L - N a. This is the excluded-volume mapping used
-        # for the analytic hard-rod ground-state benchmark in [Mazzanti et. al. 2008HardRods].
+        # for the analytic hard-rod ground-state benchmark in [Mazzanti2008HardRods].
         return self.length - self.n_particles * self.rod_length
 
     def wrap(self, positions: FloatArray) -> FloatArray:
@@ -87,7 +87,7 @@ class HardRodSystem:
         gaps = self.nearest_neighbor_gaps(positions)
         # Hard-rod constraint: nearest-neighbor separation must be >= rod length a.
         # This encodes the infinite hard-core interaction V_HR(r<a)=infinity.
-        # Source system: [Mazzanti et. al. 2008HardRods].
+        # Source system: [Mazzanti2008HardRods].
         return bool(np.all(gaps + atol >= self.rod_length))
 
     def initial_lattice(self, jitter: float = 0.0, seed: int | None = None) -> FloatArray:
@@ -117,7 +117,7 @@ class HardRodSystem:
             raise ValueError("n_modes must be positive")
         modes = np.arange(1, n_modes + 1, dtype=float)
         # Periodic boundary condition on a ring: k_n = 2*pi*n/L.
-        # This is standard for the hard-rod ring geometry used in [Mazzanti et. al. 2008HardRods].
+        # This is standard for the hard-rod ring geometry used in [Mazzanti2008HardRods].
         return 2.0 * np.pi * modes / self.length
 
     def exact_energy_per_particle_finite(self) -> float:
@@ -127,7 +127,7 @@ class HardRodSystem:
         ---------------
         Uses the hard-rod mapping to free-fermion-like quasi-momenta on the
         reduced unexcluded length L' = L - N a. This is the analytic hard-rod
-        benchmark behind the exact finite-system energy in [Mazzanti et. al. 2008HardRods].
+        benchmark behind the exact finite-system energy in [Mazzanti2008HardRods].
 
         In units hbar^2/(2m)=1:
             E/N = (1/N) * sum_i k_i^2,
@@ -143,7 +143,7 @@ class HardRodSystem:
 
         Source equation
         ---------------
-        Hard-rod equation of state from [Mazzanti et. al. 2008HardRods]. In physical units:
+        Hard-rod equation of state from [Mazzanti2008HardRods]. In physical units:
             E/N = (pi^2 * hbar^2 * rho^2) / (6*m*(1-rho*a)^2).
         In repo units hbar^2/(2m)=1:
             E/N = pi^2 * rho^2 / (3*(1-rho*a)^2).

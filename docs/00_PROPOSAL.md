@@ -2,130 +2,173 @@
 
 ## Title
 
-**Cost-Accuracy Benchmarking of Diffusion Monte Carlo Estimators in One-Dimensional Hard-Rod Bose Gases**
+**Trapped One-Dimensional Hard-Rod Bosons: QMC Benchmarks of Excluded-Volume Local-Density Theory**
 
 ## Abstract
 
-This project proposes a computational thesis on Quantum Monte Carlo estimator performance for the one-dimensional hard-rod Bose gas. The physical system is not chosen as a source of unknown phase behavior, but as a controlled benchmark with well-established reference results for the equation of state and for correlation observables such as the pair distribution function $g(r)$ and the static structure factor $S(k)$ [1]. The main goal is to quantify, for physically relevant observables, the trade-off between bias, variance, and computational cost across four estimator families: a VMC baseline, the mixed DMC estimator, the extrapolated estimator, and the pure estimator obtained through forward walking [2,3]. The intended outcome is an observable- and density-dependent recommendation map indicating when inexpensive estimators are already sufficient and when the additional cost of pure estimation is justified.
+This project studies trapped one-dimensional hard-rod bosons as the main thesis problem. The homogeneous hard-rod gas on a periodic ring is used as a controlled validation benchmark for the Quantum Monte Carlo workflow, because its ground-state energy and wavefunction are known through the excluded-volume mapping [1]. Available trapped Bose-gas QMC and hard-sphere/hard-rod wavefunction results provide additional reference anchors for the inhomogeneous problem [2,4]. The central comparison is not the construction of LDA itself, but a benchmark of where an excluded-volume LDA built from the homogeneous hard-rod equation of state succeeds and where it fails. The thesis asks how far the excluded-volume idea can be pushed from the exactly controlled homogeneous system into a spatially varying trapped gas.
 
 ## 1. Motivation
 
-The one-dimensional hard-rod Bose gas provides a convenient setting for a methodological study. On the one hand, it is a physically meaningful many-body model with direct connections to strongly correlated quasi-one-dimensional bosonic systems. On the other hand, it is sufficiently controlled to separate numerical estimator effects from genuine physical uncertainty. The hard-rod benchmark is particularly suitable because the main static quantities of interest are already understood in the literature, which makes it possible to evaluate numerical bias in a disciplined way [1,4].
+One-dimensional hard rods are a useful model for strongly correlated bosons because the hard core introduces a finite excluded length while preserving an analytically controlled homogeneous reference. On a ring, the problem maps to point-like particles living on the reduced length `L' = L - N a`, where `a` is the rod length. This gives an exact benchmark for the homogeneous energy and a physically transparent equation of state [1].
 
-From the Quantum Monte Carlo perspective, the relevant methodological issue is not whether Diffusion Monte Carlo can in principle project to the ground state, but how one should estimate observables once sampling has been obtained. For observables that do not commute with the Hamiltonian, the natural mixed estimator is generally biased by the trial wavefunction. Extrapolated estimators can reduce part of that bias at small additional cost, while pure estimators obtained through forward walking are expected to be less biased but statistically more expensive [2,3]. The central question of the thesis is therefore practical: for a given observable and density regime, which estimator provides the best compromise between accuracy and cost?
+The trapped problem is more relevant as a many-body target because real quasi-one-dimensional gases are normally inhomogeneous. In a trap, translation invariance is lost and the density profile becomes a primary observable. LDA methods for trapped systems are already established, including work that derives density profiles, Thomas-Fermi sizes, and energy relations from perturbative equations of state [3]. The contribution here is therefore not to introduce LDA, but to test the accuracy limits of the excluded-volume LDA in a controlled hard-rod setting.
 
-This question is not expected to have the same answer for all observables. In particular, the comparison is likely to be most informative for structural observables such as $g(r)$ and especially $S(k)$, where trial-state bias can remain visible, whereas the energy per particle is expected to be less demanding as a benchmark quantity. The estimator differences may also depend strongly on density regime, trial-wavefunction quality, and the possible inclusion of weak inhomogeneity. For this reason, the thesis is framed not as a search for a single universally best estimator, but as a regime-dependent comparison.
+The scope also should not claim that trapped hard rods are being solved for the first time. There are already strong trapped hard-sphere/hard-rod wavefunction results in the literature [4]. The thesis contribution is a controlled QMC and benchmark-data failure map for excluded-volume LDA, especially where finite particle number, trap-edge behavior, density profiles, and correlation observables can expose the limits of a local approximation.
+
+The former estimator-cost benchmark remains useful as infrastructure, especially for separating VMC and DMC data products and for tracking uncertainty. It is no longer the main thesis objective. The main scientific comparison is now trapped QMC benchmarks versus excluded-volume LDA, with DMC as the target production method and VMC as a baseline and diagnostic stage.
 
 ## 2. Objective
 
-The objective of the thesis is to use the one-dimensional hard-rod Bose gas as a controlled benchmark for comparing Quantum Monte Carlo estimator families.
+The objective is to benchmark the regime of validity of excluded-volume LDA for trapped hard rods, using homogeneous exact results and available trapped wavefunction/QMC results as validation anchors.
 
 More specifically, the project will:
 
-1. implement and validate the hard-rod benchmark geometry and its reference energy;
-2. compute static observables such as $E/N$, $g(r)$, and $S(k)$;
-3. compare VMC, mixed DMC, extrapolated, and pure estimators;
-4. quantify the bias-variance-cost trade-off as a function of density and observable;
-5. produce a recommendation map for estimator choice in this benchmark.
+1. validate the homogeneous hard-rod implementation on a ring using exact energy and wavefunction information;
+2. include available trapped hard-sphere/hard-rod wavefunction and QMC results as reference context;
+3. implement a trapped one-dimensional hard-rod system with open-line geometry and a harmonic external potential;
+4. compute trapped benchmark observables with QMC, with DMC as the target production method and VMC as a baseline and diagnostic stage;
+5. quantify LDA accuracy and failure regimes across particle number, rod length, trap strength, trap edge, and correlation observables.
 
-## 3. Physical and Methodological Scope
+## 3. Physical Scope
 
-The physical system is the one-dimensional hard-rod Bose gas on a periodic ring of length $L$, with rod length $a$, particle number $N$, and density $\rho = N/L$. In the thermodynamic limit, the reference hard-rod energy per particle is
+The validation system is the homogeneous one-dimensional hard-rod Bose gas on a periodic ring of length `L`, rod length `a`, particle number `N`, and density `rho = N/L`.
 
-```text
-E/N = pi^2 rho^2 / [3 (1 - rho a)^2]
-```
+In the thermodynamic limit, the hard-rod energy per particle in repository units \(\hbar^2/(2m)=1\) is
 
-in the units used by the present repository, namely $\hbar^2/(2m)=1$ [1].
+$$
+e_{\mathrm{HR}}(\rho)=\frac{E}{N}
+=\frac{\pi^2 \rho^2}{3(1-a\rho)^2}.
+$$
 
-The main observables of interest are:
+The corresponding homogeneous energy density is
 
-- the energy per particle $E/N$;
-- the pair distribution function $g(r)$;
-- the static structure factor
+$$
+\epsilon_{\mathrm{HR}}(\rho)
+=\rho e_{\mathrm{HR}}(\rho)
+=\frac{\pi^2\rho^3}{3(1-a\rho)^2}.
+$$
 
-```text
-S(k) = (1/N) < |sum_j exp(i k x_j)|^2 > .
-```
+The local chemical potential used by the LDA is
 
-The methodological comparison will focus on the following estimator families:
+$$
+\mu_{\mathrm{HR}}(\rho)
+=\frac{d\epsilon_{\mathrm{HR}}}{d\rho}
+=\frac{\pi^2\rho^2(3-a\rho)}{3(1-a\rho)^3}.
+$$
 
-```text
-O_VMC   = <Psi_T | O | Psi_T> / <Psi_T | Psi_T>
-O_mixed = <Psi_T | O | Psi_0> / <Psi_T | Psi_0>
-O_ext   = 2 O_mixed - O_VMC
-O_pure  = <Psi_0 | O | Psi_0> / <Psi_0 | Psi_0> .
-```
+For a trapped system with external potential `V_trap(x)`, the LDA density satisfies
 
-Here $\Psi_T$ denotes the trial wavefunction and $\Psi_0$ the projected ground state. The pure estimator will be approached numerically through forward walking within the DMC workflow [2,3].
+$$
+\mu_0 = V_{\mathrm{trap}}(x) + \mu_{\mathrm{HR}}\!\left(n_{\mathrm{LDA}}(x)\right)
+$$
+
+inside the cloud, with `n_LDA(x)=0` outside the classically allowed region. The global chemical potential `mu_0` is fixed by
+
+$$
+\int n_{\mathrm{LDA}}(x)\,dx = N.
+$$
+
+The main trapped observables are:
+
+- density profile `n(x)`;
+- cloud radius or edge position;
+- total energy and potential-energy contribution;
+- trap-edge behavior;
+- finite-`N` dependence;
+- selected correlation observables such as `g(r)`, `g_2(x,x')`, or `S(k)` where they remain numerically meaningful.
 
 ## 4. Methodology
 
-The project is organized in five layers. The `systems/` module defines the hard-rod benchmark and its reference quantities. The `wavefunctions/` module defines the trial state $\Psi_T$. The `monte_carlo/` module contains the VMC and DMC workflows. The `estimators/` module computes observables from sampled coordinates, independently of the sampling method. The `analysis/` module performs blocking analysis, bias and variance estimation, and cost scoring.
+The repository remains organized into separate physical, sampling, observable, and analysis layers.
 
-The computational workflow is:
+The homogeneous ring workflow is:
 
 ```text
-choose benchmark parameters
--> choose trial wavefunction
--> generate samples with VMC or DMC
--> compute observables
--> construct estimator families
--> compare bias, variance, MSE, and runtime
+choose N, L, a
+-> validate hard-rod exclusion and exact energy
+-> validate trial wavefunction behavior
+-> run VMC checks and DMC checks when available
+-> compare sampled quantities with homogeneous references
 ```
 
-The current repository already contains an initial VMC workflow, hard-rod geometry utilities, and implementations of $g(r)$ and $S(k)$. The DMC side is already separated at the architectural level so that the estimator comparison can be extended to mixed and pure estimators without changing the observable layer.
+The trapped workflow is:
+
+```text
+choose N, a, trap strength
+-> generate trapped QMC samples
+-> estimate n(x), radius, and energy
+-> evaluate the excluded-volume LDA
+-> compare benchmark observables with LDA predictions
+```
+
+The DMC implementation remains the target production method because the final trapped comparison should target ground-state observables. VMC provides smoke tests, trial-state diagnostics, and baseline data; it should not be presented as final trapped-system validation unless DMC or other benchmark data are unavailable.
+
+The pure-estimator and forward-walking reference [5] is method background if DMC estimator support becomes necessary. It does not define the central thesis contribution.
 
 ## 5. Comparison Criteria
 
-For each observable and estimator family, the analysis will track the following quantities:
+For homogeneous validation, the primary criteria are agreement with exact or known reference quantities:
 
-```text
-bias     = mean(O_hat) - O_ref
-variance = Var(O_hat)
-MSE      = bias^2 + variance
-```
+$$
+\Delta E_{\mathrm{hom}} = E_{\mathrm{QMC}} - E_{\mathrm{exact}}.
+$$
 
-In addition, computational cost will be measured through elapsed runtime under fixed environment conditions. A practical cost metric will be defined by combining error and runtime, for example through
+For the trapped system, the primary comparison is between benchmark data and LDA:
 
-```text
-cost_score = MSE * runtime .
-```
+$$
+\Delta E = E_{\mathrm{benchmark}} - E_{\mathrm{LDA}}.
+$$
 
-The aim is not only to identify the least biased estimator, but to determine which estimator is preferable once the statistical and computational costs are considered together.
+$$
+\Delta n_2 = \int
+\left|n_{\mathrm{benchmark}}(x)-n_{\mathrm{LDA}}(x)\right|^2\,dx.
+$$
+
+$$
+\Delta R = R_{\mathrm{benchmark}} - R_{\mathrm{LDA}}.
+$$
+
+The comparison should explicitly separate bulk agreement from trap-edge failure. Finite-`N` dependence is part of the target result, because LDA is expected to improve in larger, smoother systems but can fail for small or moderately sized trapped gases. Correlation observables are also important because an LDA may describe density and energy more reliably than nonlocal quantities.
+
+Uncertainty will be estimated with blocking or repeated seeds where appropriate. Runtime and estimator-family differences may be reported as supporting diagnostics, but they are not the main thesis endpoint.
 
 ## 6. Expected Contribution
 
-The expected contribution is methodological rather than phenomenological. The thesis does not aim to introduce a new hard-rod phase diagram. Instead, it aims to provide a clear estimator benchmark for a controlled many-body system. The final outcome should specify, for each observable and density regime, whether the mixed estimator is sufficient, whether the extrapolated estimator provides the best practical compromise, or whether pure estimation through forward walking is necessary.
+The contribution is not the hard-rod model, the LDA formalism, or DMC itself. The contribution is a controlled benchmark of how far an excluded-volume LDA built from the homogeneous hard-rod equation of state can reproduce trapped hard-rod observables, using QMC data, DMC when available, and available trapped-system references as validation anchors.
 
-If time permits, the same framework may be extended to a weakly inhomogeneous setting, such as a shallow periodic external potential, in order to test whether estimator bias becomes more pronounced away from the uniform benchmark.
+If time permits, the same excluded-volume intuition may be tested beyond hard rods, for example as an approximate route to selected Lieb-Liniger excited-state or correlation-function quantities. This extension is optional and should remain secondary to the trapped hard-rod study.
 
 ## 7. Work Plan
 
-The work plan is divided into four stages.
+### Stage I. Scope and homogeneous validation
 
-### Stage I. Uniform hard-rod validation
+Reframe the repository around trapped hard rods, then complete homogeneous ring validation for energy and basic observables.
 
-The first stage is the validation of the benchmark geometry and the basic observables. This includes the reference energy, the exclusion structure of $g(r)$, and the qualitative density dependence of $S(k)$.
+### Stage II. Trapped-system implementation
 
-### Stage II. Mixed and extrapolated estimator study
+Add open-line hard-rod geometry, harmonic trapping, trapped initial states, and non-periodic density-profile estimation.
 
-The second stage is the introduction of the DMC workflow for mixed estimators, followed by the construction of extrapolated estimates from the combined VMC and DMC data.
+### Stage III. LDA implementation
 
-### Stage III. Pure-estimator study
+Implement the hard-rod equation of state, chemical-potential inversion, trap normalization, and LDA observables.
 
-The third stage is the implementation of forward walking and the study of the dependence of pure-estimator quality on the forward-walking length, variance growth, and computational cost.
+### Stage IV. QMC benchmarks versus LDA comparison
 
-### Stage IV. Final comparison
+Run trapped simulations, compute density profiles and energies, and benchmark them against the LDA across the selected parameter grid. The output should be an accuracy and failure map, not a claim that LDA is new.
 
-The final stage is the construction of a cost-accuracy comparison across density regimes and observables, leading to a supervisor-facing summary of recommended estimator choices.
+### Stage V. Optional extension
+
+Only after the trapped hard-rod comparison is complete, test whether the excluded-volume idea gives useful approximations for selected Lieb-Liniger quantities.
 
 ## References
 
 [1] F. Mazzanti, G. E. Astrakharchik, J. Boronat, and J. Casulleras, "Ground-State Properties of a One-Dimensional System of Hard Rods," *Physical Review Letters* **100**, 020401 (2008). DOI: 10.1103/PhysRevLett.100.020401.
 
-[2] J. Boronat and J. Casulleras, "Unbiased estimators in quantum Monte Carlo methods: Application to liquid helium," *Physical Review B* **52**, 3654-3661 (1995). DOI: 10.1103/PhysRevB.52.3654.
+[2] G. E. Astrakharchik and S. Giorgini, "Quantum Monte Carlo study of the three- to one-dimensional crossover for a trapped Bose gas," *Physical Review A* **66**, 053614 (2002). DOI: 10.1103/PhysRevA.66.053614.
 
-[3] A. Sarsa, J. Boronat, and J. Casulleras, "Quadratic diffusion Monte Carlo and pure estimators for atoms," *The Journal of Chemical Physics* **116**, 5956-5962 (2002). DOI: 10.1063/1.1446847.
+[3] G. E. Astrakharchik, "Local density approximation for a perturbative equation of state," *Physical Review A* **72**, 063620 (2005). DOI: 10.1103/PhysRevA.72.063620.
 
-[4] G. E. Astrakharchik, J. Boronat, J. Casulleras, and S. Giorgini, "Beyond the Tonks-Girardeau Gas: Strongly Correlated Regime in Quasi-One-Dimensional Bose Gases," *Physical Review Letters* **95**, 190407 (2005). DOI: 10.1103/PhysRevLett.95.190407.
+[4] M. D. Girardeau and G. E. Astrakharchik, "Wave functions of the super-Tonks-Girardeau gas and the trapped one-dimensional hard-sphere Bose gas," *Physical Review A* **81**, 061601(R) (2010). DOI: 10.1103/PhysRevA.81.061601.
+
+[5] J. Boronat and J. Casulleras, "Unbiased estimators in quantum Monte Carlo methods: Application to liquid helium," *Physical Review B* **52**, 3654-3661 (1995). DOI: 10.1103/PhysRevB.52.3654.

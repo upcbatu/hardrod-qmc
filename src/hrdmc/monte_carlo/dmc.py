@@ -18,8 +18,8 @@ class DMCResult:
     ----------------
     The eventual engine should support DMC mixed estimators plus forward-walking
     pure estimators. The pure-estimator methodology is from
-    [BoronatCasulleras1995PureEstimators] and [Sarsa et al. 2002QuadraticDMC].
-    The physical hard-rod benchmark is [Mazzanti et. al. 2008HardRods].
+    [BoronatCasulleras1995PureEstimators] and [SarsaBoronatCasulleras2002QuadraticDMC].
+    The physical hard-rod benchmark is [Mazzanti2008HardRods].
     """
 
     snapshots: FloatArray
@@ -83,7 +83,7 @@ class AncestryBuffer:
     The pure-estimator plan is based on forward walking as developed for QMC
     expectation values by Casulleras and Boronat [BoronatCasulleras1995PureEstimators]
     and used in the quadratic DMC / pure-estimator implementation of Sarsa,
-    Boronat and Casulleras [Sarsa et al. 2002QuadraticDMC].
+    Boronat and Casulleras [SarsaBoronatCasulleras2002QuadraticDMC].
 
     This object is only a data-structure seam. The final DMC engine should push
     ancestry index arrays into this object at every branching step so that

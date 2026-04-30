@@ -2,27 +2,31 @@
 
 This repository is organized around a simple principle:
 
-> the physical model, the trial state, the Monte Carlo methods, the observables, and the statistical analysis are kept separate, while experiment scripts are responsible for combining them into concrete runs.
+> physical definitions, trial states, Monte Carlo sampling, observables, and analysis references are kept separate, while experiment scripts combine them into concrete runs.
 
-The purpose of this separation is practical. The thesis is expected to evolve from an initial VMC implementation to a more complete DMC and forward-walking benchmark. A modular layout makes that transition easier to inspect, extend, and validate.
+The revised thesis direction makes this separation more important. The homogeneous hard-rod ring is a validation benchmark, while the trapped hard-rod gas is the main physics target. The same codebase must support both without mixing periodic-ring assumptions into trapped observables.
 
-## 1. Why the repository is split into layers
-
-The code is divided into five scientific roles.
+## 1. Why the Repository Is Split Into Layers
 
 ### `systems/`
 
 Purpose:
-define the physical benchmark and its reference quantities.
+define physical systems and reference formulas.
 
-This module owns:
+This module currently owns:
 
-- the one-dimensional hard-rod geometry;
-- periodic boundary conditions on a ring;
-- the hard-core exclusion rule;
-- derived physical quantities such as density, packing fraction, and excluded length;
-- reference hard-rod energies used for validation;
-- optional external potentials for later extensions.
+- homogeneous one-dimensional hard rods on a periodic ring;
+- periodic boundary conditions;
+- hard-core exclusion;
+- derived quantities such as density, packing fraction, and excluded length;
+- exact homogeneous reference energies.
+
+It still needs to own:
+
+- open-line trapped hard rods;
+- harmonic trap potential support;
+- trapped initial configurations;
+- homogeneous equation-of-state helpers for LDA.
 
 ### `wavefunctions/`
 
@@ -31,117 +35,107 @@ define the trial state `Psi_T` used by the Monte Carlo layer.
 
 This module owns:
 
-- evaluate the trial amplitude or its logarithm;
-- reject invalid configurations;
-- expose tunable trial-state parameters;
-- provide the trial forms used directly in VMC and as input to DMC.
+- trial amplitude or log-amplitude evaluation;
+- rejection of invalid configurations;
+- tunable trial-state parameters;
+- trial forms used directly in VMC and as DMC input.
+
+The current trial forms are ring-oriented. Trapped calculations may need additional one-body trap factors or supervisor-provided trial forms.
 
 ### `monte_carlo/`
 
 Purpose:
-generate Monte Carlo data from the physical model and the trial state.
+generate coordinate and energy data from a physical system and a trial state.
 
 This module owns:
 
-- `vmc.py` for the present Metropolis VMC implementation;
-- `dmc.py` for the DMC interface together with the associated walker, branching, and pure-estimator support logic.
+- `vmc.py` for the current Metropolis VMC implementation;
+- `dmc.py` for the DMC result contract, walker data structures, population-control support, and optional forward-walking support.
 
-Its outputs are the sampled configurations and run metadata passed to the observable and analysis layers.
+For the revised thesis, VMC is a smoke and diagnostic path. DMC is the intended production path for trapped ground-state observables.
 
 ### `estimators/`
 
 Purpose:
-compute observables from sampled particle coordinates.
+compute observables from sampled coordinates.
 
-This module owns:
+This module currently owns:
 
 - pair distribution function `g(r)`;
 - static structure factor `S(k)`;
-- density profile `n(x)`.
+- periodic density profile `n(x)`.
 
-The key design choice is that these estimators do not depend on whether the data came from VMC, mixed DMC, or forward-walking pure estimation.
+It still needs to separate periodic and open-line density conventions. Trapped density estimation must not wrap coordinates onto a ring.
 
 ### `analysis/`
 
 Purpose:
-turn raw estimator outputs into uncertainty, accuracy, and cost comparisons.
+turn raw observables into scientific comparisons.
 
-This module owns:
+This module currently owns:
 
-- estimator-family labels and constructions such as VMC, mixed, extrapolated, and pure;
 - blocking-aware uncertainty estimates;
 - bias and variance bookkeeping;
-- mean-squared error;
-- runtime-weighted cost metrics.
+- mean-squared error utilities;
+- estimator-family labels and combinations.
 
-This is the layer that supports the central thesis question: which estimator family is preferable once both accuracy and computational cost are taken into account?
+It still needs to own or host:
 
-## 2. Why this structure is useful for the thesis
+- homogeneous hard-rod chemical potential;
+- chemical-potential inversion;
+- trapped LDA normalization;
+- QMC benchmark versus LDA comparison summaries.
 
-The thesis is not only about obtaining hard-rod observables. It is also about comparing estimator families:
+The estimator-family code remains useful support infrastructure, but it no longer defines the thesis endpoint.
 
-- VMC;
-- mixed DMC;
-- extrapolated estimators;
-- pure estimators via forward walking.
+## 2. Why This Structure Fits the Revised Thesis
 
-That comparison becomes clearer when the roles are separated:
+The thesis has two different physical roles:
 
-- `systems/` defines the benchmark physics;
-- `wavefunctions/` defines the trial state;
-- `monte_carlo/` generates the Monte Carlo data;
-- `estimators/` convert coordinates into observables;
-- `analysis/` builds estimator families and compares them statistically.
+- homogeneous hard rods on a ring validate the numerical machinery;
+- trapped hard rods provide the main benchmark of excluded-volume LDA accuracy and failures.
 
-This makes it possible to improve the DMC implementation later without rewriting the observable definitions, and to compare estimator families without mixing physical definitions with method-specific code.
+Separating systems, estimators, and analysis prevents a ring-specific assumption from leaking into the trapped workflow. For example, `S(k)` on a ring and `n(x)` in a trap have different coordinate conventions, even if both are computed from sampled coordinates.
 
-## 3. Current implementation status
+The LDA comparison also benefits from separation:
 
-At present, the repository already contains:
+- `systems/` provides the homogeneous equation of state;
+- `analysis/` evaluates the LDA normalization and comparison metrics;
+- `estimators/` computes benchmark observables;
+- `experiments/` assembles parameter sweeps.
 
-- a hard-rod geometry implementation;
+## 3. Current Implementation Status
+
+At present, the repository contains:
+
+- homogeneous ring hard-rod geometry;
+- exact homogeneous energy references;
 - a Jastrow-like VMC implementation;
-- observable estimators for `g(r)`, `S(k)`, and `n(x)`;
-- blocking and cost-analysis utilities;
-- an initial integrated VMC experiment;
-- an initial DMC structure for the thesis-level implementation.
+- observable estimators for `g(r)`, `S(k)`, and ring-based `n(x)`;
+- blocking and support metric utilities;
+- an initial homogeneous VMC smoke experiment;
+- an initial DMC result contract and support structures.
 
-The DMC production engine is not yet complete. The repository is designed so that a more mature DMC implementation can be added without changing the overall benchmark structure.
+The trapped system, harmonic trap, LDA implementation, and production DMC engine are not yet complete.
 
-## 4. Why the `monte_carlo/` package is structured this way
-
-The repository keeps the sampling algorithms in one place:
-
-- `vmc.py` contains the Metropolis sampling workflow used for the current VMC runs;
-- `dmc.py` contains the DMC-facing data structures and the support needed for walker evolution, branching, and pure-estimator work.
-
-This keeps the method layer readable while leaving the observable and analysis layers unchanged as the DMC implementation matures.
-
-## 5. Planned DMC integration
+## 4. Planned DMC Integration
 
 The final DMC implementation is expected to plug into `src/hrdmc/monte_carlo/dmc.py` and produce a result object containing:
 
 - coordinate snapshots;
 - local energies;
 - weights;
-- ancestry information for pure estimators;
-- run metadata.
+- run metadata;
+- ancestry information only when pure-estimator support is needed.
 
-Once such a result object exists, the observable layer can remain unchanged:
+Once such a result exists, the trapped observable layer should compute density profiles, energies, and cloud-size diagnostics from DMC data without depending on DMC internals.
 
-- the same `g(r)` code can act on DMC coordinates;
-- the same `S(k)` code can act on DMC coordinates;
-- the estimator-family layer can label those results as mixed or pure;
-- the extrapolated estimator can be formed later from compatible VMC and mixed DMC outputs.
+## 5. Summary
 
-This is the main reason the method and observable layers are kept separate.
-
-## 6. Summary
-
-The repository is structured to support a controlled progression:
+The repository should evolve toward this progression:
 
 ```text
-physical model -> trial state -> Monte Carlo method -> observable -> statistical comparison
+homogeneous validation -> trapped system -> benchmark observables -> excluded-volume LDA -> failure map
 ```
 
-We use the hard-rod system as a controlled benchmark, generate data with VMC and later DMC, compute observables consistently, and then compare estimator families in terms of bias, variance, and computational cost.
+Estimator-family and cost-analysis utilities remain available, but the main thesis comparison is trapped benchmark observables against the excluded-volume LDA reference.

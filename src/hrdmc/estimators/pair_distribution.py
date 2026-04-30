@@ -30,7 +30,7 @@ def estimate_pair_distribution(
     Source/rationale
     ----------------
     g(r) is one of the hard-rod observables analyzed in
-    [Mazzanti et. al. 2008HardRods] to distinguish gas-like and solid-like regimes.
+    [Mazzanti2008HardRods] to distinguish gas-like and solid-like regimes.
 
     Implementation convention
     -------------------------

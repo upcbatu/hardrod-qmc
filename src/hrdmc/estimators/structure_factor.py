@@ -28,7 +28,7 @@ def estimate_static_structure_factor(
     Source equation
     ---------------
     The static structure factor S(k) is a central observable in
-    [Mazzanti et. al. 2008HardRods]. We estimate it from density Fourier modes:
+    [Mazzanti2008HardRods]. We estimate it from density Fourier modes:
 
         rho_k = sum_j exp(i*k*x_j)
         S(k)  = < rho_k rho_-k > / N = < |rho_k|^2 > / N
