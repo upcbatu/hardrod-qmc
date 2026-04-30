@@ -26,6 +26,8 @@ This repository is currently at a **homogeneous validation plus initial trapped 
   files: `experiments/02_trapped_vmc_smoke.py`
 - trapped VMC diagnostic grid over `N = 4, 8` and `omega = 0.05, 0.10, 0.20`;
   files: `experiments/03_trapped_vmc_diagnostic_grid.py`
+- trapped VMC seed-stability diagnostic for replicate spread checks;
+  files: `experiments/04_trapped_vmc_seed_stability.py`, `src/hrdmc/analysis/stability.py`
 - blocking analysis and bias/MSE utilities;
   files: `src/hrdmc/analysis/blocking.py`, `src/hrdmc/analysis/metrics.py`
 
@@ -53,8 +55,8 @@ files: `experiments/00_smoke_vmc.py`, `experiments/configs/smoke.json`
 The homogeneous validation benchmark checks the exact all-pair trial local energy against finite-`N` ring references and can be run with `make validate-ring`.
 files: `experiments/01_uniform_hard_rods_validation.py`
 
-The trapped smoke run is a VMC diagnostic and can be run with `make smoke-trap`. The trapped diagnostic grid can be run with `make diagnose-trap-grid`. They check sampled density, LDA normalization on the same grid, and density L2 differences. They should not be treated as final trapped benchmarks.
-files: `experiments/02_trapped_vmc_smoke.py`, `experiments/03_trapped_vmc_diagnostic_grid.py`
+The trapped smoke run is a VMC diagnostic and can be run with `make smoke-trap`. The trapped diagnostic grid can be run with `make diagnose-trap-grid`. The seed-stability diagnostic can be run with `make diagnose-trap-seeds`. They check sampled density, LDA normalization on the same grid, density L2 differences, and replicate spread. They should not be treated as final trapped benchmarks.
+files: `experiments/02_trapped_vmc_smoke.py`, `experiments/03_trapped_vmc_diagnostic_grid.py`, `experiments/04_trapped_vmc_seed_stability.py`
 
 Benchmark interpretation and remaining validation checks are maintained in `docs/validation/README.md`.
 

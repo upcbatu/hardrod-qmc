@@ -178,9 +178,29 @@ This remains a diagnostic grid. It checks plumbing, normalization, and rough tre
 
 ## 6. Next Step
 
+The first stability check has been added as a seed-replicate diagnostic for a selected trapped case.
+
+Command:
+
+```bash
+PYTHONPATH=src python3 experiments/04_trapped_vmc_seed_stability.py
+```
+
+Output:
+
+```text
+results/trapped_vmc_seed_stability/summary.json
+results/trapped_vmc_seed_stability/*_density_profiles.npz
+```
+
+It reports replicate mean, sample standard deviation, standard error, and spread for acceptance rate, density-normalization error, sampled potential energy, and VMC-versus-LDA density L2 error.
+
+This remains a `VMC diagnostic` check. Its purpose is to decide whether the trapped VMC settings are stable enough to inspect before moving toward DMC.
+
+## 7. Next Step
+
 The next technical step is to make the diagnostic grid numerically meaningful enough to decide what must be improved before DMC:
 
-- check run-to-run stability across seeds;
 - check density-profile convergence with longer VMC chains;
 - inspect whether the diagnostic trial parameter should be optimized;
 - add simple plots for \(n_{\mathrm{VMC}}(x)\) versus \(n_{\mathrm{LDA}}(x)\);

@@ -46,6 +46,6 @@ notebooks/                inspection and figure drafting
 - the homogeneous ring validation benchmark compares all-pair trial local energy against exact finite-`N` references
 - a working VMC smoke pipeline exists for the homogeneous scaffold
 - observable estimators for local energy, `g(r)`, `S(k)`, and ring-based `n(x)` exist
-- initial trapped VMC diagnostic paths exist for open-line hard rods, harmonic trapping, non-periodic density, LDA density comparison, and a small diagnostic grid
+- initial trapped VMC diagnostic paths exist for open-line hard rods, harmonic trapping, non-periodic density, LDA density comparison, a small diagnostic grid, and a seed-stability probe
 - DMC is scaffolded, not production-ready
 - trapped benchmark-tier expansion, DMC validation, and failure-map workflows are the next implementation targets

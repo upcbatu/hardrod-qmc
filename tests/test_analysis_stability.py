@@ -1,0 +1,29 @@
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from hrdmc.analysis import summarize_replicate_metrics
+
+
+def test_summarize_replicate_metrics_reports_spread() -> None:
+    rows = [
+        {"density_l2_error_vmc_vs_lda": 0.2, "acceptance_rate": 0.8},
+        {"density_l2_error_vmc_vs_lda": 0.4, "acceptance_rate": 0.9},
+        {"density_l2_error_vmc_vs_lda": 0.6, "acceptance_rate": 1.0},
+    ]
+    summary = summarize_replicate_metrics(
+        rows,
+        ["density_l2_error_vmc_vs_lda", "acceptance_rate"],
+    )
+
+    density_summary = summary["density_l2_error_vmc_vs_lda"]
+    assert density_summary["count"] == 3
+    np.testing.assert_allclose(density_summary["mean"], 0.4)
+    np.testing.assert_allclose(density_summary["sample_std"], 0.2)
+    np.testing.assert_allclose(density_summary["spread"], 0.4)
+
+
+def test_summarize_replicate_metrics_rejects_empty_rows() -> None:
+    with pytest.raises(ValueError, match="at least one replicate"):
+        summarize_replicate_metrics([], ["acceptance_rate"])
