@@ -31,6 +31,10 @@ src/hrdmc/analysis/       errors, uncertainty, and failure maps
 src/hrdmc/io/             JSON / NPZ outputs
 src/hrdmc/plotting/       figures
 experiments/              runnable entrypoints
+tests/                    regression tests
+data/                     external/reference inputs, usually untracked
+results/                  generated experiment outputs, usually untracked
+notebooks/                inspection and figure drafting
 ```
 
 ## Current status

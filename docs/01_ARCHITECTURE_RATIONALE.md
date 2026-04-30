@@ -2,7 +2,7 @@
 
 This repository is organized around a simple principle:
 
-> physical systems, trial states, Monte Carlo sampling, coordinate observables, theory approximations, and comparison analysis are separate owners.
+> physical systems, trial states, Monte Carlo sampling, coordinate observables, theory approximations, comparison analysis, artifact IO, and plotting are separate owners.
 
 The revised thesis direction needs this boundary. The homogeneous hard-rod ring is a validation benchmark, the trapped hard-rod gas is the main sampled many-body target, the excluded-volume LDA is a theory-layer approximation, and the final thesis product is an analysis-layer accuracy and failure map.
 
@@ -97,6 +97,20 @@ This module owns:
 
 It should not solve the LDA normalization or own EOS formulas.
 
+### `io/`
+
+Purpose:
+serialize and load run artifacts.
+
+This module owns:
+
+- JSON and NPZ artifact handling;
+- lightweight schema conversion;
+- result metadata serialization;
+- file-format boundaries between experiments, analysis, and plotting.
+
+It should not own physics formulas, sampling behavior, comparison metrics, or figure layout.
+
 ### `experiments/`
 
 Purpose:
@@ -110,6 +124,34 @@ Purpose:
 generate figures only.
 
 Plotting should render outputs from experiments and analysis without owning physics or comparison logic.
+
+### `tests/`
+
+Purpose:
+verify implemented behavior.
+
+Tests should cover owner contracts, numerical formulas, shape conventions, and regression behavior. Tests should not become hidden experiments.
+
+### `data/`
+
+Purpose:
+hold external or generated input data.
+
+Raw/reference data should stay separate from generated results. Large data should remain out of git unless it is tiny and required for tests.
+
+### `results/`
+
+Purpose:
+hold generated experiment outputs.
+
+Experiment outputs should include metadata with parameters, seeds, sample counts, and runtime. Results are artifacts, not source ownership.
+
+### `notebooks/`
+
+Purpose:
+support inspection and figure drafting.
+
+Notebook logic should be promoted into `src/` or `experiments/` before it becomes part of the thesis workflow.
 
 ## 2. Main Thesis Flow
 
