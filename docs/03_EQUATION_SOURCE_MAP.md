@@ -42,6 +42,7 @@ The proposal should cite only the thesis-backbone items. The method-background a
 | [src/hrdmc/estimators/density.py](src/hrdmc/estimators/density.py) | Periodic and open-line density profile estimators | Repository histogram normalization convention | Periodic density wraps ring coordinates; trapped density uses raw open-line coordinates on a chosen grid. |
 | [src/hrdmc/analysis/blocking.py](src/hrdmc/analysis/blocking.py#L25-L64) | Blocking analysis for correlated Monte Carlo error bars | `[FlyvbjergPetersen1989Blocking]` | Used for QMC uncertainty estimates. |
 | [src/hrdmc/analysis/metrics.py](src/hrdmc/analysis/metrics.py) | Bias, MSE, and density L2 error helpers | Standard statistical definitions | Small support utilities for comparison code. |
+| [experiments/03_trapped_vmc_diagnostic_grid.py](experiments/03_trapped_vmc_diagnostic_grid.py) | Trapped VMC diagnostic grid over particle number and trap strength | Repository orchestration convention | Diagnostic artifact generation only; not final QMC/DMC benchmark evidence. |
 
 ## LDA Benchmark Formulas
 

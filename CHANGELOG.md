@@ -19,6 +19,7 @@
 - Added tests for the all-pair local-energy estimator against finite-`N` ring references.
 - Added `docs/validation/` for thesis-facing validation notes.
 - Added open-line trapped hard-rod geometry, harmonic trap support, trapped density diagnostics, and a trapped VMC smoke entrypoint.
+- Added a trapped VMC diagnostic grid over particle number and trap strength.
 
 ### Removed
 

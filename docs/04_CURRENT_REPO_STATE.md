@@ -24,6 +24,8 @@ This repository is currently at a **homogeneous validation plus initial trapped 
   files: `src/hrdmc/estimators/density.py`, `src/hrdmc/analysis/metrics.py`
 - trapped VMC smoke experiment with VMC-versus-LDA density diagnostics;
   files: `experiments/02_trapped_vmc_smoke.py`
+- trapped VMC diagnostic grid over `N = 4, 8` and `omega = 0.05, 0.10, 0.20`;
+  files: `experiments/03_trapped_vmc_diagnostic_grid.py`
 - blocking analysis and bias/MSE utilities;
   files: `src/hrdmc/analysis/blocking.py`, `src/hrdmc/analysis/metrics.py`
 
@@ -51,8 +53,8 @@ files: `experiments/00_smoke_vmc.py`, `experiments/configs/smoke.json`
 The homogeneous validation benchmark checks the exact all-pair trial local energy against finite-`N` ring references and can be run with `make validate-ring`.
 files: `experiments/01_uniform_hard_rods_validation.py`
 
-The trapped smoke run is a VMC diagnostic and can be run with `make smoke-trap`. It checks sampled density, LDA normalization on the same grid, and a first density L2 difference. It should not be treated as a final trapped benchmark.
-files: `experiments/02_trapped_vmc_smoke.py`
+The trapped smoke run is a VMC diagnostic and can be run with `make smoke-trap`. The trapped diagnostic grid can be run with `make diagnose-trap-grid`. They check sampled density, LDA normalization on the same grid, and density L2 differences. They should not be treated as final trapped benchmarks.
+files: `experiments/02_trapped_vmc_smoke.py`, `experiments/03_trapped_vmc_diagnostic_grid.py`
 
 Benchmark interpretation and remaining validation checks are maintained in `docs/validation/README.md`.
 

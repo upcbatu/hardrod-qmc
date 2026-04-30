@@ -142,9 +142,9 @@ This is a diagnostic result only. It should be used to catch implementation and 
 - Validate population-control behavior.
 - Decide which observables need mixed, extrapolated, or pure-estimator treatment before using DMC as the main production reference.
 
-## 5. Next Step
+## 5. Current Diagnostic Grid
 
-The next technical step is to promote the trapped smoke path into a controlled diagnostic grid:
+The trapped smoke path has been promoted into a controlled diagnostic grid:
 
 ```text
 N = 4, 8
@@ -152,7 +152,20 @@ a = 0.5
 omega = 0.05, 0.10, 0.20
 ```
 
-For each point, the output should include:
+Command:
+
+```bash
+PYTHONPATH=src python3 experiments/03_trapped_vmc_diagnostic_grid.py
+```
+
+Output:
+
+```text
+results/trapped_vmc_grid/summary.json
+results/trapped_vmc_grid/*_density_profiles.npz
+```
+
+For each point, the output includes:
 
 - sampled density profile;
 - LDA density profile on the same grid;
@@ -161,7 +174,19 @@ For each point, the output should include:
 - acceptance rate;
 - benchmark-tier metadata.
 
-Only after this grid is stable should the project move to the main thesis comparison:
+This remains a diagnostic grid. It checks plumbing, normalization, and rough trends, but it does not yet establish LDA accuracy.
+
+## 6. Next Step
+
+The next technical step is to make the diagnostic grid numerically meaningful enough to decide what must be improved before DMC:
+
+- check run-to-run stability across seeds;
+- check density-profile convergence with longer VMC chains;
+- inspect whether the diagnostic trial parameter should be optimized;
+- add simple plots for \(n_{\mathrm{VMC}}(x)\) versus \(n_{\mathrm{LDA}}(x)\);
+- keep all outputs labeled as `VMC diagnostic`.
+
+Only after those checks should the project move to the main thesis comparison:
 
 ```text
 trapped QMC/DMC observables versus excluded-volume LDA predictions
