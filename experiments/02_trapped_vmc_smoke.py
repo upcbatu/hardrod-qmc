@@ -7,11 +7,16 @@ from pathlib import Path
 import numpy as np
 
 from hrdmc.analysis import density_l2_error, relative_density_l2_error
-from hrdmc.estimators import estimate_open_line_density_profile, integrate_density_profile
+from hrdmc.estimators import (
+    density_support_edges,
+    estimate_cloud_moments,
+    estimate_open_line_density_profile,
+    integrate_density_profile,
+)
 from hrdmc.io.artifacts import ensure_dir, write_json
 from hrdmc.monte_carlo.vmc import MetropolisVMC
 from hrdmc.systems import HarmonicTrap, OpenLineHardRodSystem
-from hrdmc.theory import lda_density_profile, lda_total_energy
+from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_support_edges, lda_total_energy
 from hrdmc.wavefunctions import TrappedHardRodTrial
 
 
@@ -76,6 +81,10 @@ def main() -> None:
     l2_error = density_l2_error(density.x, density.n_x, lda.n_x)
     relative_l2_error = relative_density_l2_error(density.x, density.n_x, lda.n_x)
     sampled_density_integral = integrate_density_profile(density)
+    cloud = estimate_cloud_moments(result.snapshots, center=trap.center)
+    lda_rms = lda_rms_radius(lda, center=trap.center)
+    sampled_left_edge, sampled_right_edge = density_support_edges(density)
+    lda_left_edge, lda_right_edge = lda_support_edges(lda)
     potential_values = np.asarray([trap.total(snapshot) for snapshot in result.snapshots], dtype=float)
 
     summary = {
@@ -113,6 +122,13 @@ def main() -> None:
         "density_l2_error_vmc_vs_lda": l2_error,
         "density_l2_error_units": "particles^2/length",
         "relative_density_l2_error_vmc_vs_lda": relative_l2_error,
+        "sampled_mean_square_radius": cloud.mean_square_radius,
+        "sampled_mean_square_radius_stderr": cloud.mean_square_radius_stderr,
+        "sampled_rms_radius": cloud.rms_radius,
+        "lda_rms_radius": lda_rms,
+        "rms_radius_error_vmc_vs_lda": cloud.rms_radius - lda_rms,
+        "sampled_density_support_edges": [sampled_left_edge, sampled_right_edge],
+        "lda_density_support_edges": [lda_left_edge, lda_right_edge],
         "grid": {
             "x_min": x_min,
             "x_max": x_max,

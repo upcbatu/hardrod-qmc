@@ -7,7 +7,6 @@ from numpy.typing import NDArray
 
 from hrdmc.systems.hard_rods import HardRodSystem
 
-
 FloatArray = NDArray[np.float64]
 
 
@@ -24,6 +23,20 @@ def integrate_density_profile(profile: DensityProfileResult) -> float:
     if widths.shape != profile.n_x.shape:
         raise ValueError("bin_edges must have one more entry than n_x")
     return float(np.sum(profile.n_x * widths))
+
+
+def density_support_edges(
+    profile: DensityProfileResult,
+    *,
+    density_threshold: float = 0.0,
+) -> tuple[float | None, float | None]:
+    """Return the first and last occupied bin centers above a density threshold."""
+    if density_threshold < 0:
+        raise ValueError("density_threshold must be non-negative")
+    occupied = np.flatnonzero(profile.n_x > density_threshold)
+    if occupied.size == 0:
+        return None, None
+    return float(profile.x[occupied[0]]), float(profile.x[occupied[-1]])
 
 
 def estimate_density_profile(

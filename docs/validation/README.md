@@ -199,12 +199,31 @@ It reports replicate mean, sample standard deviation, standard error, and spread
 
 This remains a `VMC diagnostic` check. Its purpose is to decide whether the trapped VMC settings are stable enough to inspect before moving toward DMC.
 
-## 7. Next Step
+## 7. Alpha Scan Diagnostic
+
+The trapped diagnostic path includes an alpha scan for the Gaussian factor in the trial state.
+
+Command:
+
+```bash
+PYTHONPATH=src python3 experiments/05_trapped_vmc_alpha_scan.py
+```
+
+Output:
+
+```text
+results/trapped_vmc_alpha_scan/summary.json
+results/trapped_vmc_alpha_scan/*_density_profiles.npz
+```
+
+It reports acceptance, density errors, sampled RMS radius, LDA RMS radius, radius error, and replicate spread across seeds for each alpha multiplier. The sampled potential energy is only a trap-energy proxy; it is not a full VMC total energy until a trapped local-energy estimator is implemented and validated.
+
+## 8. Next Step
 
 The next technical step is to make the diagnostic grid numerically meaningful enough to decide what must be improved before DMC:
 
 - check density-profile convergence with longer VMC chains;
-- inspect whether the diagnostic trial parameter should be optimized;
+- use the alpha scan only as diagnostic guidance unless a trapped local-energy estimator is added;
 - add simple plots for \(n_{\mathrm{VMC}}(x)\) versus \(n_{\mathrm{LDA}}(x)\);
 - keep all outputs labeled as `VMC diagnostic`.
 

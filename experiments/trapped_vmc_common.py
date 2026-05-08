@@ -5,10 +5,15 @@ from dataclasses import dataclass
 import numpy as np
 
 from hrdmc.analysis import density_l2_error, relative_density_l2_error
-from hrdmc.estimators import estimate_open_line_density_profile, integrate_density_profile
+from hrdmc.estimators import (
+    density_support_edges,
+    estimate_cloud_moments,
+    estimate_open_line_density_profile,
+    integrate_density_profile,
+)
 from hrdmc.monte_carlo.vmc import MetropolisVMC
 from hrdmc.systems import HarmonicTrap, OpenLineHardRodSystem
-from hrdmc.theory import lda_density_profile, lda_total_energy
+from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_support_edges, lda_total_energy
 from hrdmc.wavefunctions import TrappedHardRodTrial
 
 
@@ -34,12 +39,13 @@ def run_trapped_vmc_case(
     seed: int,
     grid_extent: float,
     n_bins: int,
+    alpha_multiplier: float = 1.0,
 ) -> tuple[dict[str, object], dict[str, np.ndarray]]:
     system = OpenLineHardRodSystem(n_particles=case.n_particles, rod_length=rod_length)
     trap = HarmonicTrap(omega=case.omega)
     trial = TrappedHardRodTrial(
         system=system,
-        gaussian_alpha=case.omega / np.sqrt(2.0),
+        gaussian_alpha=alpha_multiplier * case.omega / np.sqrt(2.0),
         contact_power=1.0,
     )
     sampler = MetropolisVMC(system=system, trial=trial, step_size=step_size, seed=seed)
@@ -62,6 +68,10 @@ def run_trapped_vmc_case(
     sampled_integral = integrate_density_profile(density)
     l2_error = density_l2_error(density.x, density.n_x, lda.n_x)
     relative_l2_error = relative_density_l2_error(density.x, density.n_x, lda.n_x)
+    cloud = estimate_cloud_moments(result.snapshots, center=trap.center)
+    lda_rms = lda_rms_radius(lda, center=trap.center)
+    sampled_left_edge, sampled_right_edge = density_support_edges(density)
+    lda_left_edge, lda_right_edge = lda_support_edges(lda)
     valid_fraction = float(np.mean([system.is_valid(snapshot) for snapshot in result.snapshots]))
     slug = trapped_case_slug(case)
 
@@ -82,6 +92,7 @@ def run_trapped_vmc_case(
         "trial": {
             "type": "TrappedHardRodTrial",
             "gaussian_alpha": trial.gaussian_alpha,
+            "alpha_multiplier": alpha_multiplier,
             "contact_power": trial.contact_power,
         },
         "vmc": result.metadata,
@@ -101,6 +112,13 @@ def run_trapped_vmc_case(
         "density_l2_error_vmc_vs_lda": l2_error,
         "density_l2_error_units": "particles^2/length",
         "relative_density_l2_error_vmc_vs_lda": relative_l2_error,
+        "sampled_mean_square_radius": cloud.mean_square_radius,
+        "sampled_mean_square_radius_stderr": cloud.mean_square_radius_stderr,
+        "sampled_rms_radius": cloud.rms_radius,
+        "lda_rms_radius": lda_rms,
+        "rms_radius_error_vmc_vs_lda": cloud.rms_radius - lda_rms,
+        "sampled_density_support_edges": [sampled_left_edge, sampled_right_edge],
+        "lda_density_support_edges": [lda_left_edge, lda_right_edge],
         "grid": {
             "x_min": -grid_extent,
             "x_max": grid_extent,

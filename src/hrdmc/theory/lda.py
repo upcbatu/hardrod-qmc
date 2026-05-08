@@ -10,7 +10,6 @@ from hrdmc.theory.hard_rods import (
     invert_hard_rod_chemical_potential,
 )
 
-
 FloatArray = NDArray[np.float64]
 
 
@@ -122,3 +121,30 @@ def lda_total_energy(profile: LDADensityProfile, rod_length: float) -> float:
     )
     potential_energy = profile.potential_x * profile.n_x
     return _integrate(profile.x, local_energy + potential_energy)
+
+
+def lda_mean_square_radius(profile: LDADensityProfile, *, center: float = 0.0) -> float:
+    """Return <(x-center)^2> from an LDA density profile."""
+    if profile.integrated_particles <= 0:
+        raise ValueError("profile must contain a positive particle count")
+    moment = _integrate(profile.x, ((profile.x - center) ** 2) * profile.n_x)
+    return float(moment / profile.integrated_particles)
+
+
+def lda_rms_radius(profile: LDADensityProfile, *, center: float = 0.0) -> float:
+    """Return sqrt(<(x-center)^2>) from an LDA density profile."""
+    return float(np.sqrt(lda_mean_square_radius(profile, center=center)))
+
+
+def lda_support_edges(
+    profile: LDADensityProfile,
+    *,
+    density_threshold: float = 1e-8,
+) -> tuple[float | None, float | None]:
+    """Return the first and last LDA grid points above a density threshold."""
+    if density_threshold < 0:
+        raise ValueError("density_threshold must be non-negative")
+    occupied = np.flatnonzero(profile.n_x > density_threshold)
+    if occupied.size == 0:
+        return None, None
+    return float(profile.x[occupied[0]]), float(profile.x[occupied[-1]])

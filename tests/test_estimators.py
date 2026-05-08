@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 
 from hrdmc.estimators import (
+    density_support_edges,
+    estimate_cloud_moments,
     estimate_density_profile,
     estimate_local_energy,
     estimate_open_line_density_profile,
@@ -99,6 +101,29 @@ def test_density_profile_integral_uses_histogram_edges() -> None:
 
     np.testing.assert_allclose(integrate_density_profile(result), 3.0)
     assert np.trapezoid(result.n_x, result.x) != 3.0
+
+
+def test_density_support_edges() -> None:
+    result = estimate_open_line_density_profile(
+        np.array([[-1.0, 0.0, 2.0]]),
+        x_min=-2.0,
+        x_max=3.0,
+        n_bins=5,
+    )
+    assert density_support_edges(result) == (-0.5, 2.5)
+
+
+def test_cloud_moments_from_snapshots() -> None:
+    snapshots = np.array(
+        [
+            [-1.0, 1.0],
+            [-2.0, 2.0],
+        ]
+    )
+    result = estimate_cloud_moments(snapshots)
+    np.testing.assert_allclose(result.mean_square_radius, 2.5)
+    np.testing.assert_allclose(result.rms_radius, np.sqrt(2.5))
+    assert result.mean_square_radius_stderr > 0.0
 
 
 def test_open_line_density_profile_integrates_particle_count() -> None:

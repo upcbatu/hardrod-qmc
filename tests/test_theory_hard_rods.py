@@ -11,6 +11,9 @@ from hrdmc.theory import (
     hard_rod_finite_ring_energy_per_particle,
     invert_hard_rod_chemical_potential,
     lda_density_profile,
+    lda_mean_square_radius,
+    lda_rms_radius,
+    lda_support_edges,
     lda_total_energy,
 )
 
@@ -56,6 +59,12 @@ def test_lda_profile_normalizes_particles() -> None:
     assert np.all(profile.n_x >= 0.0)
     assert profile.n_x[np.argmin(np.abs(x))] > profile.n_x[0]
     assert lda_total_energy(profile, rod_length=0.2) > 0.0
+    assert lda_mean_square_radius(profile) > 0.0
+    assert lda_rms_radius(profile) > 0.0
+    left, right = lda_support_edges(profile)
+    assert left is not None
+    assert right is not None
+    assert left < 0.0 < right
 
 
 def test_lda_profile_rejects_truncated_grid() -> None:

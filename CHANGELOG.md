@@ -6,6 +6,7 @@
 
 - Added normalization/reference checks for homogeneous `g(r)`, `S(k)`, and periodic density estimators.
 - Added histogram-edge density integration, LDA boundary containment checks, and relative density L2 diagnostics.
+- Added trapped cloud-radius estimators and an alpha-scan diagnostic for the trapped VMC trial.
 
 ### Changed
 

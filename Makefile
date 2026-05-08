@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: test smoke validate-ring smoke-trap diagnose-trap-grid diagnose-trap-seeds clean
+.PHONY: test smoke validate-ring smoke-trap diagnose-trap-grid diagnose-trap-seeds scan-trap-alpha clean
 
 test:
 	PYTHONPATH=src $(PYTHON) -m pytest
@@ -19,6 +19,9 @@ diagnose-trap-grid:
 
 diagnose-trap-seeds:
 	PYTHONPATH=src $(PYTHON) experiments/04_trapped_vmc_seed_stability.py
+
+scan-trap-alpha:
+	PYTHONPATH=src $(PYTHON) experiments/05_trapped_vmc_alpha_scan.py
 
 clean:
 	rm -rf .pytest_cache .ruff_cache
