@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-08
+
+### Added
+
+- Added normalization/reference checks for homogeneous `g(r)`, `S(k)`, and periodic density estimators.
+
+### Changed
+
+- Updated validation notes to distinguish initial homogeneous observable normalization checks from later literature-curve comparisons.
+
 ## 2026-04-30
 
 ### Changed

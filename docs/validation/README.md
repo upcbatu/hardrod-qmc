@@ -95,8 +95,8 @@ Before using the code for thesis-level trapped-system conclusions, the following
 
 ### Homogeneous Observables
 
-- Compare homogeneous `g(r)` and `S(k)` outputs against analytic expectations, literature curves, or trusted reference data where available.
-- Confirm that estimator normalization conventions are documented and stable across system sizes.
+- Initial normalization checks now cover the periodic density integral, the `g(r)` finite-`N` unique-pair sum rule, and a lattice reference for `S(k)`.
+- Still useful later: compare homogeneous `g(r)` and `S(k)` shapes against literature curves or trusted reference data where available.
 
 ### Trapped Geometry and Sampling
 

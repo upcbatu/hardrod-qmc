@@ -41,7 +41,8 @@ def estimate_pair_distribution(
 
     This normalization is the repository convention for the pair-correlation
     estimator; the physical observable is the same g(r) used in the hard-rod
-    paper.
+    paper. For finite N, integrating the estimator over [0, L/2] gives the
+    unique-pair sum rule L*(N-1)/(2*N).
     """
     snapshots = np.asarray(snapshots, dtype=float)
     if snapshots.ndim != 2:
