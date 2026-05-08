@@ -2,19 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MPL_CONFIG_DIR = REPO_ROOT / "results" / "trapped_vmc_alpha_scan" / ".matplotlib"
-MPL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-os.environ.setdefault("MPLCONFIGDIR", str(MPL_CONFIG_DIR))
-
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
 
 PLOT_SPECS = (
     (
@@ -28,14 +18,6 @@ PLOT_SPECS = (
         "alpha_vs_rms_radius_error.png",
     ),
     ("acceptance_rate", "Acceptance rate", "alpha_vs_acceptance.png"),
-)
-
-TABLE_METRICS = (
-    "acceptance_rate",
-    "relative_density_l2_error_vmc_vs_lda",
-    "sampled_rms_radius",
-    "rms_radius_error_vmc_vs_lda",
-    "sampled_potential_energy_mean",
 )
 
 
@@ -69,7 +51,33 @@ def max_metric_spread(scan: list[dict], name: str) -> float:
     return max(metric(case, name, "spread") for case in scan)
 
 
-def plot_metric(scan: list[dict], metric_name: str, ylabel: str, output_path: Path) -> None:
+def load_pyplot():
+    import os
+
+    scratch_dir = REPO_ROOT / "results" / "trapped_vmc_alpha_scan" / ".tmp"
+    mpl_config_dir = scratch_dir / "matplotlib"
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    mpl_config_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["TMPDIR"] = str(scratch_dir)
+    os.environ["TEMP"] = str(scratch_dir)
+    os.environ["TMP"] = str(scratch_dir)
+    os.environ["MPLCONFIGDIR"] = str(mpl_config_dir)
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    return plt
+
+
+def plot_metric(
+    plt,
+    scan: list[dict],
+    metric_name: str,
+    ylabel: str,
+    output_path: Path,
+) -> None:
     x = [float(case["alpha_multiplier"]) for case in scan]
     y = [metric(case, metric_name, "mean") for case in scan]
     yerr = [metric(case, metric_name, "stderr") for case in scan]
@@ -111,15 +119,21 @@ def write_markdown_summary(summary: dict, output_path: Path) -> None:
         "",
         f"- summary status: {summary['status']}",
         f"- completed replicates: {completed_count}/{replicate_count}",
-        f"- minimum valid snapshot fraction: {min_replicate(summary, 'valid_snapshot_fraction'):.6g}",
-        f"- max |sampled density integral error|: {max_abs_replicate(summary, 'sampled_density_integral_error'):.3g}",
-        f"- max |LDA integrated particles error|: {max_abs_replicate(summary, 'lda_integrated_particles_error'):.3g}",
-        f"- max acceptance seed spread by alpha: {max_metric_spread(scan, 'acceptance_rate'):.3g}",
-        f"- max relative-density-L2 seed spread by alpha: {max_metric_spread(scan, 'relative_density_l2_error_vmc_vs_lda'):.3g}",
+        "- minimum valid snapshot fraction: "
+        f"{min_replicate(summary, 'valid_snapshot_fraction'):.6g}",
+        "- max |sampled density integral error|: "
+        f"{max_abs_replicate(summary, 'sampled_density_integral_error'):.3g}",
+        "- max |LDA integrated particles error|: "
+        f"{max_abs_replicate(summary, 'lda_integrated_particles_error'):.3g}",
+        "- max acceptance seed spread by alpha: "
+        f"{max_metric_spread(scan, 'acceptance_rate'):.3g}",
+        "- max relative-density-L2 seed spread by alpha: "
+        f"{max_metric_spread(scan, 'relative_density_l2_error_vmc_vs_lda'):.3g}",
         "",
         "## Replicate Summary",
         "",
-        "| alpha | acceptance | relative density L2 | sampled RMS radius | RMS radius error | sampled potential energy |",
+        "| alpha | acceptance | relative density L2 | sampled RMS radius | "
+        "RMS radius error | sampled potential energy |",
         "|---:|---:|---:|---:|---:|---:|",
     ]
 
@@ -146,7 +160,8 @@ def write_markdown_summary(summary: dict, output_path: Path) -> None:
             "",
             "This is a VMC diagnostic alpha scan.",
             "The scan can guide density/radius diagnostics.",
-            "It does not select a production variational optimum because trapped local energy is not implemented.",
+            "It does not select a production variational optimum because trapped local "
+            "energy is not implemented.",
             "It does not validate LDA accuracy or DMC readiness.",
             "",
         ]
@@ -162,9 +177,10 @@ def main() -> None:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     scan = sorted(summary["scan"], key=lambda case: float(case["alpha_multiplier"]))
+    plt = load_pyplot()
 
     for metric_name, ylabel, filename in PLOT_SPECS:
-        plot_metric(scan, metric_name, ylabel, output_dir / filename)
+        plot_metric(plt, scan, metric_name, ylabel, output_dir / filename)
     write_markdown_summary(summary, output_dir / "alpha_scan_summary.md")
 
 

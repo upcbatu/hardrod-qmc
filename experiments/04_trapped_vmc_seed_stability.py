@@ -10,7 +10,6 @@ from hrdmc.analysis import summarize_replicate_metrics
 from hrdmc.io.artifacts import ensure_dir, write_json
 from trapped_vmc_common import TrappedVMCCase, run_trapped_vmc_case, trapped_case_slug
 
-
 STABILITY_METRICS = (
     "acceptance_rate",
     "valid_snapshot_fraction",
@@ -99,7 +98,9 @@ def main() -> None:
     }
 
     if not args.no_write:
-        out_dir = ensure_dir(args.output_dir or repo_root / "results" / "trapped_vmc_seed_stability")
+        out_dir = ensure_dir(
+            args.output_dir or repo_root / "results" / "trapped_vmc_seed_stability"
+        )
         write_json(out_dir / "summary.json", summary)
         for seed, arrays in arrays_by_seed.items():
             np.savez(out_dir / f"{case_id}_seed{seed}_density_profiles.npz", **arrays)

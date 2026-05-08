@@ -7,7 +7,6 @@ from numpy.typing import NDArray
 
 from hrdmc.systems.open_line import OpenLineHardRodSystem
 
-
 FloatArray = NDArray[np.float64]
 
 

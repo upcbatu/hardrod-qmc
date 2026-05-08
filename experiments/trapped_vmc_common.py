@@ -64,7 +64,10 @@ def run_trapped_vmc_case(
         n_particles=float(system.n_particles),
         rod_length=system.rod_length,
     )
-    potential_values = np.asarray([trap.total(snapshot) for snapshot in result.snapshots], dtype=float)
+    potential_values = np.asarray(
+        [trap.total(snapshot) for snapshot in result.snapshots],
+        dtype=float,
+    )
     sampled_integral = integrate_density_profile(density)
     l2_error = density_l2_error(density.x, density.n_x, lda.n_x)
     relative_l2_error = relative_density_l2_error(density.x, density.n_x, lda.n_x)

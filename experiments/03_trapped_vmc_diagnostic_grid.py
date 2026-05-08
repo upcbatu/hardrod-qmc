@@ -4,6 +4,8 @@ import argparse
 import json
 from pathlib import Path
 
+import numpy as np
+
 from hrdmc.io.artifacts import ensure_dir, write_json
 from trapped_vmc_common import TrappedVMCCase, run_trapped_vmc_case
 

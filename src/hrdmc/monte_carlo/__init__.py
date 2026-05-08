@@ -1,6 +1,6 @@
 from hrdmc.monte_carlo.dmc import (
-    DMCResult,
     DiffusionMonteCarloEngine,
+    DMCResult,
     WalkerSet,
     normalize_weights,
     systematic_resample,

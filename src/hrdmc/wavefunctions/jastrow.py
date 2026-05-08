@@ -8,7 +8,6 @@ from numpy.typing import NDArray
 from hrdmc.systems.hard_rods import HardRodSystem
 from hrdmc.theory import excluded_length
 
-
 FloatArray = NDArray[np.float64]
 
 

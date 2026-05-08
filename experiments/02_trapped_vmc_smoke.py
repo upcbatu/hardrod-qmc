@@ -85,7 +85,10 @@ def main() -> None:
     lda_rms = lda_rms_radius(lda, center=trap.center)
     sampled_left_edge, sampled_right_edge = density_support_edges(density)
     lda_left_edge, lda_right_edge = lda_support_edges(lda)
-    potential_values = np.asarray([trap.total(snapshot) for snapshot in result.snapshots], dtype=float)
+    potential_values = np.asarray(
+        [trap.total(snapshot) for snapshot in result.snapshots],
+        dtype=float,
+    )
 
     summary = {
         "status": "completed",

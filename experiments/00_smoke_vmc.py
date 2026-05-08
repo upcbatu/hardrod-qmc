@@ -34,8 +34,17 @@ def main() -> None:
         rod_length=sys_cfg.rod_length,
     )
     trial = HardRodJastrowTrial(system=system, power=1.0, nearest_neighbor_only=True)
-    sampler = MetropolisVMC(system=system, trial=trial, step_size=vmc_cfg.step_size, seed=vmc_cfg.seed)
-    result = sampler.run(n_steps=vmc_cfg.n_steps, burn_in=vmc_cfg.burn_in, thinning=vmc_cfg.thinning)
+    sampler = MetropolisVMC(
+        system=system,
+        trial=trial,
+        step_size=vmc_cfg.step_size,
+        seed=vmc_cfg.seed,
+    )
+    result = sampler.run(
+        n_steps=vmc_cfg.n_steps,
+        burn_in=vmc_cfg.burn_in,
+        thinning=vmc_cfg.thinning,
+    )
 
     g = estimate_pair_distribution(result.snapshots, system, n_bins=80)
     s = estimate_static_structure_factor(result.snapshots, system, n_modes=24)

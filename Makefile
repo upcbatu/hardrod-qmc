@@ -1,8 +1,13 @@
 PYTHON ?= python3
 
-.PHONY: test smoke validate-ring smoke-trap diagnose-trap-grid diagnose-trap-seeds scan-trap-alpha clean
+.PHONY: test lint unit smoke validate-ring smoke-trap diagnose-trap-grid diagnose-trap-seeds scan-trap-alpha clean
 
-test:
+test: lint unit
+
+lint:
+	$(PYTHON) -m ruff check
+
+unit:
 	PYTHONPATH=src $(PYTHON) -m pytest
 
 smoke:

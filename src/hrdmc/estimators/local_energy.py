@@ -7,7 +7,6 @@ from numpy.typing import NDArray
 
 from hrdmc.wavefunctions.jastrow import HardRodJastrowTrial
 
-
 FloatArray = NDArray[np.float64]
 
 
