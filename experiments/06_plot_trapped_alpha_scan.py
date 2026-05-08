@@ -51,10 +51,11 @@ def max_metric_spread(scan: list[dict], name: str) -> float:
     return max(metric(case, name, "spread") for case in scan)
 
 
-def load_pyplot():
+def load_pyplot(output_dir: Path):
     import os
+    import tempfile
 
-    scratch_dir = REPO_ROOT / "results" / "trapped_vmc_alpha_scan" / ".tmp"
+    scratch_dir = output_dir / ".tmp"
     mpl_config_dir = scratch_dir / "matplotlib"
     scratch_dir.mkdir(parents=True, exist_ok=True)
     mpl_config_dir.mkdir(parents=True, exist_ok=True)
@@ -62,6 +63,7 @@ def load_pyplot():
     os.environ["TEMP"] = str(scratch_dir)
     os.environ["TMP"] = str(scratch_dir)
     os.environ["MPLCONFIGDIR"] = str(mpl_config_dir)
+    tempfile.tempdir = str(scratch_dir)
 
     import matplotlib
 
@@ -174,10 +176,10 @@ def main() -> None:
     with args.summary.open(encoding="utf-8") as handle:
         summary = json.load(handle)
 
-    output_dir = args.output_dir
+    output_dir = args.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     scan = sorted(summary["scan"], key=lambda case: float(case["alpha_multiplier"]))
-    plt = load_pyplot()
+    plt = load_pyplot(output_dir)
 
     for metric_name, ylabel, filename in PLOT_SPECS:
         plot_metric(plt, scan, metric_name, ylabel, output_dir / filename)
