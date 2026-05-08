@@ -18,6 +18,7 @@ STABILITY_METRICS = (
     "lda_integrated_particles_error",
     "sampled_potential_energy_mean",
     "density_l2_error_vmc_vs_lda",
+    "relative_density_l2_error_vmc_vs_lda",
 )
 
 

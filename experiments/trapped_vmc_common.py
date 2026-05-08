@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from hrdmc.analysis import density_l2_error
-from hrdmc.estimators import estimate_open_line_density_profile
+from hrdmc.analysis import density_l2_error, relative_density_l2_error
+from hrdmc.estimators import estimate_open_line_density_profile, integrate_density_profile
 from hrdmc.monte_carlo.vmc import MetropolisVMC
 from hrdmc.systems import HarmonicTrap, OpenLineHardRodSystem
 from hrdmc.theory import lda_density_profile, lda_total_energy
@@ -59,8 +59,9 @@ def run_trapped_vmc_case(
         rod_length=system.rod_length,
     )
     potential_values = np.asarray([trap.total(snapshot) for snapshot in result.snapshots], dtype=float)
-    sampled_integral = float(np.trapezoid(density.n_x, density.x))
+    sampled_integral = integrate_density_profile(density)
     l2_error = density_l2_error(density.x, density.n_x, lda.n_x)
+    relative_l2_error = relative_density_l2_error(density.x, density.n_x, lda.n_x)
     valid_fraction = float(np.mean([system.is_valid(snapshot) for snapshot in result.snapshots]))
     slug = trapped_case_slug(case)
 
@@ -98,6 +99,8 @@ def run_trapped_vmc_case(
             np.std(potential_values, ddof=1) / np.sqrt(potential_values.size)
         ),
         "density_l2_error_vmc_vs_lda": l2_error,
+        "density_l2_error_units": "particles^2/length",
+        "relative_density_l2_error_vmc_vs_lda": relative_l2_error,
         "grid": {
             "x_min": -grid_extent,
             "x_max": grid_extent,

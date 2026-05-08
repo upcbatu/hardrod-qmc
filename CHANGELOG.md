@@ -5,10 +5,13 @@
 ### Added
 
 - Added normalization/reference checks for homogeneous `g(r)`, `S(k)`, and periodic density estimators.
+- Added histogram-edge density integration, LDA boundary containment checks, and relative density L2 diagnostics.
 
 ### Changed
 
 - Updated validation notes to distinguish initial homogeneous observable normalization checks from later literature-curve comparisons.
+- Removed invalid blocking-analysis reporting from the homogeneous smoke output.
+- Clarified homogeneous validation and structure-factor source-map wording.
 
 ## 2026-04-30
 

@@ -8,6 +8,7 @@ from hrdmc.estimators import (
     estimate_open_line_density_profile,
     estimate_pair_distribution,
     estimate_static_structure_factor,
+    integrate_density_profile,
 )
 from hrdmc.systems.hard_rods import HardRodSystem
 from hrdmc.theory import hard_rod_finite_ring_energy_per_particle
@@ -84,8 +85,20 @@ def test_periodic_density_profile_integrates_particle_count() -> None:
         ]
     )
     result = estimate_density_profile(snapshots, system=system, n_bins=16)
-    integral = np.sum(result.n_x * np.diff(result.bin_edges))
+    integral = integrate_density_profile(result)
     np.testing.assert_allclose(integral, system.n_particles)
+
+
+def test_density_profile_integral_uses_histogram_edges() -> None:
+    result = estimate_open_line_density_profile(
+        np.array([[0.1, 1.1, 2.1]]),
+        x_min=0.0,
+        x_max=3.0,
+        n_bins=3,
+    )
+
+    np.testing.assert_allclose(integrate_density_profile(result), 3.0)
+    assert np.trapezoid(result.n_x, result.x) != 3.0
 
 
 def test_open_line_density_profile_integrates_particle_count() -> None:
@@ -96,5 +109,5 @@ def test_open_line_density_profile_integrates_particle_count() -> None:
         ]
     )
     result = estimate_open_line_density_profile(snapshots, x_min=-2.0, x_max=2.0, n_bins=40)
-    integral = np.sum(result.n_x * np.diff(result.bin_edges))
+    integral = integrate_density_profile(result)
     np.testing.assert_allclose(integral, 3.0)

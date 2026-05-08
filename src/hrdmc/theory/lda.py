@@ -46,6 +46,7 @@ def lda_density_profile(
     rod_length: float,
     *,
     tolerance: float = 1e-10,
+    boundary_density_tolerance: float = 1e-8,
     max_iterations: int = 200,
 ) -> LDADensityProfile:
     """Solve the excluded-volume LDA normalization on a fixed spatial grid."""
@@ -56,6 +57,8 @@ def lda_density_profile(
         raise ValueError("n_particles must be positive")
     if rod_length < 0:
         raise ValueError("rod_length must be non-negative")
+    if boundary_density_tolerance < 0:
+        raise ValueError("boundary_density_tolerance must be non-negative")
     if rod_length > 0:
         max_particles = (float(x[-1]) - float(x[0])) / rod_length
         if n_particles >= max_particles:
@@ -72,6 +75,20 @@ def lda_density_profile(
         ]
         return densities
 
+    def build_profile(global_mu: float, n_x: FloatArray, count: float) -> LDADensityProfile:
+        if max(float(n_x[0]), float(n_x[-1])) > boundary_density_tolerance:
+            raise ValueError(
+                "LDA grid does not contain the density cloud; increase the spatial extent"
+            )
+        return LDADensityProfile(
+            x=x,
+            n_x=n_x,
+            potential_x=potential_x,
+            chemical_potential=float(global_mu),
+            target_particles=float(n_particles),
+            integrated_particles=float(count),
+        )
+
     low = v_min
     high = max(v_min + 1.0, float(np.max(potential_x)) + 1.0)
     for _ in range(max_iterations):
@@ -86,14 +103,7 @@ def lda_density_profile(
         n_mid = density_for_mu(mid)
         count_mid = _integrate(x, n_mid)
         if abs(count_mid - n_particles) <= tolerance * max(1.0, n_particles):
-            return LDADensityProfile(
-                x=x,
-                n_x=n_mid,
-                potential_x=potential_x,
-                chemical_potential=float(mid),
-                target_particles=float(n_particles),
-                integrated_particles=float(count_mid),
-            )
+            return build_profile(mid, n_mid, count_mid)
         if count_mid < n_particles:
             low = mid
         else:
@@ -101,14 +111,7 @@ def lda_density_profile(
 
     global_mu = 0.5 * (low + high)
     n_x = density_for_mu(global_mu)
-    return LDADensityProfile(
-        x=x,
-        n_x=n_x,
-        potential_x=potential_x,
-        chemical_potential=float(global_mu),
-        target_particles=float(n_particles),
-        integrated_particles=_integrate(x, n_x),
-    )
+    return build_profile(global_mu, n_x, _integrate(x, n_x))
 
 
 def lda_total_energy(profile: LDADensityProfile, rod_length: float) -> float:

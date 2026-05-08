@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
-from hrdmc.analysis import density_l2_error
-from hrdmc.estimators import estimate_open_line_density_profile
+from hrdmc.analysis import density_l2_error, relative_density_l2_error
+from hrdmc.estimators import estimate_open_line_density_profile, integrate_density_profile
 from hrdmc.io.artifacts import ensure_dir, write_json
 from hrdmc.monte_carlo.vmc import MetropolisVMC
 from hrdmc.systems import HarmonicTrap, OpenLineHardRodSystem
@@ -74,7 +74,8 @@ def main() -> None:
         rod_length=system.rod_length,
     )
     l2_error = density_l2_error(density.x, density.n_x, lda.n_x)
-    sampled_density_integral = float(np.trapezoid(density.n_x, density.x))
+    relative_l2_error = relative_density_l2_error(density.x, density.n_x, lda.n_x)
+    sampled_density_integral = integrate_density_profile(density)
     potential_values = np.asarray([trap.total(snapshot) for snapshot in result.snapshots], dtype=float)
 
     summary = {
@@ -100,7 +101,9 @@ def main() -> None:
         "n_snapshots": int(result.snapshots.shape[0]),
         "valid_snapshot_fraction": float(np.mean([system.is_valid(x) for x in result.snapshots])),
         "sampled_density_integral": sampled_density_integral,
+        "sampled_density_integral_error": sampled_density_integral - system.n_particles,
         "lda_integrated_particles": lda.integrated_particles,
+        "lda_integrated_particles_error": lda.integrated_particles - system.n_particles,
         "lda_chemical_potential": lda.chemical_potential,
         "lda_total_energy": lda_total_energy(lda, rod_length=system.rod_length),
         "sampled_potential_energy_mean": float(np.mean(potential_values)),
@@ -108,6 +111,8 @@ def main() -> None:
             np.std(potential_values, ddof=1) / np.sqrt(potential_values.size)
         ),
         "density_l2_error_vmc_vs_lda": l2_error,
+        "density_l2_error_units": "particles^2/length",
+        "relative_density_l2_error_vmc_vs_lda": relative_l2_error,
         "grid": {
             "x_min": x_min,
             "x_max": x_max,

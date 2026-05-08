@@ -20,7 +20,7 @@ This repository is currently at a **homogeneous validation plus initial trapped 
   files: `src/hrdmc/estimators/`
 - open-line trapped hard-rod geometry, harmonic trap potential, and trapped diagnostic trial state;
   files: `src/hrdmc/systems/open_line.py`, `src/hrdmc/systems/external_potential.py`, `src/hrdmc/wavefunctions/trapped.py`
-- non-periodic density estimation and density L2 comparison;
+- non-periodic density estimation plus raw and relative density L2 comparison;
   files: `src/hrdmc/estimators/density.py`, `src/hrdmc/analysis/metrics.py`
 - trapped VMC smoke experiment with VMC-versus-LDA density diagnostics;
   files: `experiments/02_trapped_vmc_smoke.py`

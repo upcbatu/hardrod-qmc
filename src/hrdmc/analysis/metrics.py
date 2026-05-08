@@ -30,3 +30,12 @@ def density_l2_error(x: FloatArray, estimate: FloatArray, reference: FloatArray)
     if not np.all(np.diff(x) > 0):
         raise ValueError("x must be strictly increasing")
     return float(np.trapezoid((estimate - reference) ** 2, x))
+
+
+def relative_density_l2_error(x: FloatArray, estimate: FloatArray, reference: FloatArray) -> float:
+    """Return ||estimate-reference||_2 / ||reference||_2 on a fixed grid."""
+    numerator = density_l2_error(x, estimate, reference)
+    denominator = density_l2_error(x, np.zeros_like(np.asarray(reference, dtype=float)), reference)
+    if denominator <= 0.0:
+        raise ValueError("reference density norm must be positive")
+    return float(np.sqrt(numerator / denominator))

@@ -38,10 +38,10 @@ The proposal should cite only the thesis-backbone items. The method-background a
 | [src/hrdmc/monte_carlo/vmc.py](src/hrdmc/monte_carlo/vmc.py#L27-L94) | Metropolis VMC with burn-in, thinning, and acceptance/rejection on `|Psi_T|^2` | Standard Variational Monte Carlo methodology | Current homogeneous smoke workflow. |
 | [src/hrdmc/monte_carlo/dmc.py](src/hrdmc/monte_carlo/dmc.py) | DMC result contract, walker population support, and resampling support | Standard walker Monte Carlo conventions | Contract layer only; production DMC is not implemented. |
 | [src/hrdmc/estimators/pair_distribution.py](src/hrdmc/estimators/pair_distribution.py#L22-L69) | Pair distribution function `g(r)` estimated from coordinate snapshots | `[Mazzanti2008HardRods]` for the observable; repository histogram normalization for implementation | Mainly useful for homogeneous validation unless adapted for trapped local analysis. |
-| [src/hrdmc/estimators/structure_factor.py](src/hrdmc/estimators/structure_factor.py#L21-L54) | Static structure factor `S(k) = <|rho_k|^2>/N`, with `rho_k = sum_j exp(i k x_j)` | `[Mazzanti2008HardRods]` | Ring observable for homogeneous validation. |
+| [src/hrdmc/estimators/structure_factor.py](src/hrdmc/estimators/structure_factor.py#L21-L54) | Static structure factor `S(k) = <|rho_k|^2>/N`, with `rho_k = sum_j exp(i k x_j)` using physical wrapped particle positions, not reduced coordinates | `[Mazzanti2008HardRods]` | Ring observable for homogeneous validation. |
 | [src/hrdmc/estimators/density.py](src/hrdmc/estimators/density.py) | Periodic and open-line density profile estimators | Repository histogram normalization convention | Periodic density wraps ring coordinates; trapped density uses raw open-line coordinates on a chosen grid. |
 | [src/hrdmc/analysis/blocking.py](src/hrdmc/analysis/blocking.py#L25-L64) | Blocking analysis for correlated Monte Carlo error bars | `[FlyvbjergPetersen1989Blocking]` | Used for QMC uncertainty estimates. |
-| [src/hrdmc/analysis/metrics.py](src/hrdmc/analysis/metrics.py) | Bias, MSE, and density L2 error helpers | Standard statistical definitions | Small support utilities for comparison code. |
+| [src/hrdmc/analysis/metrics.py](src/hrdmc/analysis/metrics.py) | Bias, MSE, raw density L2 error, and relative density L2 error helpers | Standard statistical definitions | Small support utilities for comparison code. |
 | [src/hrdmc/analysis/stability.py](src/hrdmc/analysis/stability.py) | Replicate spread summaries for diagnostic stability checks | Standard sample mean and sample standard deviation | Used to decide whether VMC diagnostic metrics are stable across seeds. |
 | [experiments/trapped_vmc_common.py](experiments/trapped_vmc_common.py) | Shared trapped VMC diagnostic orchestration | Repository orchestration convention | Calls system, wavefunction, MC, estimator, theory, and analysis seams without owning their formulas. |
 | [experiments/03_trapped_vmc_diagnostic_grid.py](experiments/03_trapped_vmc_diagnostic_grid.py) | Trapped VMC diagnostic grid over particle number and trap strength | Repository orchestration convention | Diagnostic artifact generation only; not final QMC/DMC benchmark evidence. |
@@ -95,6 +95,17 @@ $$
 $$
 \Delta n_2 = \int
 \left|n_{\mathrm{benchmark}}(x)-n_{\mathrm{LDA}}(x)\right|^2\,dx,
+$$
+
+with a dimensionless relative version:
+
+$$
+\delta n_2 =
+\frac{
+\left[\int |n_{\mathrm{benchmark}}(x)-n_{\mathrm{LDA}}(x)|^2\,dx\right]^{1/2}
+}{
+\left[\int |n_{\mathrm{LDA}}(x)|^2\,dx\right]^{1/2}
+},
 $$
 
 $$

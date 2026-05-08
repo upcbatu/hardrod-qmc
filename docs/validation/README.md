@@ -79,7 +79,7 @@ The benchmark passed for all 9 cases.
 | valid snapshot fraction | 1.0 in every case |
 | acceptance-rate range | approximately 0.83 to 0.87 |
 
-The energy error is at floating-point roundoff level. This indicates that the periodic hard-rod geometry, the exact all-pair trial wavefunction, the VMC sampler, and the local-energy estimator are mutually consistent for the homogeneous benchmark.
+The energy error is at floating-point roundoff level. This indicates that the periodic hard-rod geometry, the exact all-pair trial wavefunction, and the local-energy formula are mutually consistent for the homogeneous benchmark. It is not a strong standalone validation of sampler convergence, because the exact all-pair local energy is constant for every valid sampled configuration.
 
 ## 3. Interpretation
 
@@ -118,7 +118,7 @@ results/trapped_vmc_smoke/summary.json
 results/trapped_vmc_smoke/density_profiles.npz
 ```
 
-The smoke test currently reports sampled density, LDA density on the same grid, LDA normalization, and a density L2 difference. A representative dry-run with `N=4`, `a=0.5`, and `omega=0.2` gave:
+The smoke test currently reports sampled density, LDA density on the same grid, LDA normalization, raw density L2 difference, and relative density L2 difference. Sampled histogram density normalization is checked with bin widths rather than trapezoidal integration over bin centers. A representative dry-run with `N=4`, `a=0.5`, and `omega=0.2` gave:
 
 | Quantity | Result |
 | --- | ---: |
@@ -126,7 +126,8 @@ The smoke test currently reports sampled density, LDA density on the same grid, 
 | sampled density integral | 4.0 |
 | LDA integrated particles | 4.0 |
 | acceptance rate | about 0.88 |
-| density L2 difference | about 0.31 |
+| density L2 difference | diagnostic only; value depends on chain length and trial settings |
+| relative density L2 difference | diagnostic only; value depends on chain length and trial settings |
 
 This is a diagnostic result only. It should be used to catch implementation and convention errors, not as a thesis-level claim about LDA accuracy.
 
@@ -170,6 +171,7 @@ For each point, the output includes:
 - sampled density profile;
 - LDA density profile on the same grid;
 - density L2 difference;
+- relative density L2 difference;
 - valid snapshot fraction;
 - acceptance rate;
 - benchmark-tier metadata.

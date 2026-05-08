@@ -3,14 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from hrdmc.analysis.blocking import blocking_standard_error
 from hrdmc.config import load_experiment_config
 from hrdmc.estimators import (
     estimate_pair_distribution,
     estimate_static_structure_factor,
 )
 from hrdmc.io.artifacts import ensure_dir, write_json
-from hrdmc.io.schema import to_jsonable
 from hrdmc.monte_carlo.vmc import MetropolisVMC
 from hrdmc.plotting import plot_pair_distribution, plot_structure_factor
 from hrdmc.systems.hard_rods import HardRodSystem
@@ -49,9 +47,6 @@ def main() -> None:
     e_thermo = hard_rod_energy_per_particle(system.density, system.rod_length)
     reduced_length = excluded_length(system.n_particles, system.length, system.rod_length)
 
-    # Smoke-level scalar series: first mode of S(k). This is not a final thesis error bar.
-    block = blocking_standard_error(s.s_k)
-
     artifacts = []
     plotting_status = "ok"
     try:
@@ -82,7 +77,12 @@ def main() -> None:
         "cpu_seconds": result.cpu_seconds,
         "reference_energy_per_particle_finite_N": e_finite,
         "reference_energy_per_particle_thermodynamic": e_thermo,
-        "blocking_smoke_for_Sk_modes": to_jsonable(block),
+        "structure_factor_first_mode": float(s.s_k[0]),
+        "structure_factor_first_mode_stderr": float(s.stderr[0]),
+        "structure_factor_uncertainty_note": (
+            "Per-mode stderr is computed across stored snapshots; blocking analysis is not "
+            "reported in this smoke output."
+        ),
         "plotting_status": plotting_status,
         "artifacts": artifacts,
     }

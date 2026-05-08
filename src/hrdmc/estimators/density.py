@@ -18,6 +18,14 @@ class DensityProfileResult:
     bin_edges: FloatArray
 
 
+def integrate_density_profile(profile: DensityProfileResult) -> float:
+    """Integrate a histogram density profile using its bin widths."""
+    widths = np.diff(profile.bin_edges)
+    if widths.shape != profile.n_x.shape:
+        raise ValueError("bin_edges must have one more entry than n_x")
+    return float(np.sum(profile.n_x * widths))
+
+
 def estimate_density_profile(
     snapshots: FloatArray,
     system: HardRodSystem,
