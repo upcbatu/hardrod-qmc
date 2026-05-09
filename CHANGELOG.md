@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-05-09
+
+### Added
+
+- Added trapped hard-rod local-energy diagnostics with kinetic, trap, and total energy components.
+- Added finite-difference and invalid-configuration tests for the trapped local-energy estimator.
+- Added total-energy alpha-scan reporting, including an energy-vs-alpha plot and bracketing diagnostics.
+- Added a lower-alpha trapped VMC energy bracket packet for the current diagnostic trial.
+- Added an upper-side trapped VMC energy alpha scan with longer chains to test whether the diagnostic minimum is bracketed.
+
+### Changed
+
+- Updated trapped alpha-scan summaries to keep `sampled_potential_energy_mean` as a labeled harmonic-trap-energy alias while using `sampled_total_energy_mean` for energy diagnostics.
+
 ## 2026-05-08
 
 ### Added

@@ -10,11 +10,15 @@ from hrdmc.estimators import (
     estimate_open_line_density_profile,
     estimate_pair_distribution,
     estimate_static_structure_factor,
+    estimate_trapped_local_energy,
     integrate_density_profile,
+    trapped_hard_rod_local_energy,
 )
+from hrdmc.systems import HarmonicTrap, OpenLineHardRodSystem
 from hrdmc.systems.hard_rods import HardRodSystem
 from hrdmc.theory import hard_rod_finite_ring_energy_per_particle
 from hrdmc.wavefunctions.jastrow import HardRodJastrowTrial
+from hrdmc.wavefunctions.trapped import TrappedHardRodTrial
 
 
 def test_pair_distribution_shapes() -> None:
@@ -76,6 +80,54 @@ def test_all_pair_local_energy_matches_finite_ring_reference() -> None:
     )
     np.testing.assert_allclose(result.values, exact_total, rtol=1e-12, atol=1e-12)
     np.testing.assert_allclose(result.mean, exact_total, rtol=1e-12, atol=1e-12)
+
+
+def test_trapped_local_kinetic_energy_matches_finite_difference() -> None:
+    system = OpenLineHardRodSystem(n_particles=3, rod_length=0.4)
+    trial = TrappedHardRodTrial(system=system, gaussian_alpha=0.07, contact_power=1.2)
+    trap = HarmonicTrap(omega=0.1)
+    positions = np.array([-1.4, 0.15, 1.35])
+    step = 1e-5
+    log0 = trial.log_value(positions)
+
+    laplacian_over_value = 0.0
+    for particle in range(system.n_particles):
+        plus = positions.copy()
+        minus = positions.copy()
+        plus[particle] += step
+        minus[particle] -= step
+        grad_log = (trial.log_value(plus) - trial.log_value(minus)) / (2.0 * step)
+        lap_log = (trial.log_value(plus) - 2.0 * log0 + trial.log_value(minus)) / step**2
+        laplacian_over_value += lap_log + grad_log**2
+
+    finite_difference_kinetic = -laplacian_over_value
+    local_energy = trapped_hard_rod_local_energy(positions, trial, trap)
+
+    np.testing.assert_allclose(local_energy.kinetic, finite_difference_kinetic, rtol=5e-6)
+
+
+def test_trapped_local_energy_uses_harmonic_trap_convention() -> None:
+    system = OpenLineHardRodSystem(n_particles=3, rod_length=0.4)
+    trial = TrappedHardRodTrial(system=system, gaussian_alpha=0.05)
+    trap = HarmonicTrap(omega=0.3, center=0.2)
+    positions = np.array([-1.3, -0.2, 1.1])
+
+    local_energy = trapped_hard_rod_local_energy(positions, trial, trap)
+
+    np.testing.assert_allclose(local_energy.trap, trap.total(positions))
+    np.testing.assert_allclose(local_energy.total, local_energy.kinetic + trap.total(positions))
+
+
+def test_trapped_local_energy_rejects_invalid_hard_rod_configuration() -> None:
+    system = OpenLineHardRodSystem(n_particles=3, rod_length=0.5)
+    trial = TrappedHardRodTrial(system=system, gaussian_alpha=0.05)
+    trap = HarmonicTrap(omega=0.1)
+    invalid_positions = np.array([-0.1, 0.2, 1.4])
+
+    with np.testing.assert_raises(ValueError):
+        trapped_hard_rod_local_energy(invalid_positions, trial, trap)
+    with np.testing.assert_raises(ValueError):
+        estimate_trapped_local_energy(np.asarray([invalid_positions]), trial, trap)
 
 
 def test_periodic_density_profile_integrates_particle_count() -> None:

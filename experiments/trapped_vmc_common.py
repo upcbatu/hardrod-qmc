@@ -9,6 +9,7 @@ from hrdmc.estimators import (
     density_support_edges,
     estimate_cloud_moments,
     estimate_open_line_density_profile,
+    estimate_trapped_local_energy,
     integrate_density_profile,
 )
 from hrdmc.monte_carlo.vmc import MetropolisVMC
@@ -64,10 +65,7 @@ def run_trapped_vmc_case(
         n_particles=float(system.n_particles),
         rod_length=system.rod_length,
     )
-    potential_values = np.asarray(
-        [trap.total(snapshot) for snapshot in result.snapshots],
-        dtype=float,
-    )
+    local_energy = estimate_trapped_local_energy(result.snapshots, trial, trap)
     sampled_integral = integrate_density_profile(density)
     l2_error = density_l2_error(density.x, density.n_x, lda.n_x)
     relative_l2_error = relative_density_l2_error(density.x, density.n_x, lda.n_x)
@@ -108,10 +106,15 @@ def run_trapped_vmc_case(
         "lda_integrated_particles_error": lda.integrated_particles - system.n_particles,
         "lda_chemical_potential": lda.chemical_potential,
         "lda_total_energy": lda_total_energy(lda, rod_length=system.rod_length),
-        "sampled_potential_energy_mean": float(np.mean(potential_values)),
-        "sampled_potential_energy_stderr": float(
-            np.std(potential_values, ddof=1) / np.sqrt(potential_values.size)
-        ),
+        "sampled_kinetic_energy_mean": local_energy.kinetic_mean,
+        "sampled_kinetic_energy_stderr": local_energy.kinetic_stderr,
+        "sampled_trap_energy_mean": local_energy.trap_mean,
+        "sampled_trap_energy_stderr": local_energy.trap_stderr,
+        "sampled_total_energy_mean": local_energy.total_mean,
+        "sampled_total_energy_stderr": local_energy.total_stderr,
+        "sampled_potential_energy_mean": local_energy.trap_mean,
+        "sampled_potential_energy_stderr": local_energy.trap_stderr,
+        "sampled_potential_energy_label": "harmonic trap energy only",
         "density_l2_error_vmc_vs_lda": l2_error,
         "density_l2_error_units": "particles^2/length",
         "relative_density_l2_error_vmc_vs_lda": relative_l2_error,
@@ -135,5 +138,8 @@ def run_trapped_vmc_case(
         "n_lda": lda.n_x,
         "potential_x": potential_x,
         "bin_edges": density.bin_edges,
+        "local_kinetic_energy": local_energy.kinetic_values,
+        "trap_energy": local_energy.trap_values,
+        "local_total_energy": local_energy.total_values,
     }
     return summary, arrays

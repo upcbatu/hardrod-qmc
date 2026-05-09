@@ -13,6 +13,9 @@ from trapped_vmc_common import TrappedVMCCase, run_trapped_vmc_case, trapped_cas
 ALPHA_SCAN_METRICS = (
     "acceptance_rate",
     "valid_snapshot_fraction",
+    "sampled_total_energy_mean",
+    "sampled_kinetic_energy_mean",
+    "sampled_trap_energy_mean",
     "sampled_potential_energy_mean",
     "density_l2_error_vmc_vs_lda",
     "relative_density_l2_error_vmc_vs_lda",
@@ -123,9 +126,10 @@ def main() -> None:
             "n_bins": args.n_bins,
         },
         "interpretation": (
-            "Diagnostic alpha scan only. sampled_potential_energy_mean is a trap-energy "
-            "proxy, not a full VMC total energy. Do not select a production trial without "
-            "a trapped local-energy estimator or another explicit criterion."
+            "Diagnostic alpha scan only. sampled_total_energy_mean is the VMC local-energy "
+            "diagnostic for the current trapped trial, not a hostile-audited production "
+            "benchmark. sampled_potential_energy_mean is kept as a backward-compatible "
+            "alias for harmonic trap energy only."
         ),
     }
 

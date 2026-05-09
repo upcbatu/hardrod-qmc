@@ -8,6 +8,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 PLOT_SPECS = (
     (
+        "sampled_total_energy_mean",
+        "VMC total local energy",
+        "alpha_vs_total_energy.png",
+    ),
+    (
         "relative_density_l2_error_vmc_vs_lda",
         "Relative density L2",
         "alpha_vs_relative_density_l2.png",
@@ -49,6 +54,48 @@ def min_replicate(summary: dict, name: str) -> float:
 
 def max_metric_spread(scan: list[dict], name: str) -> float:
     return max(metric(case, name, "spread") for case in scan)
+
+
+def max_metric_stderr(scan: list[dict], name: str) -> float:
+    return max(metric(case, name, "stderr") for case in scan)
+
+
+def has_metric(scan: list[dict], name: str) -> bool:
+    return all(name in case["metric_summary"] for case in scan)
+
+
+def energy_diagnostic_lines(scan: list[dict]) -> list[str]:
+    if not has_metric(scan, "sampled_total_energy_mean"):
+        return []
+
+    energies = [metric(case, "sampled_total_energy_mean", "mean") for case in scan]
+    min_index = int(min(range(len(scan)), key=lambda index: energies[index]))
+    min_case = scan[min_index]
+    min_alpha = float(min_case["alpha_multiplier"])
+    min_energy = metric(min_case, "sampled_total_energy_mean", "mean")
+    min_stderr = metric(min_case, "sampled_total_energy_mean", "stderr")
+    bracketed = 0 < min_index < len(scan) - 1
+    if bracketed:
+        bracket_note = "yes; the lowest sampled energy is inside the scanned alpha range"
+    elif min_index == 0:
+        bracket_note = "no; the lowest sampled energy is on the lower-alpha boundary"
+    else:
+        bracket_note = "no; the lowest sampled energy is on the upper-alpha boundary"
+
+    return [
+        "",
+        "## Energy Diagnostic",
+        "",
+        f"- lowest sampled total energy alpha: {min_alpha:.3g}",
+        f"- lowest sampled total energy: {min_energy:.6g} +/- {min_stderr:.2g}",
+        f"- bracketed energy minimum: {bracket_note}",
+        "- max total-energy stderr by alpha: "
+        f"{max_metric_stderr(scan, 'sampled_total_energy_mean'):.3g}",
+        "- max total-energy seed spread by alpha: "
+        f"{max_metric_spread(scan, 'sampled_total_energy_mean'):.3g}",
+        "- sampled_potential_energy_mean is harmonic trap energy only; "
+        "use sampled_total_energy_mean for the VMC local-energy diagnostic.",
+    ]
 
 
 def load_pyplot(output_dir: Path):
@@ -131,29 +178,49 @@ def write_markdown_summary(summary: dict, output_path: Path) -> None:
         f"{max_metric_spread(scan, 'acceptance_rate'):.3g}",
         "- max relative-density-L2 seed spread by alpha: "
         f"{max_metric_spread(scan, 'relative_density_l2_error_vmc_vs_lda'):.3g}",
-        "",
-        "## Replicate Summary",
-        "",
-        "| alpha | acceptance | relative density L2 | sampled RMS radius | "
-        "RMS radius error | sampled potential energy |",
-        "|---:|---:|---:|---:|---:|---:|",
     ]
+    lines.extend(energy_diagnostic_lines(scan))
+    lines.extend(["", "## Replicate Summary", ""])
+    has_energy = has_metric(scan, "sampled_total_energy_mean")
+    if has_energy:
+        lines.extend(
+            [
+                "| alpha | total energy | kinetic energy | trap energy | acceptance | "
+                "relative density L2 | sampled RMS radius | RMS radius error |",
+                "|---:|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "| alpha | acceptance | relative density L2 | sampled RMS radius | "
+                "RMS radius error | sampled potential energy |",
+                "|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
 
     for case in scan:
-        lines.append(
-            "| "
-            + " | ".join(
-                (
+        if has_energy:
+            row = (
+                f"{float(case['alpha_multiplier']):.2f}",
+                fmt_mean_stderr(case, "sampled_total_energy_mean"),
+                fmt_mean_stderr(case, "sampled_kinetic_energy_mean"),
+                fmt_mean_stderr(case, "sampled_trap_energy_mean"),
+                fmt_mean_stderr(case, "acceptance_rate"),
+                fmt_mean_stderr(case, "relative_density_l2_error_vmc_vs_lda"),
+                fmt_mean_stderr(case, "sampled_rms_radius"),
+                fmt_mean_stderr(case, "rms_radius_error_vmc_vs_lda"),
+            )
+        else:
+            row = (
                     f"{float(case['alpha_multiplier']):.2f}",
                     fmt_mean_stderr(case, "acceptance_rate"),
                     fmt_mean_stderr(case, "relative_density_l2_error_vmc_vs_lda"),
                     fmt_mean_stderr(case, "sampled_rms_radius"),
                     fmt_mean_stderr(case, "rms_radius_error_vmc_vs_lda"),
                     fmt_mean_stderr(case, "sampled_potential_energy_mean"),
-                )
             )
-            + " |"
-        )
+        lines.append("| " + " | ".join(row) + " |")
 
     lines.extend(
         [
@@ -161,9 +228,11 @@ def write_markdown_summary(summary: dict, output_path: Path) -> None:
             "## Interpretation",
             "",
             "This is a VMC diagnostic alpha scan.",
+            "The total-energy curve is a diagnostic variational surface for the current "
+            "trial, not a production benchmark.",
             "The scan can guide density/radius diagnostics.",
-            "It does not select a production variational optimum because trapped local "
-            "energy is not implemented.",
+            "It does not select a production variational optimum unless the minimum is "
+            "bracketed and uncertainties support it.",
             "It does not validate LDA accuracy or DMC readiness.",
             "",
         ]
@@ -182,7 +251,8 @@ def main() -> None:
     plt = load_pyplot(output_dir)
 
     for metric_name, ylabel, filename in PLOT_SPECS:
-        plot_metric(plt, scan, metric_name, ylabel, output_dir / filename)
+        if has_metric(scan, metric_name):
+            plot_metric(plt, scan, metric_name, ylabel, output_dir / filename)
     write_markdown_summary(summary, output_dir / "alpha_scan_summary.md")
 
 
