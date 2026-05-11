@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 
 import numpy as np
+from common import TrappedVMCCase, run_trapped_vmc_case
 
 from hrdmc.io.artifacts import ensure_dir, write_json
-from trapped_vmc_common import TrappedVMCCase, run_trapped_vmc_case
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,7 +35,7 @@ def default_cases() -> list[TrappedVMCCase]:
 
 def main() -> None:
     args = build_parser().parse_args()
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
 
     cases = []
     arrays_by_case = {}

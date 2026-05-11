@@ -11,9 +11,9 @@ from hrdmc.estimators import (
 from hrdmc.io.artifacts import ensure_dir, write_json
 from hrdmc.monte_carlo.vmc import MetropolisVMC
 from hrdmc.plotting import plot_pair_distribution, plot_structure_factor
+from hrdmc.systems import excluded_length
 from hrdmc.systems.hard_rods import HardRodSystem
 from hrdmc.theory import (
-    excluded_length,
     hard_rod_energy_per_particle,
     hard_rod_finite_ring_energy_per_particle,
 )
@@ -21,8 +21,8 @@ from hrdmc.wavefunctions.jastrow import HardRodJastrowTrial
 
 
 def main() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    cfg_path = repo_root / "experiments" / "configs" / "smoke.json"
+    repo_root = Path(__file__).resolve().parents[2]
+    cfg_path = repo_root / "experiments" / "vmc" / "configs" / "smoke.json"
     cfg = load_experiment_config(cfg_path)
     sys_cfg = cfg.system
     vmc_cfg = cfg.vmc

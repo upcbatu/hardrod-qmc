@@ -4,15 +4,16 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
 from hrdmc.estimators import estimate_local_energy
 from hrdmc.io.artifacts import ensure_dir, write_json
 from hrdmc.monte_carlo.vmc import MetropolisVMC
+from hrdmc.systems import excluded_length
 from hrdmc.systems.hard_rods import HardRodSystem
 from hrdmc.theory import (
-    excluded_length,
     hard_rod_energy_per_particle,
     hard_rod_finite_ring_energy_per_particle,
 )
@@ -70,7 +71,7 @@ def run_case(
     thinning: int,
     seed: int,
     tolerance: float,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     density = case.packing_fraction / rod_length
     length = case.n_particles / density
     system = HardRodSystem(
@@ -135,7 +136,7 @@ def run_case(
 
 def main() -> None:
     args = build_parser().parse_args()
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
 
     cases = [
         run_case(

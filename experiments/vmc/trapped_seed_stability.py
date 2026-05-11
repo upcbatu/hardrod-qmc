@@ -5,10 +5,10 @@ import json
 from pathlib import Path
 
 import numpy as np
+from common import TrappedVMCCase, run_trapped_vmc_case, trapped_case_slug
 
 from hrdmc.analysis import summarize_replicate_metrics
 from hrdmc.io.artifacts import ensure_dir, write_json
-from trapped_vmc_common import TrappedVMCCase, run_trapped_vmc_case, trapped_case_slug
 
 STABILITY_METRICS = (
     "acceptance_rate",
@@ -47,7 +47,7 @@ def parse_seeds(raw: str) -> list[int]:
 
 def main() -> None:
     args = build_parser().parse_args()
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
     seeds = parse_seeds(args.seeds)
     case = TrappedVMCCase(n_particles=args.n_particles, omega=args.omega)
     case_id = trapped_case_slug(case)
