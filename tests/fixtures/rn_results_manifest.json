@@ -1,0 +1,16 @@
+{
+  "schema_version": "rn_results_manifest_v1",
+  "purpose": "RN-DMC table manifest for compact artifact tests; not a raw run bundle.",
+  "tables": [
+    "docs/tables/rn_validation_summary.csv",
+    "docs/tables/rn_grid_summary.csv",
+    "docs/tables/rn_seed_robustness_summary.csv"
+  ],
+  "claim_boundary": "Validated candidate tables only; full run artifacts are archived separately.",
+  "canonical_controls": {
+    "dt": 0.00125,
+    "walkers": 512,
+    "tau_block": 0.01,
+    "rn_cadence_tau": 0.005
+  }
+}
