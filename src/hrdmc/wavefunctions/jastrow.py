@@ -5,8 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from hrdmc.systems import excluded_length
 from hrdmc.systems.hard_rods import HardRodSystem
-from hrdmc.theory import excluded_length
 
 FloatArray = NDArray[np.float64]
 

@@ -1,22 +1,20 @@
-from hrdmc.monte_carlo.dmc import (
+from hrdmc.monte_carlo.dmc.common import WeightedDMCResult
+from hrdmc.monte_carlo.dmc.contracts import (
     DiffusionMonteCarloEngine,
     DMCResult,
-    RNBlockDMCConfig,
-    RNBlockDMCResult,
     WalkerSet,
     normalize_weights,
     systematic_resample,
 )
-from hrdmc.monte_carlo.vmc import MetropolisVMC, VMCResult
+from hrdmc.monte_carlo.dmc.rn_block import RNBlockDMCConfig, RNBlockDMCResult
 
 __all__ = [
     "DMCResult",
     "DiffusionMonteCarloEngine",
-    "MetropolisVMC",
     "RNBlockDMCConfig",
     "RNBlockDMCResult",
-    "VMCResult",
     "WalkerSet",
+    "WeightedDMCResult",
     "normalize_weights",
     "systematic_resample",
 ]

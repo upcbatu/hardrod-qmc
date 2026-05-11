@@ -33,7 +33,8 @@ class HardRodSystem:
     Notes
     -----
     The prototype works in units hbar^2 / (2m) = 1.
-    Analytic excluded-volume mapping and EOS formulas live in `hrdmc.theory`.
+    Reduced-length geometry lives in `hrdmc.systems.reduced`; EOS formulas live
+    in `hrdmc.theory`.
     """
 
     n_particles: int
