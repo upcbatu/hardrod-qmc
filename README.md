@@ -18,26 +18,44 @@ The homogeneous hard-rod system on a ring is kept as a controlled QMC validation
   What is already implemented, what the tests cover, and what is still missing.
 - [docs/05_TIMELINE_AND_NAVIGATION.md](docs/05_TIMELINE_AND_NAVIGATION.md)
   Tentative calendar and navigation note.
+- [docs/RN_BLOCK_DMC.md](docs/RN_BLOCK_DMC.md)
+  Canonical RN-DMC method note, written for careful first-time readers.
+- [docs/07_ENGINE_QUALITY_GATES.md](docs/07_ENGINE_QUALITY_GATES.md)
+  Generic numerical-quality gates for QMC engine release.
 - [docs/validation/README.md](docs/validation/README.md)
   Validation notes for benchmark status, interpretation, and remaining checks.
 
 ## Code layout
 
 ```text
-src/hrdmc/systems/        physical geometry, constraints, and potentials
-src/hrdmc/wavefunctions/  trial states
-src/hrdmc/monte_carlo/    VMC and DMC
+src/hrdmc/systems/        physical geometry, constraints, potentials, kernels
+src/hrdmc/wavefunctions/  VMC trials and DMC guides
+src/hrdmc/monte_carlo/    VMC plus DMC contracts and implementations
 src/hrdmc/estimators/     observables from coordinate data
-src/hrdmc/theory/         homogeneous EOS, excluded-volume mapping, LDA
+src/hrdmc/theory/         homogeneous EOS, chemical potential, LDA
 src/hrdmc/analysis/       errors, uncertainty, and failure maps
+src/hrdmc/runners/        generic seed-batch execution and progress plumbing
+src/hrdmc/workflows/      method workflow composition above engines
+src/hrdmc/artifacts/      canonical result routing
 src/hrdmc/io/             JSON / NPZ outputs
 src/hrdmc/plotting/       figures
-experiments/              runnable entrypoints
+experiments/vmc/          VMC diagnostic entrypoints
+experiments/validation/   exact and analytic validation entrypoints
+experiments/dmc/rn_block/ RN-block DMC entrypoints
 tests/                    regression tests
 data/                     external/reference inputs, usually untracked
 results/                  generated experiment outputs, usually untracked
 notebooks/                inspection and figure drafting
 ```
+
+## Development Checks
+
+Install development tooling with `python3 -m pip install -e ".[dev]"`.
+
+- `make lint` runs `ruff check`.
+- `make typecheck` runs `pyright` with the repository `pyproject.toml` settings.
+- `make check` runs both lint and type checks.
+- `make test` runs lint and unit tests.
 
 ## Current status
 
@@ -47,5 +65,8 @@ notebooks/                inspection and figure drafting
 - a working VMC smoke pipeline exists for the homogeneous scaffold
 - observable estimators for local energy, `g(r)`, `S(k)`, and ring-based `n(x)` exist
 - initial trapped VMC diagnostic paths exist for open-line hard rods, harmonic trapping, non-periodic density, LDA density comparison, a small diagnostic grid, and a seed-stability probe
-- DMC is scaffolded, not production-ready
-- trapped benchmark-tier expansion, DMC validation, and failure-map workflows are the next implementation targets
+- the DMC layer now has a generic contract package and an RN-block
+  candidate implementation under `src/hrdmc/monte_carlo/dmc/rn_block/`
+- compact validation tables, streaming RN runners, and release-quality
+  documentation are now present; release metadata and archived result bundles
+  are still pending

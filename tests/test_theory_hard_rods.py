@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from hrdmc.systems import excluded_length
 from hrdmc.theory import (
-    excluded_length,
     hard_rod_chemical_potential,
     hard_rod_energy_density,
     hard_rod_energy_per_particle,
