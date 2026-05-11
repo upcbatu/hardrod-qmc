@@ -9,6 +9,8 @@
 - Added exact homogeneous and trapped validation entrypoints for RN-DMC release checks.
 - Added weighted estimators, time-series diagnostics, chain diagnostics, and artifact/provenance helpers.
 - Added cloud run scripts for reproducible VM campaigns.
+- Added a canonical RN-block DMC method note and completed bibliography entries
+  for DMC kernels, RN transition components, and stationarity diagnostics.
 
 ### Changed
 

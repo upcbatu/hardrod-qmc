@@ -63,6 +63,11 @@ Every entry below has one of these statuses:
 - `[FlyvbjergPetersen1989Blocking]` H. Flyvbjerg, H. G. Petersen, *Error
   estimates on averages of correlated data*, **J. Chem. Phys. 91**, 461-466
   (1989). DOI: [10.1063/1.457480](https://doi.org/10.1063/1.457480)
+- `[VehtariGelmanSimpsonCarpenterBuerkner2021Rhat]` A. Vehtari, A. Gelman,
+  D. Simpson, B. Carpenter, P.-C. Buerkner, *Rank-normalization, folding, and
+  localization: An improved R-hat for assessing convergence of MCMC*,
+  **Bayesian Analysis 16**, 667-718 (2021).
+  DOI: [10.1214/20-BA1221](https://doi.org/10.1214/20-BA1221)
 
 ### Optional Literature
 
@@ -1094,6 +1099,23 @@ $$
 It then uses autocorrelation-adjusted slope and cumulative-drift diagnostics on
 production traces.
 
+For multiple independent seed traces, the stationarity report also computes the
+standard potential-scale-reduction diagnostic. With within-chain variance \(W\),
+between-chain variance \(B\), \(M\) chains, and \(N\) samples per chain:
+
+$$
+\widehat{\mathrm{var}}^+
+=
+\frac{N-1}{N}W+\frac{1}{N}B,
+\qquad
+\hat R
+=
+\sqrt{\frac{\widehat{\mathrm{var}}^+}{W}}.
+$$
+
+The implementation uses this as a conservative chain-agreement diagnostic, not
+as a Bayesian posterior diagnostic.
+
 For a fitted production-tail slope \(b\) with naive regression standard error
 \(\sigma_b\), the autocorrelation-adjusted slope statistic is
 
@@ -1189,7 +1211,9 @@ silently trusting the seed standard error.
 
 Source basis:
 `Method paper`, autocorrelation/error-control logic aligned with
-`[FlyvbjergPetersen1989Blocking]`; DMC validation need from `[Foulkes2001QMC]`.
+`[FlyvbjergPetersen1989Blocking]`; chain-agreement context from
+`[VehtariGelmanSimpsonCarpenterBuerkner2021Rhat]`; DMC validation need from
+`[Foulkes2001QMC]`.
 
 Claim boundary:
 Gate-support analysis only. It is not a physics source and does not make DMC
