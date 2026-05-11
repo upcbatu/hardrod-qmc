@@ -19,23 +19,41 @@ This module owns only:
 - open-line trapped geometry;
 - hard-core constraints;
 - boundary conventions;
-- external potentials.
+- external potentials;
+- reduced-coordinate geometry identities such as `L' = L - N a`.
+- DMC target propagator interfaces tied to a system Hamiltonian.
 
-It does not own the homogeneous equation of state, chemical potential, excluded-volume LDA, or benchmark error logic.
+It does not own the homogeneous equation of state, chemical potential,
+excluded-volume LDA, or benchmark error logic.
 
 ### `wavefunctions/`
 
 Purpose:
-define trial states used by the Monte Carlo layer.
+define trial states and guides used by the Monte Carlo layer.
 
 This module owns:
 
 - trial amplitude or log-amplitude evaluation;
+- DMC guide derivatives when a trial state is used for importance sampling;
+- local-energy ingredients derived from the guide;
 - rejection of invalid configurations;
 - tunable trial-state parameters;
 - trial forms used directly in VMC and as DMC input.
 
 The current trial forms are ring-oriented. Trapped calculations may need additional one-body trap factors or supervisor-provided trial forms.
+
+For production DMC, a "wavefunction" is not just an initializer. It controls
+the importance-sampling drift, local-energy variance, and practical projection
+quality. The RN-DMC release path should therefore expose a guide protocol
+with:
+
+```text
+log_value
+grad_log_value
+lap_log_value
+local_energy
+validity
+```
 
 ### `monte_carlo/`
 
@@ -49,7 +67,41 @@ This module owns:
 - walker/result contracts;
 - population-control support;
 
-DMC is the target production method, but the architecture must not assume DMC is already a trusted reference. Until it is validated, trapped results should be labeled by benchmark tier: VMC diagnostic, DMC candidate reference, or external/group reference if available.
+DMC is the target production method, but the architecture must not assume DMC is already a trusted reference. Until it is validated, trapped results should be labeled by benchmark tier: VMC diagnostic, DMC candidate, or external/group reference if available.
+
+The generic DMC contract should remain a shared support layer inside the
+`dmc/` package. Specific DMC engines should live in subpackages. The
+RN-corrected collective-block engine candidate is therefore promoted as:
+
+```text
+src/hrdmc/monte_carlo/dmc/rn_block/
+```
+
+and not by turning the DMC contract layer into a monolith.
+
+The RN-block subpackage must not own the physical system. Its config should own
+algorithmic proposal parameters only. The system/Hamiltonian layer should own
+the target short-time transition density:
+
+```text
+K_sys(x_new | x_old, tau)
+```
+
+The guide should own trial-wavefunction derivatives and local energy. RN-block
+should own only the collective proposal:
+
+```text
+Q_theta(x_new | x_old)
+```
+
+and the ratio bookkeeping:
+
+```text
+log K_sys - log Q_theta
+```
+
+This prevents the collective block code from silently duplicating system
+physics and playing a separate dynamics game.
 
 ### `estimators/`
 
@@ -74,7 +126,8 @@ This module owns:
 
 - homogeneous hard-rod EOS;
 - chemical potential;
-- excluded-volume mapping;
+- excluded-volume EOS and LDA formulas that use the reduced length supplied by
+  `systems/`;
 - chemical-potential inversion;
 - LDA normalization;
 - LDA density and energy predictions.
@@ -111,12 +164,57 @@ This module owns:
 
 It should not own physics formulas, sampling behavior, comparison metrics, or figure layout.
 
+### `runners/`
+
+Purpose:
+execute independent run batches.
+
+This module owns seed-batch dispatch, bounded parallel-worker integration,
+worker-to-parent progress propagation, and serial fallback when multiprocessing
+is unavailable.
+
+It should not own physics systems, DMC algorithms, observables, or paper
+classification rules.
+
+### `workflows/`
+
+Purpose:
+compose package engines into reproducible scientific workflows.
+
+Workflow modules sit above engines and below command-line experiments. They own
+case parsing, default controls, system-guide-kernel composition, and
+method-specific summaries.
+
+They should not own primitive DMC transition kernels, low-level estimators, or
+CLI argument parsing.
+
+### `artifacts/`
+
+Purpose:
+define canonical result routes.
+
+Artifact layout belongs here so scripts do not invent ad hoc result folders.
+The tracked convention is:
+
+```text
+results/<physics-layer>/<method-family>/<workflow-name>/
+```
+
 ### `experiments/`
 
 Purpose:
-orchestrate concrete runs.
+orchestrate concrete runs through thin CLI entrypoints.
 
-Experiments combine systems, wavefunctions, Monte Carlo, estimators, theory predictions, analysis summaries, IO, and plots. They should not own scientific equations.
+Experiments are grouped by domain:
+
+```text
+experiments/vmc/
+experiments/validation/
+experiments/dmc/rn_block/
+```
+
+They should not contain reusable runner engines, method workflows, statistics
+logic, or scientific equations.
 
 ### `plotting/`
 
@@ -188,9 +286,15 @@ At present, the repository contains:
 - observable estimators for `g(r)`, `S(k)`, and ring-based `n(x)`;
 - blocking and support metric utilities;
 - an initial homogeneous VMC smoke experiment;
-- an initial DMC result contract and support structures.
+- a DMC contract package plus an RN-block candidate implementation.
 
-The trapped system now has an initial VMC diagnostic path. Benchmark-tier expansion, systematic failure-map workflows, and the production DMC engine are not yet complete.
+The trapped system now has an initial VMC diagnostic path. Benchmark-tier
+expansion, systematic failure-map workflows, and release-grade RN-DMC examples
+are not yet complete.
+
+Release material should include compact examples, validation fixtures, archived
+run artifacts, and one canonical method document. Exploratory notebooks,
+progress logs, and full raw run bundles should not be part of the package API.
 
 ## 4. Summary
 

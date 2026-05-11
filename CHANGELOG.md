@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-05-11
+
+### Added
+
+- Added RN-block DMC modules with shared DMC population, guide, result, and streaming owners.
+- Added finite-`a` trapped RN-DMC workflows with stationarity gates, run manifests, checkpointing, and progress reporting.
+- Added exact homogeneous and trapped validation entrypoints for RN-DMC release checks.
+- Added weighted estimators, time-series diagnostics, chain diagnostics, and artifact/provenance helpers.
+- Added cloud run scripts for reproducible VM campaigns.
+
+### Changed
+
+- Reorganized experiments into validation, VMC, and DMC method folders.
+- Moved DMC ownership from a flat module into method-specific and shared DMC packages.
+- Reworked trapped stationarity checks to separate hygiene failures, correlated-data uncertainty, and stationarity failures.
+- Updated documentation and equation source mapping for RN-block DMC, LDA comparison, and release gate semantics.
+
+### Removed
+
+- Removed tracked generated VMC result summaries from the source tree.
+- Removed numbered top-level VMC experiment scripts in favor of domain folders.
+
 ## 2026-05-09
 
 ### Added

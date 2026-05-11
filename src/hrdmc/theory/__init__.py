@@ -1,5 +1,4 @@
 from hrdmc.theory.hard_rods import (
-    excluded_length,
     hard_rod_chemical_potential,
     hard_rod_energy_density,
     hard_rod_energy_per_particle,
@@ -17,7 +16,6 @@ from hrdmc.theory.lda import (
 
 __all__ = [
     "LDADensityProfile",
-    "excluded_length",
     "hard_rod_chemical_potential",
     "hard_rod_energy_density",
     "hard_rod_energy_per_particle",

@@ -49,7 +49,7 @@ is also printed in the run output, but only as contextual information. It is not
 Command:
 
 ```bash
-PYTHONPATH=src python3 experiments/01_uniform_hard_rods_validation.py
+PYTHONPATH=src python3 experiments/validation/homogeneous_ring.py
 ```
 
 Output artifact:
@@ -108,7 +108,7 @@ Before using the code for thesis-level trapped-system conclusions, the following
 The current trapped smoke command is:
 
 ```bash
-PYTHONPATH=src python3 experiments/02_trapped_vmc_smoke.py
+PYTHONPATH=src python3 experiments/vmc/trapped_smoke.py
 ```
 
 It writes:
@@ -156,7 +156,7 @@ omega = 0.05, 0.10, 0.20
 Command:
 
 ```bash
-PYTHONPATH=src python3 experiments/03_trapped_vmc_diagnostic_grid.py
+PYTHONPATH=src python3 experiments/vmc/trapped_diagnostic_grid.py
 ```
 
 Output:
@@ -185,7 +185,7 @@ The first stability check has been added as a seed-replicate diagnostic for a se
 Command:
 
 ```bash
-PYTHONPATH=src python3 experiments/04_trapped_vmc_seed_stability.py
+PYTHONPATH=src python3 experiments/vmc/trapped_seed_stability.py
 ```
 
 Output:
@@ -206,7 +206,7 @@ The trapped diagnostic path includes an alpha scan for the Gaussian factor in th
 Command:
 
 ```bash
-PYTHONPATH=src python3 experiments/05_trapped_vmc_alpha_scan.py
+PYTHONPATH=src python3 experiments/vmc/trapped_alpha_scan.py
 ```
 
 Output:

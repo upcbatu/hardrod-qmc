@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from hrdmc.systems.reduced import excluded_length
+
 
 def _validate_density(density: float, rod_length: float) -> None:
     if density < 0:
@@ -10,20 +12,6 @@ def _validate_density(density: float, rod_length: float) -> None:
         raise ValueError("rod_length must be non-negative")
     if density * rod_length >= 1.0:
         raise ValueError("packing fraction density * rod_length must be < 1")
-
-
-def excluded_length(n_particles: int, length: float, rod_length: float) -> float:
-    """Reduced length L' = L - N a for the homogeneous hard-rod mapping."""
-    if n_particles <= 0:
-        raise ValueError("n_particles must be positive")
-    if length <= 0:
-        raise ValueError("length must be positive")
-    if rod_length < 0:
-        raise ValueError("rod_length must be non-negative")
-    reduced_length = length - n_particles * rod_length
-    if reduced_length <= 0:
-        raise ValueError("excluded length N * a must be smaller than L")
-    return float(reduced_length)
 
 
 def hard_rod_finite_ring_energy_per_particle(

@@ -11,7 +11,8 @@ FloatArray = NDArray[np.float64]
 
 
 class MetropolisSystem(Protocol):
-    n_particles: int
+    @property
+    def n_particles(self) -> int: ...
 
     def initial_lattice(self, jitter: float = 0.0, seed: int | None = None) -> FloatArray: ...
 
