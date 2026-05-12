@@ -273,7 +273,10 @@ def run_streaming_seed(
     )
     summary.metadata.update(initial.metadata)
     summary.metadata.update(proposal.to_metadata())
-    initial_rms = float(initial.metadata["initial_rms_mean"])
+    initial_rms_value = initial.metadata["initial_rms_mean"]
+    if not isinstance(initial_rms_value, int | float):
+        raise RuntimeError("initial_rms_mean metadata must be numeric")
+    initial_rms = float(initial_rms_value)
     summary.metadata["initial_to_production_rms_ratio"] = (
         float(summary.rms_radius / initial_rms) if initial_rms > 0.0 else float("nan")
     )

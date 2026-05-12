@@ -71,7 +71,9 @@ def test_lda_rms_initializer_targets_requested_rms() -> None:
         initialization_mode="lda-rms-lattice",
         target_initial_rms=25.0,
     )
-    assert abs(float(batch.metadata["initial_rms_mean"]) - 25.0) < 0.2
+    rms_mean = batch.metadata["initial_rms_mean"]
+    assert isinstance(rms_mean, int | float)
+    assert abs(float(rms_mean) - 25.0) < 0.2
     assert batch.metadata["initialization_mode"] == "lda-rms-lattice"
 
 
@@ -94,4 +96,6 @@ def test_breathing_preburn_metadata_is_reported_when_enabled() -> None:
     assert metadata["breathing_preburn_steps"] == 2
     assert "breathing_preburn_acceptance_rate" in metadata
     assert metadata["breathing_preburn_jacobian_dimension"] == case.n_particles
-    assert metadata["preburn_gap_min"] >= system.rod_length
+    preburn_gap_min = metadata["preburn_gap_min"]
+    assert isinstance(preburn_gap_min, int | float)
+    assert preburn_gap_min >= system.rod_length
