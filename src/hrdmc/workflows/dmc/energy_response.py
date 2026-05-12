@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,6 @@ PAPER_GATE_FIELDS = (
     "rn_weight_status",
     "density_accounting_clean",
     "valid_finite_clean",
-    "blocking_plateau_energy",
     "stationarity_energy",
 )
 
@@ -107,22 +107,45 @@ def collect_energy_response_rows(
 def energy_point_gate_from_row(row: dict[str, Any]) -> str:
     """Classify one existing DMC energy point for HF paper-grade eligibility."""
 
+    if row.get("rn_weight_status") == "RN_WEIGHT_NO_GO":
+        return "ENERGY_POINT_RN_WEIGHT_NO_GO"
+    if "rn_weight_status" in row and row.get("rn_weight_status") != "RN_WEIGHT_GO":
+        return "ENERGY_POINT_RN_WEIGHT_WARNING"
     missing = [field for field in PAPER_GATE_FIELDS if field not in row]
     if missing:
         return "ENERGY_POINT_METADATA_UNAVAILABLE"
-    if row.get("rn_weight_status") == "RN_WEIGHT_NO_GO":
-        return "ENERGY_POINT_RN_WEIGHT_NO_GO"
-    if row.get("rn_weight_status") != "RN_WEIGHT_GO":
-        return "ENERGY_POINT_RN_WEIGHT_WARNING"
     if not bool(row.get("density_accounting_clean", False)):
         return "ENERGY_POINT_DENSITY_ACCOUNTING_NO_GO"
     if not bool(row.get("valid_finite_clean", False)):
         return "ENERGY_POINT_HYGIENE_NO_GO"
-    if row.get("stationarity_energy") == "NO_GO_STATIONARITY":
+    if row.get("gate_split_methodology") not in {"", None, "GO"}:
         return "ENERGY_POINT_STATIONARITY_NO_GO"
-    if not bool(row.get("blocking_plateau_energy", False)):
+    if row.get("stationarity_energy") in {
+        "NO_GO_RHAT",
+        "NO_GO_NEFF",
+        "NO_GO_STATIONARITY",
+        "NO_GO_TOO_SHORT",
+        "NO_GO_NONFINITE",
+    }:
+        return "ENERGY_POINT_STATIONARITY_NO_GO"
+    if not energy_precision_repaired_or_plateau(row):
         return "ENERGY_POINT_BLOCKING_NO_GO"
     return "ENERGY_POINT_GO"
+
+
+def energy_precision_repaired_or_plateau(row: dict[str, Any]) -> bool:
+    if bool(row.get("blocking_plateau_energy", False)):
+        return True
+    stderr = _optional_float(row.get("mixed_energy_conservative_stderr"))
+    return (
+        row.get("final_classification") == "TRIANGULATED_PRECISION_WARNING"
+        and row.get("mixed_energy_error_estimator_status") in {
+            "TRIANGULATED_2_OF_3",
+            "DISAGREE_HONEST_LARGE",
+        }
+        and stderr is not None
+        and math.isfinite(stderr)
+    )
 
 
 def write_response_point_table(output_dir: Path, rows: list[dict[str, Any]]) -> Path:

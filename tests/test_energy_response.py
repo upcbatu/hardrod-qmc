@@ -130,3 +130,19 @@ def test_energy_point_gate_requires_rn_weight_go() -> None:
     }
 
     assert energy_point_gate_from_row(row) == "ENERGY_POINT_RN_WEIGHT_WARNING"
+
+
+def test_energy_point_gate_accepts_triangulated_precision_warning() -> None:
+    row = {
+        "mixed_energy_conservative_stderr": 1.0e-3,
+        "rn_weight_status": "RN_WEIGHT_GO",
+        "density_accounting_clean": True,
+        "valid_finite_clean": True,
+        "blocking_plateau_energy": False,
+        "stationarity_energy": "WARNING_SPREAD_ONLY",
+        "gate_split_methodology": "GO",
+        "final_classification": "TRIANGULATED_PRECISION_WARNING",
+        "mixed_energy_error_estimator_status": "TRIANGULATED_2_OF_3",
+    }
+
+    assert energy_point_gate_from_row(row) == "ENERGY_POINT_GO"

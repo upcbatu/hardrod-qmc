@@ -68,6 +68,20 @@ Every entry below has one of these statuses:
   localization: An improved R-hat for assessing convergence of MCMC*,
   **Bayesian Analysis 16**, 667-718 (2021).
   DOI: [10.1214/20-BA1221](https://doi.org/10.1214/20-BA1221)
+- `[Sokal1997MC]` A. D. Sokal, *Monte Carlo Methods in Statistical Mechanics:
+  Foundations and New Algorithms*, in *Functional Integration*, NATO ASI
+  Series B, **361**, 131-192 (1997).
+  DOI: [10.1007/978-1-4899-0319-8_6](https://doi.org/10.1007/978-1-4899-0319-8_6)
+- `[Geyer1992PracticalMCMC]` C. J. Geyer, *Practical Markov Chain Monte Carlo*,
+  **Statistical Science 7**, 473-483 (1992).
+  DOI: [10.1214/ss/1177011137](https://doi.org/10.1214/ss/1177011137)
+- `[Andrews1991HAC]` D. W. K. Andrews, *Heteroskedasticity and Autocorrelation
+  Consistent Covariance Matrix Estimation*, **Econometrica 59**, 817-858
+  (1991). DOI: [10.2307/2938229](https://doi.org/10.2307/2938229)
+- `[PolitisRomano1995FlatTop]` D. N. Politis and J. P. Romano,
+  *Bias-Corrected Nonparametric Spectral Estimation*, **Journal of Time Series
+  Analysis 16**, 67-103 (1995).
+  DOI: [10.1111/j.1467-9892.1995.tb00223.x](https://doi.org/10.1111/j.1467-9892.1995.tb00223.x)
 - `[Hellmann1937Quantenchemie]` H. Hellmann, *Einführung in die
   Quantenchemie*, Franz Deuticke, Leipzig und Wien (1937).
 - `[Feynman1939Forces]` R. P. Feynman, *Forces in Molecules*,
@@ -1045,7 +1059,96 @@ Claim boundary:
 Users must inspect plateau behavior. A single blocking number is not a full
 validation proof.
 
-### A2. Bias And MSE
+### A2. Correlated Monte Carlo Error Triangulation
+
+Code:
+[src/hrdmc/analysis/correlated_error.py](src/hrdmc/analysis/correlated_error.py)
+
+Formula:
+
+For a correlated production trace \(x_t\), the standard error of the sample
+mean is estimated from the spectral density at zero:
+
+$$
+\mathrm{SE}(\bar x)
+=
+\sqrt{\frac{S(0)}{N}}
+=
+\sqrt{\frac{\sigma_x^2\,2\tau_{\mathrm{int}}}{N}}.
+$$
+
+The Sokal-window estimator uses
+
+$$
+\tau_{\mathrm{int}}
+=
+\frac12+\sum_{t=1}^{W}\rho_t,
+\qquad
+W \ge c\,\tau_{\mathrm{int}},
+$$
+
+with the repository default inherited from
+[src/hrdmc/analysis/timeseries.py](src/hrdmc/analysis/timeseries.py). The
+Geyer initial-sequence estimator uses autocovariance pairs
+
+$$
+\Gamma_k=\gamma_{2k}+\gamma_{2k+1},
+\qquad
+\tau_{\mathrm{int}}
+=
+-\frac12+\frac{1}{\gamma_0}\sum_{k=0}^{m}\Gamma_k,
+$$
+
+truncated at the initial positive monotone sequence. The HAC estimator uses a
+flat-top lag window:
+
+$$
+\hat S(0)
+=
+\gamma_0+2\sum_{t=1}^{b}K(t/b)\gamma_t,
+\qquad
+K(u)=
+\begin{cases}
+1,& |u|\le 1/2,\\
+2(1-|u|),& 1/2<|u|\le 1,\\
+0,& |u|>1.
+\end{cases}
+$$
+
+The stationarity workflow computes all three estimates per seed. If at least
+two standard-error estimates overlap within their estimated one-sigma
+uncertainty, the seed status is `TRIANGULATED_2_OF_3`; otherwise the seed is
+reported as `DISAGREE_HONEST_LARGE`. The case standard error is conservative:
+
+$$
+\mathrm{SE}_{\mathrm{corr,case}}
+=
+\frac{
+\left[\sum_s \mathrm{SE}_{\mathrm{corr},s}^2\right]^{1/2}
+}{M},
+\qquad
+\mathrm{SE}_{\mathrm{reported}}
+=
+\max(\mathrm{SE}_{\mathrm{seed}},
+     \mathrm{SE}_{\mathrm{block}},
+     \mathrm{SE}_{\mathrm{corr,case}}).
+$$
+
+Source basis:
+`Method paper`; Sokal integrated-autocorrelation window from `[Sokal1997MC]`,
+Geyer initial-sequence variance estimation from `[Geyer1992PracticalMCMC]`,
+HAC long-run variance from `[Andrews1991HAC]`, and the flat-top lag window from
+`[PolitisRomano1995FlatTop]`.
+
+Claim boundary:
+This replaces "blocking plateau missing" as a hard precision veto only when the
+methodology gates are already clean: finite/hard-core hygiene, density
+accounting, RN-weight gate, R-hat, effective-sample, and explicit
+trace-stationarity checks still hard-fail. Missing blocking plateau becomes a
+precision warning with an explicitly inflated error bar; it is not a way to
+manufacture a benchmark GO.
+
+### A3. Bias And MSE
 
 Code:
 [src/hrdmc/analysis/metrics.py](src/hrdmc/analysis/metrics.py)
@@ -1066,7 +1169,7 @@ Claim boundary:
 Needs a trustworthy reference \(\theta_{\mathrm{ref}}\). LDA is not the
 benchmark reference.
 
-### A3. Density L2 Metrics
+### A4. Density L2 Metrics
 
 Code:
 [src/hrdmc/analysis/metrics.py](src/hrdmc/analysis/metrics.py)
@@ -1108,7 +1211,7 @@ Claim boundary:
 This metric is mathematically valid as a normed discrepancy. It does not decide
 which curve is true; that depends on benchmark tier.
 
-### A4. Replicate Stability
+### A5. Replicate Stability
 
 Code:
 [src/hrdmc/analysis/stability.py](src/hrdmc/analysis/stability.py)
@@ -1131,7 +1234,7 @@ Claim boundary:
 Replicate spread is a diagnostic. It is not a substitute for timestep,
 population, and stationarity controls.
 
-### A5. Time-Series Stationarity Diagnostics
+### A6. Time-Series Stationarity Diagnostics
 
 Code:
 [src/hrdmc/analysis/timeseries.py](src/hrdmc/analysis/timeseries.py)
@@ -1251,18 +1354,19 @@ $$
 =
 \max\left(
 \mathrm{SE}_{\mathrm{seed}},
-\mathrm{SE}_{\mathrm{block,combined}}
+\mathrm{SE}_{\mathrm{block,combined}},
+\mathrm{SE}_{\mathrm{corr,case}}
 \right),
 $$
 
 where \(s\) indexes independent seeds and \(M\) is the seed count. If any
-observable has spread warnings or the blocking-combined error exceeds the
-seed-spread error, the case artifact reports inflated uncertainty rather than
-silently trusting the seed standard error.
+observable has spread warnings, missing blocking plateaus, or correlated-error
+inflation, the case artifact reports a precision warning rather than silently
+trusting the seed standard error.
 
 Source basis:
 `Method paper`, autocorrelation/error-control logic aligned with
-`[FlyvbjergPetersen1989Blocking]`; chain-agreement context from
+`[FlyvbjergPetersen1989Blocking]` and A2; chain-agreement context from
 `[VehtariGelmanSimpsonCarpenterBuerkner2021Rhat]`; DMC validation need from
 `[Foulkes2001QMC]`.
 

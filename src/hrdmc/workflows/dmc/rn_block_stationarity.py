@@ -9,6 +9,7 @@ from hrdmc.analysis import (
     detect_blocking_plateau,
     diagnose_chains,
     relative_density_l2_error,
+    triangulated_error_estimate,
 )
 from hrdmc.io.artifacts import ensure_dir
 from hrdmc.io.progress import ProgressBar, QueuedProgress
@@ -27,6 +28,10 @@ from hrdmc.workflows.dmc.rn_block import (
 from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 
 GO_CLASSIFICATIONS = {"GO", "WARNING_SPREAD_ONLY"}
+TRIANGULATED_ERROR_GO = "TRIANGULATED_2_OF_3"
+TRIANGULATED_ERROR_WARNING = "DISAGREE_HONEST_LARGE"
+TRIANGULATED_ERROR_UNAVAILABLE = "CORRELATED_ERROR_UNAVAILABLE"
+TRIANGULATED_PRECISION_WARNING = "TRIANGULATED_PRECISION_WARNING"
 BLOCKING_CURVE_MIN_BLOCKS = 16
 BLOCKING_PLATEAU_MIN_BLOCKS = 32
 BLOCKING_PLATEAU_WINDOW = 3
@@ -76,6 +81,8 @@ def summarize_stationarity_case(
     )
     diagnostics = diagnose_stationarity(seed_summaries)
     spread = blocked_spread_diagnostics(seeds, seed_summaries)
+    correlated_errors = correlated_error_diagnostics(seeds, seed_summaries)
+    stationarity_audit = stationarity_failure_audit(seeds, diagnostics)
     trace_artifacts = (
         write_seed_trace_artifacts(trace_output_dir, case.case_id, seeds, seed_summaries)
         if trace_output_dir is not None
@@ -85,9 +92,24 @@ def summarize_stationarity_case(
         [relative_density_l2_error(grid, summary.density, lda.n_x) for summary in seed_summaries],
         dtype=float,
     )
-    energy_uncertainty = uncertainty_summary(energy_values, diagnostics["energy"])
-    rms_uncertainty = uncertainty_summary(rms_values, diagnostics["rms"])
-    r2_uncertainty = uncertainty_summary(r2_values, diagnostics["r2"])
+    energy_uncertainty = uncertainty_summary(
+        energy_values,
+        diagnostics["energy"],
+        correlated_errors["energy"],
+        plateau_all=spread["energy"]["plateau_all"],
+    )
+    rms_uncertainty = uncertainty_summary(
+        rms_values,
+        diagnostics["rms"],
+        correlated_errors["rms"],
+        plateau_all=spread["rms"]["plateau_all"],
+    )
+    r2_uncertainty = uncertainty_summary(
+        r2_values,
+        diagnostics["r2"],
+        correlated_errors["r2"],
+        plateau_all=spread["r2"]["plateau_all"],
+    )
     density_integral = float(np.sum(density) * (grid[1] - grid[0]))
     density_accounting_clean = abs(density_integral - system.n_particles) <= 5e-3
     valid_finite_clean = all(
@@ -122,11 +144,14 @@ def summarize_stationarity_case(
         rms=spread["rms"],
         r2=spread["r2"],
         diagnostics=diagnostics,
+        stationarity_audit=stationarity_audit,
+        correlated_errors=correlated_errors,
     )
     case_gate = final_classification in {
         "PASS_CANDIDATE",
         "WEAK_TRAP_WARNING",
         "MIXED_OBSERVABLE_WARNING",
+        TRIANGULATED_PRECISION_WARNING,
     }
     classification = classify_case(
         case_gate=case_gate,
@@ -134,6 +159,7 @@ def summarize_stationarity_case(
         valid_finite_clean=valid_finite_clean,
         rn_weight_controlled=rn_weight_controlled,
         diagnostics=diagnostics,
+        final_classification=final_classification,
     )
     lda_energy = lda_total_energy(lda, rod_length=system.rod_length)
     lda_rms = lda_rms_radius(lda, center=trap.center)
@@ -154,6 +180,15 @@ def summarize_stationarity_case(
         "hygiene_gate": hygiene_gate,
         "classification": classification,
         "final_classification": final_classification,
+        "gate_split_methodology": methodology_gate_status(
+            density_accounting_clean=density_accounting_clean,
+            valid_finite_clean=valid_finite_clean,
+            rn_weight_status=rn_weight_status,
+            diagnostics=diagnostics,
+            stationarity_audit=stationarity_audit,
+        ),
+        "gate_split_precision": precision_gate_status(final_classification),
+        "gate_split_combined": final_classification,
         "seeds": seeds,
         "seed_count": len(seeds),
         "parallel_workers": actual_worker_count,
@@ -162,18 +197,24 @@ def summarize_stationarity_case(
         "mixed_energy": mean(energy_values),
         "mixed_energy_seed_stderr": stderr(energy_values),
         "mixed_energy_blocking_stderr": energy_uncertainty["blocking_stderr"],
+        "mixed_energy_correlated_stderr": energy_uncertainty["correlated_stderr"],
         "mixed_energy_conservative_stderr": energy_uncertainty["conservative_stderr"],
         "mixed_energy_uncertainty_status": energy_uncertainty["status"],
+        "mixed_energy_error_estimator_status": correlated_errors["energy"]["status"],
         "rms_radius": mean(rms_values),
         "rms_radius_seed_stderr": stderr(rms_values),
         "rms_radius_blocking_stderr": rms_uncertainty["blocking_stderr"],
+        "rms_radius_correlated_stderr": rms_uncertainty["correlated_stderr"],
         "rms_radius_conservative_stderr": rms_uncertainty["conservative_stderr"],
         "rms_radius_uncertainty_status": rms_uncertainty["status"],
+        "rms_radius_error_estimator_status": correlated_errors["rms"]["status"],
         "r2_radius": mean(r2_values),
         "r2_radius_seed_stderr": stderr(r2_values),
         "r2_radius_blocking_stderr": r2_uncertainty["blocking_stderr"],
+        "r2_radius_correlated_stderr": r2_uncertainty["correlated_stderr"],
         "r2_radius_conservative_stderr": r2_uncertainty["conservative_stderr"],
         "r2_radius_uncertainty_status": r2_uncertainty["status"],
+        "r2_radius_error_estimator_status": correlated_errors["r2"]["status"],
         "density_integral": density_integral,
         "density_accounting_clean": density_accounting_clean,
         "valid_finite_clean": valid_finite_clean,
@@ -209,6 +250,56 @@ def summarize_stationarity_case(
         "stationarity_energy": diagnostics["energy"]["classification"],
         "stationarity_rms": diagnostics["rms"]["classification"],
         "stationarity_r2": diagnostics["r2"]["classification"],
+        "stationarity_reason_energy": stationarity_audit["energy"]["reason"],
+        "stationarity_reason_rms": stationarity_audit["rms"]["reason"],
+        "stationarity_reason_r2": stationarity_audit["r2"]["reason"],
+        "stationarity_failing_seeds_energy": ",".join(
+            str(seed) for seed in stationarity_audit["energy"]["failing_seeds"]
+        ),
+        "stationarity_failing_seeds_rms": ",".join(
+            str(seed) for seed in stationarity_audit["rms"]["failing_seeds"]
+        ),
+        "stationarity_failing_seeds_r2": ",".join(
+            str(seed) for seed in stationarity_audit["r2"]["failing_seeds"]
+        ),
+        "stationarity_slope_z_max_energy": stationarity_audit["energy"]["slope_z_max"],
+        "stationarity_slope_z_max_rms": stationarity_audit["rms"]["slope_z_max"],
+        "stationarity_slope_z_max_r2": stationarity_audit["r2"]["slope_z_max"],
+        "stationarity_quarter_z_max_energy": stationarity_audit["energy"][
+            "first_last_quarter_z_max"
+        ],
+        "stationarity_quarter_z_max_rms": stationarity_audit["rms"][
+            "first_last_quarter_z_max"
+        ],
+        "stationarity_quarter_z_max_r2": stationarity_audit["r2"][
+            "first_last_quarter_z_max"
+        ],
+        "stationarity_late_z_max_energy": stationarity_audit["energy"][
+            "late_cumulative_z_max"
+        ],
+        "stationarity_late_z_max_rms": stationarity_audit["rms"]["late_cumulative_z_max"],
+        "stationarity_late_z_max_r2": stationarity_audit["r2"]["late_cumulative_z_max"],
+        "stationarity_block_z_max_energy": stationarity_audit["energy"][
+            "first_last_blocking_z_max"
+        ],
+        "stationarity_block_z_max_rms": stationarity_audit["rms"][
+            "first_last_blocking_z_max"
+        ],
+        "stationarity_block_z_max_r2": stationarity_audit["r2"][
+            "first_last_blocking_z_max"
+        ],
+        "correlated_error_energy": correlated_errors["energy"]["status"],
+        "correlated_error_rms": correlated_errors["rms"]["status"],
+        "correlated_error_r2": correlated_errors["r2"]["status"],
+        "correlated_error_energy_triangulated_seed_count": correlated_errors["energy"][
+            "triangulated_seed_count"
+        ],
+        "correlated_error_rms_triangulated_seed_count": correlated_errors["rms"][
+            "triangulated_seed_count"
+        ],
+        "correlated_error_r2_triangulated_seed_count": correlated_errors["r2"][
+            "triangulated_seed_count"
+        ],
         "spread_warning_count": int(
             diagnostics["energy"]["spread_warning_count"]
             + diagnostics["rms"]["spread_warning_count"]
@@ -279,6 +370,8 @@ def summarize_stationarity_case(
             for seed, summary in zip(seeds, seed_summaries, strict=True)
         ],
         "diagnostics": diagnostics,
+        "correlated_error_diagnostics": correlated_errors,
+        "stationarity_failure_audit": stationarity_audit,
     }
 
 
@@ -362,9 +455,170 @@ def diagnose_stationarity(seed_summaries: list[RNBlockStreamingSummary]) -> dict
     }
 
 
+def correlated_error_diagnostics(
+    seeds: list[int],
+    seed_summaries: list[RNBlockStreamingSummary],
+) -> dict[str, dict[str, Any]]:
+    metric_traces = {
+        "energy": [optional_trace(summary.mixed_energy_trace) for summary in seed_summaries],
+        "rms": [optional_trace(summary.rms_radius_trace) for summary in seed_summaries],
+        "r2": [optional_trace(summary.r2_radius_trace) for summary in seed_summaries],
+    }
+    spacings = [
+        trace_spacing_tau(optional_trace(summary.trace_times)) for summary in seed_summaries
+        ]
+    return {
+        metric: summarize_correlated_error_metric(seeds, traces, spacings)
+        for metric, traces in metric_traces.items()
+    }
+
+
+def stationarity_failure_audit(
+    seeds: list[int],
+    diagnostics: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    return {
+        metric: stationarity_metric_audit(seeds, diagnostics[metric])
+        for metric in ("energy", "rms", "r2")
+    }
+
+
+def stationarity_metric_audit(
+    seeds: list[int],
+    metric_diagnostics: dict[str, Any],
+) -> dict[str, Any]:
+    rows = metric_diagnostics["chain_diagnostics"]
+    per_seed = []
+    failing_seeds: list[int] = []
+    reasons: list[str] = []
+    for seed, row in zip(seeds, rows, strict=True):
+        failures = stationarity_row_failures(row)
+        if failures:
+            failing_seeds.append(int(seed))
+            reasons.extend(failures)
+        per_seed.append({"seed": int(seed), "failures": failures, **stationarity_row_values(row)})
+    unique_reasons = sorted(set(reasons))
+    return {
+        "reason": "+".join(unique_reasons) if unique_reasons else "GO",
+        "failing_seeds": failing_seeds,
+        "failing_seed_count": len(failing_seeds),
+        "slope_z_max": max_finite(row["slope_z_autocorr_adjusted"] for row in rows),
+        "first_last_quarter_z_max": max_finite(row["first_last_quarter_z"] for row in rows),
+        "late_cumulative_z_max": max_finite(row["late_cumulative_z"] for row in rows),
+        "first_last_blocking_z_max": max_finite(row["first_last_blocking_z"] for row in rows),
+        "spread_blocking_z_max": max_finite(row["spread_blocking_z"] for row in rows),
+        "per_seed": per_seed,
+    }
+
+
+def stationarity_row_failures(row: dict[str, Any]) -> list[str]:
+    failures: list[str] = []
+    if not bool(row.get("trend_clean", False)):
+        failures.append("TREND")
+    if not bool(row.get("cumulative_drift_clean", False)):
+        failures.append("CUMULATIVE_DRIFT")
+    if not bool(row.get("blocking_clean", False)):
+        failures.append("BLOCK_DRIFT")
+    if bool(row.get("spread_warning", False)):
+        failures.append("SPREAD_WARNING")
+    return failures
+
+
+def stationarity_row_values(row: dict[str, Any]) -> dict[str, float]:
+    return {
+        "slope_z_autocorr_adjusted": float(row["slope_z_autocorr_adjusted"]),
+        "first_last_quarter_z": float(row["first_last_quarter_z"]),
+        "late_cumulative_z": float(row["late_cumulative_z"]),
+        "first_last_blocking_z": float(row["first_last_blocking_z"]),
+        "spread_blocking_z": float(row["spread_blocking_z"]),
+    }
+
+
+def max_finite(values: Any) -> float:
+    finite = [float(value) for value in values if np.isfinite(float(value))]
+    return max(finite) if finite else float("nan")
+
+
+def summarize_correlated_error_metric(
+    seeds: list[int],
+    traces: list[np.ndarray],
+    spacings: list[float],
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    finite_stderrs: list[float] = []
+    statuses: list[str] = []
+    for seed, trace, spacing in zip(seeds, traces, spacings, strict=True):
+        if trace.size == 0:
+            row = {
+                "seed": int(seed),
+                "trace_spacing_tau": float(spacing),
+                "status": TRIANGULATED_ERROR_UNAVAILABLE,
+                "conservative_stderr": float("nan"),
+                "overlap_pair_count": 0,
+                "estimates": [],
+            }
+            rows.append(row)
+            statuses.append(TRIANGULATED_ERROR_UNAVAILABLE)
+        else:
+            result = triangulated_error_estimate(trace, trace_spacing_tau=spacing)
+            rows.append(
+                {
+                    "seed": int(seed),
+                    "trace_spacing_tau": float(spacing),
+                    **result.to_dict(),
+                }
+            )
+            statuses.append(result.status)
+            if np.isfinite(result.conservative_stderr):
+                finite_stderrs.append(float(result.conservative_stderr))
+
+    if not finite_stderrs:
+        status = TRIANGULATED_ERROR_UNAVAILABLE
+        case_stderr = float("nan")
+    elif any(value == TRIANGULATED_ERROR_UNAVAILABLE for value in statuses):
+        status = TRIANGULATED_ERROR_UNAVAILABLE
+        case_stderr = float("nan")
+    elif all(value == TRIANGULATED_ERROR_GO for value in statuses):
+        status = TRIANGULATED_ERROR_GO
+        case_stderr = float(np.sqrt(np.sum(np.square(finite_stderrs))) / len(seeds))
+    else:
+        status = TRIANGULATED_ERROR_WARNING
+        case_stderr = float(np.sqrt(np.sum(np.square(finite_stderrs))) / len(seeds))
+
+    return {
+        "status": status,
+        "case_correlated_stderr": case_stderr,
+        "seed_count": len(seeds),
+        "triangulated_seed_count": int(sum(value == TRIANGULATED_ERROR_GO for value in statuses)),
+        "disagree_seed_count": int(
+            sum(value == TRIANGULATED_ERROR_WARNING for value in statuses)
+        ),
+        "unavailable_seed_count": int(
+            sum(value == TRIANGULATED_ERROR_UNAVAILABLE for value in statuses)
+        ),
+        "per_seed": rows,
+    }
+
+
+def trace_spacing_tau(times: np.ndarray) -> float:
+    arr = np.asarray(times, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if arr.size < 2:
+        return 1.0
+    diffs = np.diff(arr)
+    diffs = diffs[np.isfinite(diffs) & (diffs > 0.0)]
+    return float(np.median(diffs)) if diffs.size else 1.0
+
+
 def require_trace(values: np.ndarray | None) -> np.ndarray:
     if values is None:
         raise ValueError("RN streaming summary does not contain trace data")
+    return np.asarray(values, dtype=float)
+
+
+def optional_trace(values: np.ndarray | None) -> np.ndarray:
+    if values is None:
+        return np.asarray([], dtype=float)
     return np.asarray(values, dtype=float)
 
 
@@ -375,8 +629,13 @@ def classify_case(
     valid_finite_clean: bool,
     rn_weight_controlled: bool,
     diagnostics: dict[str, dict],
+    final_classification: str,
 ) -> str:
     if case_gate:
+        if final_classification == TRIANGULATED_PRECISION_WARNING:
+            return "RN_TRAPPED_STATIONARITY_PRECISION_WARNING"
+        if final_classification in {"MIXED_OBSERVABLE_WARNING", "WEAK_TRAP_WARNING"}:
+            return "RN_TRAPPED_STATIONARITY_WARNING"
         if any(
             diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY"
             for name in ("energy", "rms", "r2")
@@ -487,31 +746,110 @@ def classify_blocked_case(
     rms: dict[str, Any],
     r2: dict[str, Any],
     diagnostics: dict[str, dict],
+    stationarity_audit: dict[str, dict[str, Any]],
+    correlated_errors: dict[str, dict[str, Any]],
 ) -> str:
     if rn_weight_status == "RN_WEIGHT_NO_GO":
         return "RN_WEIGHT_NO_GO"
     if not hygiene_gate:
         return "HYGIENE_NO_GO"
-    if not energy["plateau_all"]:
-        return "NO_GO_NO_BLOCKING_PLATEAU"
-    if diagnostics["energy"]["classification"] == "NO_GO_STATIONARITY":
+    if hard_chain_no_go(diagnostics, stationarity_audit):
         return "NO_GO_STATIONARITY"
-    if not energy["blocked_zscore_gate"]:
-        return "SPREAD_VETO_NO_GO"
-    mixed_warning = (
-        not rms["plateau_all"]
-        or not r2["plateau_all"]
-        or not rms["blocked_zscore_gate"]
-        or not r2["blocked_zscore_gate"]
+
+    energy_problem = metric_precision_problem(energy, diagnostics["energy"])
+    rms_problem = metric_precision_problem(rms, diagnostics["rms"])
+    r2_problem = metric_precision_problem(r2, diagnostics["r2"])
+
+    energy_repairable = metric_precision_repairable(
+        energy_problem,
+        correlated_errors["energy"],
     )
-    if mixed_warning:
+    rms_repairable = metric_precision_repairable(rms_problem, correlated_errors["rms"])
+    r2_repairable = metric_precision_repairable(r2_problem, correlated_errors["r2"])
+
+    if energy_problem and not energy_repairable:
+        if not energy["plateau_all"]:
+            return "NO_GO_NO_BLOCKING_PLATEAU"
+        if not energy["blocked_zscore_gate"]:
+            return "SPREAD_VETO_NO_GO"
+        return "NO_GO_NO_BLOCKING_PLATEAU"
+
+    if (rms_problem and not rms_repairable) or (r2_problem and not r2_repairable):
         return "MIXED_OBSERVABLE_WARNING"
+
+    if energy_problem or rms_problem or r2_problem:
+        return TRIANGULATED_PRECISION_WARNING
+
     if any(
         diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY"
         for name in ("energy", "rms", "r2")
     ):
         return "WEAK_TRAP_WARNING"
     return "PASS_CANDIDATE"
+
+
+def metric_precision_problem(metric: dict[str, Any], diagnostics: dict[str, Any]) -> bool:
+    del diagnostics
+    return bool(not metric["plateau_all"] or not metric["blocked_zscore_gate"])
+
+
+def metric_precision_repairable(problem: bool, correlated_error: dict[str, Any]) -> bool:
+    return (not problem) or correlated_error_available(correlated_error)
+
+
+def correlated_error_available(metric: dict[str, Any]) -> bool:
+    return str(metric["status"]) in {
+        TRIANGULATED_ERROR_GO,
+        TRIANGULATED_ERROR_WARNING,
+    } and np.isfinite(float(metric["case_correlated_stderr"]))
+
+
+def hard_chain_no_go(
+    diagnostics: dict[str, dict],
+    stationarity_audit: dict[str, dict[str, Any]],
+) -> bool:
+    if any(
+        diagnostics[name]["classification"] in {"NO_GO_RHAT", "NO_GO_NEFF"}
+        for name in ("energy", "rms", "r2")
+    ):
+        return True
+    return any(
+        stationarity_audit[name]["reason"]
+        not in {"GO", "SPREAD_WARNING"}
+        and diagnostics[name]["classification"] == "NO_GO_STATIONARITY"
+        for name in ("energy", "rms", "r2")
+    )
+
+
+def methodology_gate_status(
+    *,
+    density_accounting_clean: bool,
+    valid_finite_clean: bool,
+    rn_weight_status: str,
+    diagnostics: dict[str, dict],
+    stationarity_audit: dict[str, dict[str, Any]],
+) -> str:
+    if not density_accounting_clean:
+        return "DENSITY_ACCOUNTING_NO_GO"
+    if not valid_finite_clean:
+        return "HYGIENE_NO_GO"
+    if rn_weight_status == "RN_WEIGHT_NO_GO":
+        return "RN_WEIGHT_NO_GO"
+    if hard_chain_no_go(diagnostics, stationarity_audit):
+        return "STATIONARITY_NO_GO"
+    return "GO"
+
+
+def precision_gate_status(final_classification: str) -> str:
+    if final_classification == "PASS_CANDIDATE":
+        return "GO"
+    if final_classification == TRIANGULATED_PRECISION_WARNING:
+        return "WARNING_BLOCKING_PLATEAU_ABSENT_TRIANGULATED_ERROR"
+    if final_classification == "MIXED_OBSERVABLE_WARNING":
+        return "WARNING_MIXED_COORDINATE_OBSERVABLE"
+    if final_classification == "WEAK_TRAP_WARNING":
+        return "WARNING_SPREAD_ONLY"
+    return "NOT_EVALUATED_DUE_TO_METHODOLOGY_NO_GO"
 
 
 def classify_rn_weight_status(
@@ -680,21 +1018,37 @@ def stderr(values: np.ndarray) -> float:
     return float(np.std(values, ddof=1) / np.sqrt(values.size))
 
 
-def uncertainty_summary(values: np.ndarray, diagnostics: dict[str, Any]) -> dict[str, Any]:
+def uncertainty_summary(
+    values: np.ndarray,
+    diagnostics: dict[str, Any],
+    correlated_error: dict[str, Any],
+    *,
+    plateau_all: bool,
+) -> dict[str, Any]:
     seed_stderr = stderr(np.asarray(values, dtype=float))
     blocking_stderr = combined_blocking_stderr(diagnostics)
-    conservative = finite_max([seed_stderr, blocking_stderr])
+    correlated_stderr = float(correlated_error["case_correlated_stderr"])
+    conservative = finite_max([seed_stderr, blocking_stderr, correlated_stderr])
     spread_warning = int(diagnostics["spread_warning_count"]) > 0
-    status = (
-        "INFLATED"
-        if spread_warning or blocking_stderr_exceeds_seed(blocking_stderr, seed_stderr)
-        else "STANDARD"
-    )
+    correlated_available = correlated_error_available(correlated_error)
+    status = "STANDARD"
+    if not plateau_all and not correlated_available:
+        status = "NO_BLOCKING_PLATEAU_NO_CORRELATED_REPAIR"
+    elif correlated_available and (
+        spread_warning
+        or not plateau_all
+        or blocking_stderr_exceeds_seed(blocking_stderr, seed_stderr)
+        or blocking_stderr_exceeds_seed(correlated_stderr, seed_stderr)
+    ):
+        status = "TRIANGULATED_PRECISION_WARNING"
+    elif spread_warning or blocking_stderr_exceeds_seed(blocking_stderr, seed_stderr):
+        status = "INFLATED"
     if not np.isfinite(conservative):
         status = "UNAVAILABLE"
     return {
         "seed_stderr": float(seed_stderr),
         "blocking_stderr": float(blocking_stderr),
+        "correlated_stderr": float(correlated_stderr),
         "conservative_stderr": float(conservative),
         "status": status,
     }
@@ -727,6 +1081,10 @@ def case_uncertainty_status(summaries: list[dict[str, Any]]) -> str:
     statuses = {str(summary["status"]) for summary in summaries}
     if "UNAVAILABLE" in statuses:
         return "UNAVAILABLE"
+    if "NO_BLOCKING_PLATEAU_NO_CORRELATED_REPAIR" in statuses:
+        return "NO_BLOCKING_PLATEAU_NO_CORRELATED_REPAIR"
+    if "TRIANGULATED_PRECISION_WARNING" in statuses:
+        return "TRIANGULATED_PRECISION_WARNING"
     if "INFLATED" in statuses:
         return "INFLATED"
     return "STANDARD"

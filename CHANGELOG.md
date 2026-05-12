@@ -7,12 +7,14 @@
 - Added breathing-aware RN-DMC initialization controls for LDA-RMS lattice/logspread starts and optional guide-Metropolis breathing preburn.
 - Added configurable fixed-scale RN collective proposal mixtures for weak-trap stationarity probes.
 - Added Hellmann-Feynman energy-response estimator and offline reanalysis support for pure trap R2/RMS from existing RN-DMC energy artifacts.
+- Added Sokal/Geyer/flat-top-HAC correlated-error triangulation for RN-block stationarity precision reporting.
 
 ### Changed
 
 - Reduced the public RN-DMC release runner surface and tightened initialization metadata typing.
 - Updated trapped RN-block blocking-plateau detection to use Flyvbjerg-Petersen/pyblock-compatible standard-error uncertainty instead of relying only on a fixed relative-spread cutoff.
 - Raised the stationarity plateau gate to ignore under-sampled coarsest blocking points while keeping full blocking curves in artifacts.
+- Split blocking-plateau absence from hard methodology failures when correlated-error triangulation provides a conservative finite error bar.
 
 ## 2026-05-11
 
