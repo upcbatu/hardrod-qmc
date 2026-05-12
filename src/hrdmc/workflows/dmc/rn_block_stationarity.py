@@ -16,8 +16,8 @@ from hrdmc.monte_carlo.dmc.rn_block import RNBlockStreamingSummary
 from hrdmc.runners import run_seed_batch
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
 from hrdmc.workflows.dmc.rn_block import (
-    RNCollectiveProposalControls,
     RNCase,
+    RNCollectiveProposalControls,
     RNRunControls,
     build_case_objects,
     make_grid,
@@ -27,6 +27,11 @@ from hrdmc.workflows.dmc.rn_block import (
 from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 
 GO_CLASSIFICATIONS = {"GO", "WARNING_SPREAD_ONLY"}
+BLOCKING_CURVE_MIN_BLOCKS = 16
+BLOCKING_PLATEAU_MIN_BLOCKS = 32
+BLOCKING_PLATEAU_WINDOW = 3
+BLOCKING_PLATEAU_REL_TOL = 0.10
+BLOCKING_PLATEAU_SIGMA_TOL = 1.0
 
 
 def summarize_stationarity_case(
@@ -424,14 +429,15 @@ def blocked_metric_diagnostics(
     for index, (seed, trace) in enumerate(zip(seeds, traces, strict=True)):
         trace = np.asarray(trace, dtype=float)
         trace = trace[np.isfinite(trace)]
-        curve = blocking_curve(trace, min_blocks=16)
+        curve = blocking_curve(trace, min_blocks=BLOCKING_CURVE_MIN_BLOCKS)
         plateau = detect_blocking_plateau(
             curve.block_sizes,
             curve.n_blocks,
             curve.stderr,
-            min_blocks=16,
-            window=3,
-            rel_tol=0.10,
+            min_blocks=BLOCKING_PLATEAU_MIN_BLOCKS,
+            window=BLOCKING_PLATEAU_WINDOW,
+            rel_tol=BLOCKING_PLATEAU_REL_TOL,
+            sigma_tol=BLOCKING_PLATEAU_SIGMA_TOL,
         )
         plateau_flags.append(plateau.plateau_found)
         others = np.delete(means, index)
@@ -615,12 +621,15 @@ def write_blocking_curve_csv(
 ) -> Any:
     import csv
 
-    curve = blocking_curve(values, min_blocks=16)
+    curve = blocking_curve(values, min_blocks=BLOCKING_CURVE_MIN_BLOCKS)
     plateau = detect_blocking_plateau(
         curve.block_sizes,
         curve.n_blocks,
         curve.stderr,
-        min_blocks=16,
+        min_blocks=BLOCKING_PLATEAU_MIN_BLOCKS,
+        window=BLOCKING_PLATEAU_WINDOW,
+        rel_tol=BLOCKING_PLATEAU_REL_TOL,
+        sigma_tol=BLOCKING_PLATEAU_SIGMA_TOL,
     )
     path = output_dir / f"blocking_{case_id}_seed{seed}_{metric}.csv"
     with path.open("w", newline="") as file:

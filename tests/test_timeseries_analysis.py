@@ -123,3 +123,40 @@ def test_blocking_plateau_detection_rejects_unstable_curve() -> None:
 
     assert not plateau.plateau_found
     assert plateau.reason == "NO_GO_NO_BLOCKING_PLATEAU"
+
+
+def test_blocking_plateau_detection_ignores_under_sampled_coarsest_point() -> None:
+    block_sizes = np.asarray([128, 256, 512, 1024, 2048], dtype=float)
+    n_blocks = np.asarray([300, 150, 75, 37, 18], dtype=float)
+    stderr = np.asarray([0.000342, 0.000361, 0.000329, 0.000327, 0.000390])
+
+    plateau = detect_blocking_plateau(
+        block_sizes,
+        n_blocks,
+        stderr,
+        min_blocks=32,
+        window=3,
+        rel_tol=0.10,
+    )
+
+    assert plateau.plateau_found
+    assert plateau.plateau_block_size == 1024
+    assert plateau.plateau_n_blocks == 37
+
+
+def test_blocking_plateau_detection_accepts_standard_error_overlap() -> None:
+    block_sizes = np.asarray([256, 512, 1024], dtype=float)
+    n_blocks = np.asarray([75, 37, 18], dtype=float)
+    stderr = np.asarray([0.000566, 0.000518, 0.000490])
+
+    plateau = detect_blocking_plateau(
+        block_sizes,
+        n_blocks,
+        stderr,
+        min_blocks=16,
+        window=3,
+        rel_tol=0.10,
+        sigma_tol=1.0,
+    )
+
+    assert plateau.plateau_found

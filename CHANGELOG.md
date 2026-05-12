@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-05-12
+
+### Added
+
+- Added breathing-aware RN-DMC initialization controls for LDA-RMS lattice/logspread starts and optional guide-Metropolis breathing preburn.
+- Added configurable fixed-scale RN collective proposal mixtures for weak-trap stationarity probes.
+
+### Changed
+
+- Reduced the public RN-DMC release runner surface and tightened initialization metadata typing.
+- Updated trapped RN-block blocking-plateau detection to use Flyvbjerg-Petersen/pyblock-compatible standard-error uncertainty instead of relying only on a fixed relative-spread cutoff.
+- Raised the stationarity plateau gate to ignore under-sampled coarsest blocking points while keeping full blocking curves in artifacts.
+
 ## 2026-05-11
 
 ### Added

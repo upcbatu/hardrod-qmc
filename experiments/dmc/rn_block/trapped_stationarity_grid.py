@@ -18,9 +18,9 @@ from hrdmc.workflows.dmc.rn_block import (
     rn_progress_bar,
     write_summary,
 )
+from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 from hrdmc.workflows.dmc.rn_block_stationarity import classify_grid, summarize_stationarity_case
 from hrdmc.workflows.dmc.rn_block_stationarity_outputs import write_case_table, write_plots
-from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 
 DEFAULT_CASES = "N4_a0.5_omega0.05,N8_a0.5_omega0.05,N8_a0.5_omega0.2"
 

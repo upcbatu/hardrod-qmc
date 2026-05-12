@@ -86,12 +86,15 @@ def detect_blocking_plateau(
     min_blocks: int = 16,
     window: int = 3,
     rel_tol: float = 0.10,
+    sigma_tol: float = 1.0,
 ) -> BlockingPlateauResult:
     """Detect a stable tail in a blocking standard-error curve.
 
     The detector only considers curve points with enough remaining blocks. It
     does not blindly select the final point when the blocked sample count is
-    too small.
+    too small. The plateau criterion follows the Flyvbjerg-Petersen blocking
+    diagnostic: standard-error estimates should be constant within their own
+    sampling uncertainty after block sizes exceed the correlation scale.
     """
 
     if min_blocks < 2:
@@ -100,6 +103,8 @@ def detect_blocking_plateau(
         raise ValueError("window must be at least 2")
     if rel_tol < 0.0:
         raise ValueError("rel_tol must be non-negative")
+    if sigma_tol < 0.0:
+        raise ValueError("sigma_tol must be non-negative")
 
     sizes = np.asarray(block_sizes, dtype=float).reshape(-1)
     counts = np.asarray(n_blocks, dtype=float).reshape(-1)
@@ -128,7 +133,12 @@ def detect_blocking_plateau(
     tail_errors = errors[tail_indices]
     scale = max(float(abs(np.median(tail_errors))), float(np.max(np.abs(tail_errors))), 1e-300)
     relative_spread = float((np.max(tail_errors) - np.min(tail_errors)) / scale)
-    if relative_spread > rel_tol:
+    statistically_flat = _standard_errors_overlap(
+        tail_errors,
+        counts[tail_indices],
+        sigma_tol=sigma_tol,
+    )
+    if relative_spread > rel_tol and not statistically_flat:
         return BlockingPlateauResult(
             plateau_found=False,
             plateau_stderr=float("nan"),
@@ -145,3 +155,40 @@ def detect_blocking_plateau(
         plateau_n_blocks=int(counts[selected]),
         reason="PLATEAU_FOUND",
     )
+
+
+def standard_error_error(stderr: FloatArray, n_blocks: FloatArray) -> FloatArray:
+    """Estimate the sampling error of a blocking standard-error estimate.
+
+    For approximately Gaussian block means, the relative uncertainty of a
+    standard deviation estimate is about ``1 / sqrt(2 * (n_blocks - 1))``.
+    The same factor applies to the standard error because the block count is
+    fixed at a given blocking level.
+    """
+
+    err = np.asarray(stderr, dtype=float)
+    counts = np.asarray(n_blocks, dtype=float)
+    out = np.full(np.broadcast_shapes(err.shape, counts.shape), np.nan, dtype=float)
+    err_b = np.broadcast_to(err, out.shape)
+    counts_b = np.broadcast_to(counts, out.shape)
+    valid = np.isfinite(err_b) & np.isfinite(counts_b) & (counts_b > 1.0) & (err_b >= 0.0)
+    out[valid] = err_b[valid] / np.sqrt(2.0 * (counts_b[valid] - 1.0))
+    return out
+
+
+def _standard_errors_overlap(
+    stderr: FloatArray,
+    n_blocks: FloatArray,
+    *,
+    sigma_tol: float,
+) -> bool:
+    errors = np.asarray(stderr, dtype=float).reshape(-1)
+    error_bars = standard_error_error(errors, np.asarray(n_blocks, dtype=float).reshape(-1))
+    if errors.size < 2 or not np.all(np.isfinite(error_bars)):
+        return False
+    for i in range(errors.size):
+        for j in range(i + 1, errors.size):
+            combined = float(np.sqrt(error_bars[i] ** 2 + error_bars[j] ** 2))
+            if abs(float(errors[i] - errors[j])) > sigma_tol * combined:
+                return False
+    return True
