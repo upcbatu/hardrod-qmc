@@ -16,6 +16,7 @@ from hrdmc.monte_carlo.dmc.rn_block import RNBlockStreamingSummary
 from hrdmc.runners import run_seed_batch
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
 from hrdmc.workflows.dmc.rn_block import (
+    RNCollectiveProposalControls,
     RNCase,
     RNRunControls,
     build_case_objects,
@@ -23,6 +24,7 @@ from hrdmc.workflows.dmc.rn_block import (
     resolve_parallel_workers,
     run_streaming_seed,
 )
+from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 
 GO_CLASSIFICATIONS = {"GO", "WARNING_SPREAD_ONLY"}
 
@@ -38,7 +40,12 @@ def summarize_stationarity_case(
     ess_warning_fraction: float = 0.20,
     ess_no_go_fraction: float = 0.10,
     log_weight_span_warning: float = 50.0,
+    initialization: RNInitializationControls | None = None,
+    proposal: RNCollectiveProposalControls | None = None,
 ) -> dict[str, Any]:
+    initialization = RNInitializationControls() if initialization is None else initialization
+    proposal = RNCollectiveProposalControls() if proposal is None else proposal
+    proposal.validate()
     grid = make_grid(controls, case)
     worker_count = resolve_parallel_workers(len(seeds), parallel_workers)
     seed_summaries, actual_worker_count = run_stationarity_seeds(
@@ -48,6 +55,8 @@ def summarize_stationarity_case(
         grid,
         worker_count=worker_count,
         progress=progress,
+        initialization=initialization,
+        proposal=proposal,
     )
     system, trap, _guide, _target, _proposal = build_case_objects(case)
     density = np.mean([summary.density for summary in seed_summaries], axis=0)
@@ -128,6 +137,13 @@ def summarize_stationarity_case(
         "n_particles": case.n_particles,
         "rod_length": case.rod_length,
         "omega": case.omega,
+        "initialization_mode": initialization.mode,
+        "init_width_log_sigma": initialization.init_width_log_sigma,
+        "breathing_preburn_steps": initialization.breathing_preburn_steps,
+        "breathing_preburn_log_step": initialization.breathing_preburn_log_step,
+        **proposal.to_metadata(),
+        "target_initial_rms": seed_summaries[0].metadata.get("target_initial_rms", float("nan")),
+        "initializer_scope": seed_summaries[0].metadata.get("initializer_scope", ""),
         "case_gate": case_gate,
         "old_case_gate": old_case_gate,
         "hygiene_gate": hygiene_gate,
@@ -199,6 +215,14 @@ def summarize_stationarity_case(
         "rn_weight_ess_warning_fraction": ess_warning_fraction,
         "rn_weight_ess_no_go_fraction": ess_no_go_fraction,
         "rn_weight_log_weight_span_warning": log_weight_span_warning,
+        "initial_to_production_rms_ratio": float(
+            np.mean(
+                [
+                    summary.metadata.get("initial_to_production_rms_ratio", float("nan"))
+                    for summary in seed_summaries
+                ]
+            )
+        ),
         "guide_batch_backend": ",".join(
             sorted({str(summary.metadata["guide_batch_backend"]) for summary in seed_summaries})
         ),
@@ -217,12 +241,34 @@ def summarize_stationarity_case(
                 "resample_count": summary.metadata["resample_count"],
                 "ess_min": summary.metadata["ess_min"],
                 "ess_mean": summary.metadata["ess_mean"],
-                "ess_fraction_min": summary.metadata.get("ess_fraction_min", float("nan")),
+                "ess_fraction_min": summary.metadata["ess_fraction_min"],
                 "log_weight_span_max": summary.metadata.get("log_weight_span_max", float("nan")),
                 "invalid_proposal_fraction_max": summary.metadata.get(
                     "invalid_proposal_fraction_max",
                     float("nan"),
                 ),
+                "initialization_mode": summary.metadata["initialization_mode"],
+                "target_initial_rms": summary.metadata["target_initial_rms"],
+                "initial_spacing_mean": summary.metadata["initial_spacing_mean"],
+                "initial_spacing_std": summary.metadata["initial_spacing_std"],
+                "initial_rms_mean": summary.metadata["initial_rms_mean"],
+                "initial_rms_std": summary.metadata["initial_rms_std"],
+                "initial_gap_min": summary.metadata["initial_gap_min"],
+                "breathing_preburn_steps": summary.metadata["breathing_preburn_steps"],
+                "breathing_preburn_log_step": summary.metadata["breathing_preburn_log_step"],
+                "breathing_preburn_acceptance_rate": summary.metadata[
+                    "breathing_preburn_acceptance_rate"
+                ],
+                "breathing_preburn_jacobian_dimension": summary.metadata[
+                    "breathing_preburn_jacobian_dimension"
+                ],
+                "preburn_rms_mean": summary.metadata["preburn_rms_mean"],
+                "preburn_rms_std": summary.metadata["preburn_rms_std"],
+                "preburn_gap_min": summary.metadata["preburn_gap_min"],
+                "initial_to_production_rms_ratio": summary.metadata[
+                    "initial_to_production_rms_ratio"
+                ],
+                **breathing_trace_summary(summary),
                 "guide_batch_backend": summary.metadata["guide_batch_backend"],
             }
             for seed, summary in zip(seeds, seed_summaries, strict=True)
@@ -239,7 +285,12 @@ def run_stationarity_seeds(
     *,
     worker_count: int,
     progress: ProgressBar | None,
+    initialization: RNInitializationControls | None = None,
+    proposal: RNCollectiveProposalControls | None = None,
 ) -> tuple[list[RNBlockStreamingSummary], int]:
+    initialization = RNInitializationControls() if initialization is None else initialization
+    proposal = RNCollectiveProposalControls() if proposal is None else proposal
+    proposal.validate()
     return run_seed_batch(
         seeds,
         worker_count=worker_count,
@@ -251,6 +302,8 @@ def run_stationarity_seeds(
             seed,
             density_grid,
             progress_queue,
+            initialization,
+            proposal,
         ),
         run_serial_seed=lambda seed: run_streaming_seed(
             case,
@@ -258,6 +311,8 @@ def run_stationarity_seeds(
             seed,
             density_grid=density_grid,
             progress=progress,
+            initialization=initialization,
+            proposal=proposal,
         ),
     )
 
@@ -268,7 +323,12 @@ def run_seed_worker(
     seed: int,
     density_grid: np.ndarray,
     progress_queue: Any | None = None,
+    initialization: RNInitializationControls | None = None,
+    proposal: RNCollectiveProposalControls | None = None,
 ) -> tuple[int, RNBlockStreamingSummary]:
+    initialization = RNInitializationControls() if initialization is None else initialization
+    proposal = RNCollectiveProposalControls() if proposal is None else proposal
+    proposal.validate()
     worker_progress = QueuedProgress(progress_queue) if progress_queue is not None else None
     try:
         return seed, run_streaming_seed(
@@ -277,6 +337,8 @@ def run_seed_worker(
             seed,
             density_grid=density_grid,
             progress=worker_progress,
+            initialization=initialization,
+            proposal=proposal,
         )
     finally:
         if worker_progress is not None:
@@ -504,6 +566,32 @@ def seed_trace_dict(summary: RNBlockStreamingSummary) -> dict[str, np.ndarray]:
         "rn_logw_increment_variance": require_trace(summary.rn_logw_increment_variance_trace),
         "retained_fraction": require_trace(summary.retained_fraction_trace),
     }
+
+
+def breathing_trace_summary(summary: RNBlockStreamingSummary) -> dict[str, float]:
+    values = require_trace(summary.rms_radius_trace)
+    first, last, z_value = first_last_quarter_summary(values)
+    return {
+        "first_quarter_rms": first,
+        "last_quarter_rms": last,
+        "first_last_rms_z": z_value,
+    }
+
+
+def first_last_quarter_summary(values: np.ndarray) -> tuple[float, float, float]:
+    data = np.asarray(values, dtype=float)
+    if data.size < 4:
+        return float("nan"), float("nan"), float("nan")
+    width = max(1, data.size // 4)
+    first = data[:width]
+    last = data[-width:]
+    first_mean = float(np.mean(first))
+    last_mean = float(np.mean(last))
+    first_var = float(np.var(first, ddof=1)) if first.size > 1 else 0.0
+    last_var = float(np.var(last, ddof=1)) if last.size > 1 else 0.0
+    stderr_value = np.sqrt(first_var / first.size + last_var / last.size)
+    z_value = (last_mean - first_mean) / stderr_value if stderr_value > 0.0 else float("nan")
+    return first_mean, last_mean, float(z_value)
 
 
 def write_trace_csv(path: Any, trace: dict[str, np.ndarray]) -> None:

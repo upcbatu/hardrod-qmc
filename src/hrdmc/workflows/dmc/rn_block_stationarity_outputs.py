@@ -63,6 +63,10 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> None:
         "rn_weight_status",
         "lost_out_of_grid_sample_count_total",
         "guide_batch_backend",
+        "initialization_mode",
+        "target_initial_rms",
+        "initial_to_production_rms_ratio",
+        "breathing_preburn_steps",
     ]
     output_path = ensure_dir(output_dir) / "case_table.csv"
     with output_path.open("w", newline="") as file:

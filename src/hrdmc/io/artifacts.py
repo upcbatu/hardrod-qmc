@@ -27,7 +27,7 @@ def canonical_json_bytes(payload: Any) -> bytes:
         to_jsonable(payload),
         sort_keys=True,
         separators=(",", ":"),
-        allow_nan=True,
+        allow_nan=False,
     ).encode("utf-8")
 
 
@@ -48,7 +48,7 @@ def write_json_atomic(path: str | Path, payload: Any) -> Path:
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(f".{p.name}.tmp")
     with tmp.open("w", encoding="utf-8") as f:
-        json.dump(to_jsonable(payload), f, indent=2, sort_keys=True)
+        json.dump(to_jsonable(payload), f, indent=2, sort_keys=True, allow_nan=False)
         f.write("\n")
     tmp.replace(p)
     return p

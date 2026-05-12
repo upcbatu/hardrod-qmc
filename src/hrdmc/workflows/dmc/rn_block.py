@@ -37,6 +37,11 @@ from hrdmc.systems import (
 )
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
 from hrdmc.wavefunctions import ReducedTGHardRodGuide
+from hrdmc.workflows.dmc.rn_block_initial_conditions import (
+    RNInitializationControls,
+    initial_walkers,
+    prepare_initial_walkers,
+)
 
 CASE_RE = re.compile(r"^N(?P<n>\d+)_a(?P<a>[0-9.]+)_omega(?P<omega>[0-9.]+)$")
 MAX_AUTO_WORKERS = 6
@@ -74,6 +79,31 @@ class RNRunControls:
     @property
     def production_steps(self) -> int:
         return max(1, int(round(self.production_tau / self.dt)))
+
+
+@dataclass(frozen=True)
+class RNCollectiveProposalControls:
+    component_log_scales: tuple[float, ...] = (-0.02, 0.0, 0.02)
+    component_probabilities: tuple[float, ...] = (0.25, 0.5, 0.25)
+
+    def validate(self) -> None:
+        if not self.component_log_scales:
+            raise ValueError("component_log_scales must not be empty")
+        if len(self.component_log_scales) != len(self.component_probabilities):
+            raise ValueError("component_log_scales and component_probabilities length mismatch")
+        if any(not np.isfinite(value) for value in self.component_log_scales):
+            raise ValueError("component_log_scales must be finite")
+        probabilities = np.asarray(self.component_probabilities, dtype=float)
+        if np.any(probabilities < 0.0) or not np.all(np.isfinite(probabilities)):
+            raise ValueError("component_probabilities must be finite and non-negative")
+        if not np.isclose(float(np.sum(probabilities)), 1.0):
+            raise ValueError("component_probabilities must sum to one")
+
+    def to_metadata(self) -> dict[str, list[float]]:
+        return {
+            "component_log_scales": list(self.component_log_scales),
+            "component_probabilities": list(self.component_probabilities),
+        }
 
 
 def parse_case(case_id: str) -> RNCase:
@@ -154,7 +184,7 @@ def make_grid(controls: RNRunControls, case: RNCase | None = None) -> np.ndarray
     for _attempt in range(8):
         grid = np.linspace(-extent, extent, controls.n_bins)
         try:
-            lda_density_profile(
+            lda = lda_density_profile(
                 grid,
                 trap.values(grid),
                 n_particles=float(system.n_particles),
@@ -165,27 +195,22 @@ def make_grid(controls: RNRunControls, case: RNCase | None = None) -> np.ndarray
                 raise
             extent *= 1.5
         else:
-            return grid
+            dynamic_extent = max(extent, 20.0, 6.0 * lda_rms_radius(lda, center=trap.center))
+            if dynamic_extent <= extent * (1.0 + 1e-5):
+                return grid
+            extent = dynamic_extent
     raise ValueError("failed to build a grid containing the LDA density cloud")
 
 
-def initial_walkers(
-    system: OpenLineHardRodSystem,
-    walkers: int,
-    rng: np.random.Generator,
-) -> np.ndarray:
-    if walkers <= 0:
-        raise ValueError("walkers must be positive")
-    return np.vstack(
-        [
-            system.initial_lattice(
-                spacing=max(1.25, 2.5 * system.rod_length),
-                jitter=0.05,
-                seed=int(rng.integers(0, 2**31 - 1)),
-            )
-            for _ in range(walkers)
-        ]
+def lda_target_rms(case: RNCase, controls: RNRunControls, grid: np.ndarray) -> float:
+    system, trap, _guide, _target, _proposal = build_case_objects(case)
+    lda = lda_density_profile(
+        grid,
+        trap.values(grid),
+        n_particles=float(system.n_particles),
+        rod_length=system.rod_length,
     )
+    return lda_rms_radius(lda, center=trap.center)
 
 
 def run_streaming_seed(
@@ -198,17 +223,33 @@ def run_streaming_seed(
     checkpoint_dir: Path | None = None,
     checkpoint_every_steps: int | None = None,
     resume: bool = False,
+    initialization: RNInitializationControls | None = None,
+    proposal: RNCollectiveProposalControls | None = None,
 ) -> RNBlockStreamingSummary:
-    system, _trap, guide, target_kernel, proposal_kernel = build_case_objects(case)
     rng = np.random.default_rng(seed)
+    system, _trap, guide, target_kernel, proposal_kernel = build_case_objects(case)
     grid = make_grid(controls, case) if density_grid is None else density_grid
-    checkpoint_path = (
-        checkpoint_dir / f"{case.case_id}_seed{seed}.npz"
-        if checkpoint_dir is not None
+    initialization = RNInitializationControls() if initialization is None else initialization
+    proposal = RNCollectiveProposalControls() if proposal is None else proposal
+    proposal.validate()
+    target_initial_rms = (
+        lda_target_rms(case, controls, grid)
+        if initialization.mode in {"lda-rms-lattice", "lda-rms-logspread"}
         else None
     )
-    return run_rn_block_dmc_streaming(
-        initial_walkers=initial_walkers(system, controls.walkers, rng),
+    initial = prepare_initial_walkers(
+        system,
+        guide,
+        controls.walkers,
+        rng,
+        controls=initialization,
+        target_initial_rms=target_initial_rms,
+    )
+    checkpoint_path = (
+        checkpoint_dir / f"{case.case_id}_seed{seed}.npz" if checkpoint_dir is not None else None
+    )
+    summary = run_rn_block_dmc_streaming(
+        initial_walkers=initial.positions,
         guide=guide,
         system=system,
         target_kernel=target_kernel,
@@ -217,8 +258,8 @@ def run_streaming_seed(
         config=RNBlockDMCConfig(
             tau_block=controls.tau_block,
             rn_cadence_tau=controls.rn_cadence_tau,
-            component_log_scales=(-0.02, 0.0, 0.02),
-            component_probabilities=(0.25, 0.5, 0.25),
+            component_log_scales=proposal.component_log_scales,
+            component_probabilities=proposal.component_probabilities,
         ),
         rng=rng,
         dt=controls.dt,
@@ -230,6 +271,13 @@ def run_streaming_seed(
         checkpoint_every_steps=checkpoint_every_steps,
         resume=resume,
     )
+    summary.metadata.update(initial.metadata)
+    summary.metadata.update(proposal.to_metadata())
+    initial_rms = float(initial.metadata["initial_rms_mean"])
+    summary.metadata["initial_to_production_rms_ratio"] = (
+        float(summary.rms_radius / initial_rms) if initial_rms > 0.0 else float("nan")
+    )
+    return summary
 
 
 def validate_streaming_against_raw(
@@ -384,6 +432,7 @@ def summarize_case(
                 "resample_count": summary.metadata["resample_count"],
                 "ess_min": summary.metadata["ess_min"],
                 "ess_mean": summary.metadata["ess_mean"],
+                "ess_fraction_min": summary.metadata["ess_fraction_min"],
                 "guide_batch_backend": summary.metadata["guide_batch_backend"],
             }
             for seed, summary in zip(seeds, seed_summaries, strict=True)

@@ -8,7 +8,9 @@ from pathlib import Path
 from hrdmc.artifacts import ArtifactRoute, artifact_dir, repo_root_from
 from hrdmc.io import progress_requested
 from hrdmc.io.artifacts import build_run_provenance, ensure_dir, write_run_manifest
+from hrdmc.io.schema import to_jsonable
 from hrdmc.workflows.dmc.rn_block import (
+    RNCollectiveProposalControls,
     RNRunControls,
     controls_to_dict,
     parse_case,
@@ -18,6 +20,7 @@ from hrdmc.workflows.dmc.rn_block import (
 )
 from hrdmc.workflows.dmc.rn_block_stationarity import classify_grid, summarize_stationarity_case
 from hrdmc.workflows.dmc.rn_block_stationarity_outputs import write_case_table, write_plots
+from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 
 DEFAULT_CASES = "N4_a0.5_omega0.05,N8_a0.5_omega0.05,N8_a0.5_omega0.2"
 
@@ -37,9 +40,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--store-every", type=int, default=40)
     parser.add_argument("--grid-extent", type=float, default=20.0)
     parser.add_argument("--n-bins", type=int, default=240)
+    parser.add_argument(
+        "--initialization-mode",
+        choices=("tight-lattice", "lda-rms-lattice", "lda-rms-logspread"),
+        default="tight-lattice",
+    )
+    parser.add_argument("--init-width-log-sigma", type=float, default=0.10)
+    parser.add_argument("--breathing-preburn-steps", type=int, default=0)
+    parser.add_argument("--breathing-preburn-log-step", type=float, default=0.04)
     parser.add_argument("--ess-warning-fraction", type=float, default=0.20)
     parser.add_argument("--ess-no-go-fraction", type=float, default=0.10)
     parser.add_argument("--log-weight-span-warning", type=float, default=50.0)
+    parser.add_argument(
+        "--component-log-scales",
+        default="-0.02,0,0.02",
+        help="Comma-separated RN collective log-scale mixture components.",
+    )
+    parser.add_argument(
+        "--component-probabilities",
+        default="0.25,0.5,0.25",
+        help="Comma-separated RN collective mixture probabilities.",
+    )
     parser.add_argument(
         "--parallel-workers",
         type=int,
@@ -74,6 +95,18 @@ def main() -> None:
     )
     seeds = parse_seeds(args.seeds)
     cases = [parse_case(item) for item in args.cases.split(",") if item.strip()]
+    component_log_scales = _parse_float_tuple(args.component_log_scales)
+    component_probabilities = _parse_float_tuple(args.component_probabilities)
+    initialization = RNInitializationControls(
+        mode=args.initialization_mode,
+        init_width_log_sigma=args.init_width_log_sigma,
+        breathing_preburn_steps=args.breathing_preburn_steps,
+        breathing_preburn_log_step=args.breathing_preburn_log_step,
+    )
+    proposal = RNCollectiveProposalControls(
+        component_log_scales=component_log_scales,
+        component_probabilities=component_probabilities,
+    )
     output_dir = args.output_dir or artifact_dir(
         repo_root, ArtifactRoute("dmc", "rn_block", "trapped_stationarity_grid")
     )
@@ -95,6 +128,8 @@ def main() -> None:
                 ess_warning_fraction=args.ess_warning_fraction,
                 ess_no_go_fraction=args.ess_no_go_fraction,
                 log_weight_span_warning=args.log_weight_span_warning,
+                initialization=initialization,
+                proposal=proposal,
             )
             for case in cases
         ]
@@ -109,6 +144,12 @@ def main() -> None:
             "not final paper benchmark by itself"
         ),
         "controls": controls_to_dict(controls),
+        "initialization_mode": args.initialization_mode,
+        "init_width_log_sigma": args.init_width_log_sigma,
+        "breathing_preburn_steps": args.breathing_preburn_steps,
+        "breathing_preburn_log_step": args.breathing_preburn_log_step,
+        "component_log_scales": list(component_log_scales),
+        "component_probabilities": list(component_probabilities),
         "case_count": len(rows),
         "cases": rows,
     }
@@ -131,12 +172,25 @@ def main() -> None:
                 "seeds": seeds,
                 "controls": controls_to_dict(controls),
                 "parallel_workers": args.parallel_workers,
+                "initialization_mode": args.initialization_mode,
+                "init_width_log_sigma": args.init_width_log_sigma,
+                "breathing_preburn_steps": args.breathing_preburn_steps,
+                "breathing_preburn_log_step": args.breathing_preburn_log_step,
+                "component_log_scales": list(component_log_scales),
+                "component_probabilities": list(component_probabilities),
             },
             artifacts=artifacts,
             schema_version="rn_block_trapped_stationarity_grid_v1",
             provenance=build_run_provenance(sys.argv),
         )
-    print(json.dumps(payload, indent=2))
+    print(json.dumps(to_jsonable(payload), indent=2, allow_nan=False))
+
+
+def _parse_float_tuple(value: str) -> tuple[float, ...]:
+    values = tuple(float(item) for item in value.split(",") if item.strip())
+    if not values:
+        raise ValueError("at least one numeric value is required")
+    return values
 
 
 if __name__ == "__main__":

@@ -8,6 +8,14 @@ from numpy.typing import NDArray
 FloatArray = NDArray[np.float64]
 
 
+def lattice_spacing_for_target_rms(n_particles: int, target_rms: float) -> float:
+    if n_particles < 2:
+        raise ValueError("n_particles must be at least 2")
+    if target_rms <= 0.0:
+        raise ValueError("target_rms must be positive")
+    return float(target_rms * np.sqrt(12.0 / (n_particles * n_particles - 1.0)))
+
+
 @dataclass(frozen=True)
 class OpenLineHardRodSystem:
     """One-dimensional hard rods on an open line.
@@ -49,6 +57,14 @@ class OpenLineHardRodSystem:
     ) -> FloatArray:
         if spacing is None:
             spacing = max(1.0, 2.0 * self.rod_length)
+        return self.initial_lattice_with_spacing(spacing=spacing, jitter=jitter, seed=seed)
+
+    def initial_lattice_with_spacing(
+        self,
+        spacing: float,
+        jitter: float = 0.0,
+        seed: int | None = None,
+    ) -> FloatArray:
         if spacing <= self.rod_length:
             raise ValueError("spacing must be larger than rod_length")
         if jitter < 0:

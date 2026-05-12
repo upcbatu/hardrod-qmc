@@ -6,12 +6,15 @@ __pycache__/
 venv/
 .env
 .DS_Store
+**/.DS_Store
 plots/mplconfig/
 results/**/*.npy
 results/**/*.npz
 results/**/*.png
 results/**/*.json
 results/**/*.csv
+results/**/*.log
+results/**/*.tgz
 results/**/*.md
 results/**/.tmp/
 results/**/.matplotlib/
