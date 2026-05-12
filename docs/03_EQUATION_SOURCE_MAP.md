@@ -68,6 +68,11 @@ Every entry below has one of these statuses:
   localization: An improved R-hat for assessing convergence of MCMC*,
   **Bayesian Analysis 16**, 667-718 (2021).
   DOI: [10.1214/20-BA1221](https://doi.org/10.1214/20-BA1221)
+- `[Hellmann1937Quantenchemie]` H. Hellmann, *Einführung in die
+  Quantenchemie*, Franz Deuticke, Leipzig und Wien (1937).
+- `[Feynman1939Forces]` R. P. Feynman, *Forces in Molecules*,
+  **Phys. Rev. 56**, 340-343 (1939).
+  DOI: [10.1103/PhysRev.56.340](https://doi.org/10.1103/PhysRev.56.340)
 
 ### Optional Literature
 
@@ -106,6 +111,52 @@ T_{\mathrm{local}}
 $$
 
 Physical-unit formulas must reinsert \(\hbar^2/(2m)\) or \(m\) explicitly.
+
+## Estimator Response Formulas
+
+### E1. Hellmann-Feynman Trap R2/RMS Response
+
+Code:
+[src/hrdmc/estimators/energy_response.py](src/hrdmc/estimators/energy_response.py)
+
+Formula:
+
+For
+
+$$
+H(\lambda)=H_0+\lambda\sum_i (x_i-x_0)^2,
+\qquad
+\lambda=\frac12\omega^2,
+$$
+
+Hellmann-Feynman gives
+
+$$
+\frac{dE_0}{d\lambda}
+=
+\left\langle\sum_i (x_i-x_0)^2\right\rangle_{\rm pure}.
+$$
+
+Therefore
+
+$$
+R_2^{\rm pure}
+=
+\frac1N\frac{dE_0}{d\lambda},
+\qquad
+R_{\rm RMS}^{\rm paper}
+=
+\sqrt{R_2^{\rm pure}}.
+$$
+
+Source basis:
+Hellmann-Feynman theorem from `[Hellmann1937Quantenchemie]` and
+`[Feynman1939Forces]`.
+
+Claim boundary:
+This only estimates trap \(R_2\)/RMS from RN-DMC energy artifacts. It is not a
+density estimator. Paper-grade use requires every energy point to pass the
+RN-DMC methodology gates; missing gate metadata remains diagnostic only.
 
 ## Systems And Geometry
 

@@ -6,6 +6,7 @@
 
 - Added breathing-aware RN-DMC initialization controls for LDA-RMS lattice/logspread starts and optional guide-Metropolis breathing preburn.
 - Added configurable fixed-scale RN collective proposal mixtures for weak-trap stationarity probes.
+- Added Hellmann-Feynman energy-response estimator and offline reanalysis support for pure trap R2/RMS from existing RN-DMC energy artifacts.
 
 ### Changed
 
