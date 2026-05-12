@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from hrdmc.analysis import TraceStationarityResult, trace_stationarity_diagnostics
-from hrdmc.estimators import WeightedObservableResult, estimate_weighted_observables
+from hrdmc.estimators.mixed import WeightedObservableResult, estimate_weighted_observables
 
 FloatArray = NDArray[np.float64]
 

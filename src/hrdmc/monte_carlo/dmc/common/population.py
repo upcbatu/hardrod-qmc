@@ -63,6 +63,43 @@ def maybe_resample_population(
     )
 
 
+def maybe_resample_population_with_indices(
+    positions: FloatArray,
+    local_energies: FloatArray,
+    log_weights: FloatArray,
+    rng: np.random.Generator,
+    *,
+    threshold_fraction: float,
+) -> tuple[FloatArray, FloatArray, FloatArray, bool, IntArray]:
+    if threshold_fraction <= 0.0:
+        return (
+            positions,
+            local_energies,
+            log_weights,
+            False,
+            np.arange(positions.shape[0], dtype=np.int64),
+        )
+    weights = normalize_log_weights(log_weights)
+    ess = float(1.0 / np.sum(weights * weights))
+    threshold = threshold_fraction * positions.shape[0]
+    if ess >= threshold:
+        return (
+            positions,
+            local_energies,
+            log_weights,
+            False,
+            np.arange(positions.shape[0], dtype=np.int64),
+        )
+    indices = systematic_resample(weights, rng)
+    return (
+        positions[indices].copy(),
+        local_energies[indices].copy(),
+        np.zeros(positions.shape[0], dtype=float),
+        True,
+        indices,
+    )
+
+
 def recenter_log_weights(log_weights: FloatArray) -> FloatArray:
     finite = np.isfinite(log_weights)
     if not np.any(finite):

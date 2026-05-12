@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hrdmc.estimators.pair_distribution import PairDistributionResult
-from hrdmc.estimators.structure_factor import StructureFactorResult
+from hrdmc.estimators.observables.pair_distribution import PairDistributionResult
+from hrdmc.estimators.observables.structure_factor import StructureFactorResult
 
 
 def _require_matplotlib():  # noqa: ANN202

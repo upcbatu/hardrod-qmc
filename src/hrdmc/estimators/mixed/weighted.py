@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from hrdmc.estimators.density import DensityProfileResult
+from hrdmc.estimators.observables.density import DensityProfileResult
 
 FloatArray = NDArray[np.float64]
 

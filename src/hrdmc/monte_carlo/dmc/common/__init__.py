@@ -16,6 +16,7 @@ from hrdmc.monte_carlo.dmc.common.numeric import (
 from hrdmc.monte_carlo.dmc.common.population import (
     effective_sample_size,
     maybe_resample_population,
+    maybe_resample_population_with_indices,
     normalize_log_weights,
     normalize_weights,
     recenter_log_weights,
@@ -42,6 +43,7 @@ __all__ = [
     "guide_log_values",
     "log_weight_span",
     "maybe_resample_population",
+    "maybe_resample_population_with_indices",
     "normalize_weights",
     "normalize_log_weights",
     "recenter_log_weights",

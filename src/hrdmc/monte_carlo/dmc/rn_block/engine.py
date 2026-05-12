@@ -13,6 +13,7 @@ from hrdmc.monte_carlo.dmc.common.guide_api import (
 from hrdmc.monte_carlo.dmc.common.population import (
     effective_sample_size,
     maybe_resample_population,
+    maybe_resample_population_with_indices,
     normalize_log_weights,
     recenter_log_weights,
 )
@@ -24,6 +25,11 @@ from hrdmc.monte_carlo.dmc.rn_block.transitions import (
     advance_local_step,
     advance_rn_block,
     euler_drift_diffusion_step,
+)
+from hrdmc.monte_carlo.dmc.rn_block.transport import (
+    RNTransportEvent,
+    RNTransportObserver,
+    com_rao_blackwell_r2_per_walker,
 )
 from hrdmc.systems.open_line import OpenLineHardRodSystem
 from hrdmc.systems.propagators import ProposalTransitionKernel, TargetTransitionKernel
@@ -178,6 +184,8 @@ def run_rn_block_dmc_streaming(
     checkpoint_path: str | Path | None = None,
     checkpoint_every_steps: int | None = None,
     resume: bool = False,
+    transport_observer: RNTransportObserver | None = None,
+    transport_com_variance: float | None = None,
 ) -> RNBlockStreamingSummary:
     """Run RN-block DMC and accumulate compact observables during production."""
 
@@ -241,19 +249,56 @@ def run_rn_block_dmc_streaming(
             state.local_step_count += 1
         state.positions = advance.positions
         state.local_energies = advance.local_energies
+        finite_log_weights = advance.log_weights[np.isfinite(advance.log_weights)]
+        weight_gauge_shift = (
+            float(np.max(finite_log_weights)) if finite_log_weights.size else 0.0
+        )
         state.log_weights = recenter_log_weights(advance.log_weights)
         ess = effective_sample_size(state.log_weights)
         state.record_step(killed=advance.killed, ess=ess, telemetry=advance.telemetry)
-        state.positions, state.local_energies, state.log_weights, resampled = (
-            maybe_resample_population(
-                state.positions,
-                state.local_energies,
-                state.log_weights,
-                rng,
-                threshold_fraction=cfg.ess_resample_fraction,
-            )
+        log_weights_pre_resample = state.log_weights
+        (
+            state.positions,
+            state.local_energies,
+            state.log_weights,
+            resampled,
+            parent_indices,
+        ) = maybe_resample_population_with_indices(
+            state.positions,
+            state.local_energies,
+            state.log_weights,
+            rng,
+            threshold_fraction=cfg.ess_resample_fraction,
         )
         state.record_resample(resampled)
+        if transport_observer is not None:
+            production_step_id = (
+                step_index - burn_in_steps if step_index > burn_in_steps else None
+            )
+            r2_rb = (
+                None
+                if transport_com_variance is None
+                else com_rao_blackwell_r2_per_walker(
+                    state.positions,
+                    center=system.center,
+                    com_variance=transport_com_variance,
+                )
+            )
+            transport_observer.record_transport_event(
+                RNTransportEvent(
+                    step_id=step_index,
+                    production_step_id=production_step_id,
+                    block_id=state.rn_event_count,
+                    positions=state.positions.copy(),
+                    local_energy_per_walker=state.local_energies.copy(),
+                    r2_rb_per_walker=None if r2_rb is None else r2_rb.copy(),
+                    log_weights_pre_resample=log_weights_pre_resample.copy(),
+                    log_weights_post_resample=state.log_weights.copy(),
+                    parent_indices=parent_indices.copy(),
+                    resampled=resampled,
+                    weight_gauge_shift=weight_gauge_shift,
+                )
+            )
         if progress is not None:
             progress.update(1)
 
