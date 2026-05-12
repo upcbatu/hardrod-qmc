@@ -87,6 +87,13 @@ Every entry below has one of these statuses:
 - `[Feynman1939Forces]` R. P. Feynman, *Forces in Molecules*,
   **Phys. Rev. 56**, 340-343 (1939).
   DOI: [10.1103/PhysRev.56.340](https://doi.org/10.1103/PhysRev.56.340)
+- `[CasullerasBoronat1995Pure]` J. Casulleras and J. Boronat,
+  *Unbiased estimators in quantum Monte Carlo methods: Application to liquid
+  4He*, **Phys. Rev. B 52**, 3654-3661 (1995).
+  DOI: [10.1103/PhysRevB.52.3654](https://doi.org/10.1103/PhysRevB.52.3654)
+- `[SarsaBoronatCasulleras2002Pure]` A. Sarsa, J. Boronat, J. Casulleras,
+  *Quadratic diffusion Monte Carlo and pure estimators for atoms*,
+  **J. Chem. Phys. 116**, 5956-5962 (2002).
 
 ### Optional Literature
 
@@ -131,7 +138,7 @@ Physical-unit formulas must reinsert \(\hbar^2/(2m)\) or \(m\) explicitly.
 ### E1. Hellmann-Feynman Trap R2/RMS Response
 
 Code:
-[src/hrdmc/estimators/energy_response.py](src/hrdmc/estimators/energy_response.py)
+[src/hrdmc/estimators/pure/energy_response.py](src/hrdmc/estimators/pure/energy_response.py)
 
 Formula:
 
@@ -864,7 +871,7 @@ timestep, population, stationarity, accounting, and archived run-artifact gates.
 ### E1. Density Profiles
 
 Code:
-[src/hrdmc/estimators/density.py](src/hrdmc/estimators/density.py)
+[src/hrdmc/estimators/observables/density.py](src/hrdmc/estimators/observables/density.py)
 
 Formula:
 
@@ -896,7 +903,7 @@ grid captures all particles and weights are normalized.
 ### E1b. Density Support Edges
 
 Code:
-[src/hrdmc/estimators/density.py](src/hrdmc/estimators/density.py)
+[src/hrdmc/estimators/observables/density.py](src/hrdmc/estimators/observables/density.py)
 
 Formula:
 
@@ -916,7 +923,7 @@ the density threshold, grid, and estimator tier are explicitly justified.
 ### E2. Pair Distribution Function
 
 Code:
-[src/hrdmc/estimators/pair_distribution.py](src/hrdmc/estimators/pair_distribution.py)
+[src/hrdmc/estimators/observables/pair_distribution.py](src/hrdmc/estimators/observables/pair_distribution.py)
 
 Formula:
 
@@ -938,7 +945,7 @@ normalization.
 ### E3. Static Structure Factor
 
 Code:
-[src/hrdmc/estimators/structure_factor.py](src/hrdmc/estimators/structure_factor.py)
+[src/hrdmc/estimators/observables/structure_factor.py](src/hrdmc/estimators/observables/structure_factor.py)
 
 Formula:
 
@@ -986,7 +993,7 @@ energy is diagnostic unless backed by DMC/external validation.
 ### E5. Cloud Radius
 
 Code:
-[src/hrdmc/estimators/cloud.py](src/hrdmc/estimators/cloud.py)
+[src/hrdmc/estimators/observables/cloud.py](src/hrdmc/estimators/observables/cloud.py)
 
 Formula:
 
@@ -1011,7 +1018,7 @@ observable unless a pure-estimator path is added.
 ### E6. Weighted DMC Observables
 
 Code:
-[src/hrdmc/estimators/weighted.py](src/hrdmc/estimators/weighted.py)
+[src/hrdmc/estimators/mixed/weighted.py](src/hrdmc/estimators/mixed/weighted.py)
 
 Formula:
 
@@ -1373,6 +1380,100 @@ Source basis:
 Claim boundary:
 Gate-support analysis only. It is not a physics source and does not make DMC
 correct without timestep/population/accounting validation.
+
+## RN Transport Event Contract And Transported FW
+
+Code:
+`src/hrdmc/monte_carlo/dmc/rn_block/transport.py`,
+`src/hrdmc/estimators/pure/forward_walking/`
+
+The RN-block engine can emit one transport event per DMC step. The event is a
+bookkeeping contract, not an estimator formula:
+
+$$
+\mathcal E_t =
+\left(
+x_t,\ E_L(x_t),\ w_t^{\mathrm{pre}},\ w_t^{\mathrm{post}},\ p_t,\ I_t
+\right),
+$$
+
+where \(p_t(j)\) is the post-resampling parent index of final walker \(j\) at
+that DMC step, \(w_t^{\mathrm{pre}}\) are gauge-shifted pre-resampling log
+weights, \(w_t^{\mathrm{post}}\) define the normalized estimator weights for
+the emitted post-step population, and \(I_t\) stores the explicit convention
+fields. Global log-weight gauge shifts cancel under normalized averages and are
+not physical multiplicative factors for transported auxiliary variables.
+
+The optional COM Rao-Blackwell R2 payload is:
+
+$$
+r_i = x_i-x_0-\frac1N\sum_j (x_j-x_0),
+\qquad
+R^2_{\mathrm{RB}} =
+\frac1N\sum_i r_i^2 + \mathrm{Var}(Q).
+$$
+
+The transported auxiliary estimator supports \(R^2\), density-bin vectors
+whose integral gives particle count, pair-distance-density vectors whose
+integral gives pair count, and static structure factor vectors. A single-point
+collect/delay block uses:
+
+$$
+P_j \leftarrow P_{p_t(j)}
+$$
+
+at every DMC step. During the collection phase,
+
+$$
+P_j \leftarrow P_j + A_j,
+\qquad
+A_j = \frac1N\sum_i (x_{j,i}-x_0)^2
+$$
+
+or the corresponding vector-valued bin/Fourier observable for density,
+pair-distance density, or \(S(k)\). For \(R^2\), \(A_j=R^2_{\mathrm{RB},j}\)
+if the engine emits the RB payload and the estimator is configured to use it.
+During the delay phase, \(P_j\) is only transported. For \(L>0\), current
+`single_point` mode enforces one collected step before the delay, so every
+lagged contribution has the same forward length \(L\):
+
+$$
+\widehat A_L =
+\sum_{j=1}^M \tilde w^{\mathrm{post}}_j P_j.
+$$
+
+The \(L=0\) identity anchor is evaluated as the block average of instantaneous
+normalized weighted mixed estimates,
+
+$$
+\widehat A_0 =
+\frac1B \sum_{t=1}^B \sum_{j=1}^M
+\tilde w_{t,j}^{\mathrm{post}} A_{t,j},
+$$
+
+so changing no-resample weights inside a collection block cannot break the
+lag-zero mixed-estimator identity.
+
+The paper RMS radius is always:
+
+$$
+R_{\mathrm{rms,paper}} = \sqrt{\widehat{R^2}}.
+$$
+
+It is not the mean of per-configuration square roots.
+
+Source basis:
+Bookkeeping contract for the transported auxiliary-variable forward-walking
+approach in `[CasullerasBoronat1995Pure]` /
+`[SarsaBoronatCasulleras2002Pure]`, adapted to this repository's RN-block
+weighted-population engine.
+
+Claim boundary:
+The transport stream alone authorizes no paper coordinate claim. The
+transported auxiliary estimator is candidate-tier. It still needs lag-0
+identity, deterministic parent-map, gauge-cancellation, plateau,
+sufficient block count, walker-weight ESS, density-accounting when density is
+requested, and population checks.
 
 ## Experiment Scripts
 

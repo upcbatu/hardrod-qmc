@@ -5,6 +5,8 @@ corridor.
 
 - [method.md](method.md): end-to-end method flow, gate semantics, and claim
   boundary.
+- [transport_contract.md](transport_contract.md): RN-block event stream
+  contract for transported auxiliary forward-walking estimators.
 
 Formula ownership and literature references remain in
 [../03_EQUATION_SOURCE_MAP.md](../03_EQUATION_SOURCE_MAP.md).
