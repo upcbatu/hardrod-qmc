@@ -16,7 +16,8 @@ periodic hard-rod geometry
   -> exact finite-N ring energy
 ```
 
-An initial trapped VMC diagnostic path has also been added. It is useful for checking geometry, density-estimator, and LDA-grid consistency, but it is not yet a production trapped benchmark.
+Historical trapped VMC diagnostics were used during development. They are not
+part of the public release-facing experiment surface.
 
 ## 2. Homogeneous Ring Benchmark
 
@@ -103,33 +104,8 @@ Before using the code for thesis-level trapped-system conclusions, the following
 - Open-line hard-rod geometry without periodic wrapping has an initial implementation.
 - The harmonic trapping potential has an initial implementation.
 - Trapped initial configurations are checked against the hard-core constraint.
-- A trapped VMC smoke test exists with explicit `VMC diagnostic` benchmark-tier metadata.
-
-The current trapped smoke command is:
-
-```bash
-PYTHONPATH=src python3 experiments/vmc/trapped_smoke.py
-```
-
-It writes:
-
-```text
-results/trapped_vmc_smoke/summary.json
-results/trapped_vmc_smoke/density_profiles.npz
-```
-
-The smoke test currently reports sampled density, LDA density on the same grid, LDA normalization, raw density L2 difference, and relative density L2 difference. Sampled histogram density normalization is checked with bin widths rather than trapezoidal integration over bin centers. A representative dry-run with `N=4`, `a=0.5`, and `omega=0.2` gave:
-
-| Quantity | Result |
-| --- | ---: |
-| valid snapshot fraction | 1.0 |
-| sampled density integral | 4.0 |
-| LDA integrated particles | 4.0 |
-| acceptance rate | about 0.88 |
-| density L2 difference | diagnostic only; value depends on chain length and trial settings |
-| relative density L2 difference | diagnostic only; value depends on chain length and trial settings |
-
-This is a diagnostic result only. It should be used to catch implementation and convention errors, not as a thesis-level claim about LDA accuracy.
+- Development-only trapped VMC smoke/grid/seed/alpha scans are intentionally not
+  part of the public experiment surface.
 
 ### Trapped Density and LDA
 
@@ -139,93 +115,12 @@ This is a diagnostic result only. It should be used to catch implementation and 
 
 ### DMC Readiness
 
-- Validate DMC time-step dependence.
-- Validate population-control behavior.
-- Decide which observables need mixed, extrapolated, or pure-estimator treatment before using DMC as the main production reference.
-
-## 5. Current Diagnostic Grid
-
-The trapped smoke path has been promoted into a controlled diagnostic grid:
-
-```text
-N = 4, 8
-a = 0.5
-omega = 0.05, 0.10, 0.20
-```
-
-Command:
-
-```bash
-PYTHONPATH=src python3 experiments/vmc/trapped_diagnostic_grid.py
-```
-
-Output:
-
-```text
-results/trapped_vmc_grid/summary.json
-results/trapped_vmc_grid/*_density_profiles.npz
-```
-
-For each point, the output includes:
-
-- sampled density profile;
-- LDA density profile on the same grid;
-- density L2 difference;
-- relative density L2 difference;
-- valid snapshot fraction;
-- acceptance rate;
-- benchmark-tier metadata.
-
-This remains a diagnostic grid. It checks plumbing, normalization, and rough trends, but it does not yet establish LDA accuracy.
-
-## 6. Next Step
-
-The first stability check has been added as a seed-replicate diagnostic for a selected trapped case.
-
-Command:
-
-```bash
-PYTHONPATH=src python3 experiments/vmc/trapped_seed_stability.py
-```
-
-Output:
-
-```text
-results/trapped_vmc_seed_stability/summary.json
-results/trapped_vmc_seed_stability/*_density_profiles.npz
-```
-
-It reports replicate mean, sample standard deviation, standard error, and spread for acceptance rate, density-normalization error, sampled potential energy, and VMC-versus-LDA density L2 error.
-
-This remains a `VMC diagnostic` check. Its purpose is to decide whether the trapped VMC settings are stable enough to inspect before moving toward DMC.
-
-## 7. Alpha Scan Diagnostic
-
-The trapped diagnostic path includes an alpha scan for the Gaussian factor in the trial state.
-
-Command:
-
-```bash
-PYTHONPATH=src python3 experiments/vmc/trapped_alpha_scan.py
-```
-
-Output:
-
-```text
-results/trapped_vmc_alpha_scan/summary.json
-results/trapped_vmc_alpha_scan/*_density_profiles.npz
-```
-
-It reports acceptance, density errors, sampled RMS radius, LDA RMS radius, radius error, and replicate spread across seeds for each alpha multiplier. The sampled potential energy is only a trap-energy proxy; it is not a full VMC total energy until a trapped local-energy estimator is implemented and validated.
-
-## 8. Next Step
-
-The next technical step is to make the diagnostic grid numerically meaningful enough to decide what must be improved before DMC:
-
-- check density-profile convergence with longer VMC chains;
-- use the alpha scan only as diagnostic guidance unless a trapped local-energy estimator is added;
-- add simple plots for \(n_{\mathrm{VMC}}(x)\) versus \(n_{\mathrm{LDA}}(x)\);
-- keep all outputs labeled as `VMC diagnostic`.
+- Use `experiments/dmc/rn_block/exact_tg_trap.py` for the zero-rod-length
+  trapped TG harmonic validation.
+- Use `experiments/dmc/rn_block/trapped_stationarity_grid.py` for finite-`a`
+  trapped RN-DMC stationarity and gate diagnostics.
+- Coordinate observables remain claim-limited unless the corresponding
+  estimator gate is explicitly closed.
 
 Only after those checks should the project move to the main thesis comparison:
 

@@ -16,7 +16,7 @@ collective-block DMC candidate.
 - Jastrow-based trial-wavefunction implementation for the ring scaffold;
   files: `src/hrdmc/wavefunctions/jastrow.py`
 - initial homogeneous VMC workflow;
-  files: `src/hrdmc/monte_carlo/vmc.py`, `experiments/vmc/smoke.py`, `experiments/vmc/configs/smoke.json`
+  files: `src/hrdmc/monte_carlo/vmc.py`
 - homogeneous ring validation benchmark over particle numbers and packing fractions;
   files: `experiments/validation/homogeneous_ring.py`
 - homogeneous finite-`a` exact ring validation grid including `N = 64`;
@@ -29,30 +29,20 @@ collective-block DMC candidate.
   files: `src/hrdmc/systems/open_line.py`, `src/hrdmc/systems/external_potential.py`, `src/hrdmc/wavefunctions/trapped.py`
 - non-periodic density estimation plus raw and relative density L2 comparison;
   files: `src/hrdmc/estimators/density.py`, `src/hrdmc/analysis/metrics.py`
-- trapped VMC smoke experiment with VMC-versus-LDA density diagnostics;
-  files: `experiments/vmc/trapped_smoke.py`
-- trapped VMC diagnostic grid over `N = 4, 8` and `omega = 0.05, 0.10, 0.20`;
-  files: `experiments/vmc/trapped_diagnostic_grid.py`
-- trapped VMC seed-stability diagnostic for replicate spread checks;
-  files: `experiments/vmc/trapped_seed_stability.py`, `src/hrdmc/analysis/stability.py`
-- trapped VMC alpha-scan diagnostic and cloud-radius observables;
-  files: `experiments/vmc/trapped_alpha_scan.py`, `src/hrdmc/estimators/cloud.py`
+- trapped VMC diagnostic scripts were used during development but are no longer
+  part of the public experiment surface.
 - blocking analysis and bias/MSE utilities;
   files: `src/hrdmc/analysis/blocking.py`, `src/hrdmc/analysis/metrics.py`
 - an RN-corrected collective-block DMC candidate with injected system,
   guide, target-kernel, and proposal-kernel owners;
   files: `src/hrdmc/monte_carlo/dmc/rn_block/`
-- an RN-block DMC smoke workflow for checking package wiring;
-  files: `experiments/dmc/rn_block/smoke.py`
 - streaming RN-block summary mode for mean, radius, and density accumulation
   without retaining raw snapshots;
   files: `src/hrdmc/monte_carlo/dmc/rn_block/engine.py`,
   `src/hrdmc/analysis/streaming.py`
-- RN-block validation, single-case, and grid runners backed by the package API;
-  files: `experiments/dmc/rn_block/validate_streaming.py`,
-  `experiments/dmc/rn_block/single_case.py`, `experiments/dmc/rn_block/grid.py`
-- RN-block single-case and grid runners can parallelize independent seeds with
-  `--parallel-workers`; `0` chooses an automatic seed-count policy capped at 6;
+- RN-block development runners for smoke, streaming equivalence, single-case,
+  raw grid, eta planning, and gate-audit sweeps were used during development
+  but are no longer part of the public experiment surface.
 - generic seed-batch execution, worker-to-parent progress propagation, and
   canonical artifact routing are owned outside experiment scripts;
   files: `src/hrdmc/runners/`, `src/hrdmc/artifacts/`
@@ -87,9 +77,6 @@ estimator output shapes, theory formulas, LDA normalization, and analysis
 utilities.
 files: `tests/`
 
-The VMC run is currently an end-to-end integration check for the homogeneous scaffold.
-files: `experiments/vmc/smoke.py`, `experiments/vmc/configs/smoke.json`
-
 The homogeneous validation benchmark checks the exact all-pair trial local energy against finite-`N` ring references and can be run with `make validate-ring`.
 files: `experiments/validation/homogeneous_ring.py`
 
@@ -110,8 +97,8 @@ finite/valid sample accounting. It can be run with
 diagnostic, not a final paper benchmark by itself.
 files: `experiments/dmc/rn_block/trapped_stationarity_grid.py`
 
-The trapped smoke run is a VMC diagnostic and can be run with `make smoke-trap`. The trapped diagnostic grid can be run with `make diagnose-trap-grid`. The seed-stability diagnostic can be run with `make diagnose-trap-seeds`. The alpha scan can be run with `make scan-trap-alpha`. They check sampled density, LDA normalization on the same grid, density L2 differences, RMS radius, and replicate spread. They should not be treated as final trapped benchmarks.
-files: `experiments/vmc/trapped_smoke.py`, `experiments/vmc/trapped_diagnostic_grid.py`, `experiments/vmc/trapped_seed_stability.py`, `experiments/vmc/trapped_alpha_scan.py`
+Development-only signal runners are kept out of the public `experiments/` tree
+so it stays release-facing.
 
 Benchmark interpretation and remaining validation checks are maintained in `docs/validation/README.md`.
 

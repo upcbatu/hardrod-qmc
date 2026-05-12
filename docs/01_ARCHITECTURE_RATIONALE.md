@@ -208,10 +208,13 @@ orchestrate concrete runs through thin CLI entrypoints.
 Experiments are grouped by domain:
 
 ```text
-experiments/vmc/
 experiments/validation/
 experiments/dmc/rn_block/
 ```
+
+Only release-facing validation and RN-block DMC entrypoints belong here. Private
+diagnostic probes, tuning scans, and abandoned signal scripts are intentionally
+kept out of the public experiment surface.
 
 They should not contain reusable runner engines, method workflows, statistics
 logic, or scientific equations.
