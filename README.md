@@ -18,10 +18,8 @@ The homogeneous hard-rod system on a ring is kept as a controlled QMC validation
   What is already implemented, what the tests cover, and what is still missing.
 - [docs/05_TIMELINE_AND_NAVIGATION.md](docs/05_TIMELINE_AND_NAVIGATION.md)
   Tentative calendar and navigation note.
-- [docs/RN_BLOCK_DMC.md](docs/RN_BLOCK_DMC.md)
-  Canonical RN-DMC method note, written for careful first-time readers.
-- [docs/07_ENGINE_QUALITY_GATES.md](docs/07_ENGINE_QUALITY_GATES.md)
-  Generic numerical-quality gates for QMC engine release.
+- [docs/dmc/method.md](docs/dmc/method.md)
+  Canonical RN-DMC method, gate, and claim-boundary note.
 - [docs/validation/README.md](docs/validation/README.md)
   Validation notes for benchmark status, interpretation, and remaining checks.
 

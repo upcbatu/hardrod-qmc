@@ -97,12 +97,17 @@ finite/valid sample accounting. It can be run with
 diagnostic, not a final paper benchmark by itself.
 files: `experiments/dmc/rn_block/trapped_stationarity_grid.py`
 
+Blocking-plateau absence is now classified as a precision warning when the
+hard methodology gates pass and Sokal/Geyer/flat-top-HAC correlated-error
+estimates provide a conservative finite error bar. See
+`docs/dmc/method.md`.
+
 Development-only signal runners are kept out of the public `experiments/` tree
 so it stays release-facing.
 
 Benchmark interpretation and remaining validation checks are maintained in `docs/validation/README.md`.
 
-RN-DMC method notes are maintained in `docs/RN_BLOCK_DMC.md`. Compact
+RN-DMC method notes are maintained in `docs/dmc/`. Compact
 candidate-result tables are maintained in `docs/tables/`.
 
 This repo state should not be read as a final released DMC package until
