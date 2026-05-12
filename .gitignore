@@ -21,5 +21,6 @@ results/**/.matplotlib/
 !results/README.md
 data/raw/
 data/processed/
-notebooks/.ipynb_checkpoints/
+notebooks/
 operator/
+tests/
