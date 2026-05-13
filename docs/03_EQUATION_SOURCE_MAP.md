@@ -429,6 +429,143 @@ Claim boundary:
 Approximate short-time target density. It requires timestep validation before
 paper-level trapped benchmark claims.
 
+### S10. Gap H-Transform RN Proposal
+
+Code:
+[src/hrdmc/systems/gap_h_transform.py](src/hrdmc/systems/gap_h_transform.py)
+
+Formula:
+
+For open-line coordinates define the center of mass and nearest-neighbor gaps
+
+$$
+Q=\frac{1}{N}\sum_i(x_i-x_0),
+\qquad
+g_i=x_{i+1}-x_i.
+$$
+
+The proposal factorizes as
+
+$$
+Q_{\mathrm{gap-h}}(\mathbf{x}'\mid\mathbf{x};\tau)
+=
+Q_{\mathrm{COM}}(Q'\mid Q;\tau)
+\,
+\prod_{i=1}^{N-1}
+Q_{\mathrm{gap}}(g_i'\mid g_i;\tau),
+$$
+
+where \(Q_{\mathrm{COM}}\) is the exact harmonic COM h-transform,
+
+$$
+Q'=\rho Q + \sqrt{\sigma_Q^2(1-\rho^2)}\,\eta,
+\qquad
+\rho=e^{-\sqrt{2}\omega\tau},
+\qquad
+\sigma_Q^2=\frac{1}{\sqrt{2}N\omega},
+$$
+
+and \(Q_{\mathrm{gap}}\) is the N=2 relative hard-wall harmonic h-transform
+on \(g\ge a\),
+
+$$
+Q_{\mathrm{gap}}(g'\mid g;\tau)
+=
+\frac{
+K_{\mathrm{rel,D}}^{(a)}(g'\mid g;\tau)\psi_0(g')
+}{
+e^{-E_0\tau}\psi_0(g)
+},
+$$
+
+with
+
+$$
+H_{\mathrm{rel}}
+=
+-2\frac{d^2}{dg^2}
++
+\frac{1}{4}\omega^2 g^2,
+\qquad
+g\ge a,
+\qquad
+\psi(a)=0.
+$$
+
+The implementation reconstructs positions from \(Q'\) and the sampled gaps.
+The RN engine still uses the primitive target density and exact mixture
+\(\log Q\); this proposal changes exploration, not the target definition.
+
+Source basis:
+`Analytic identity`, harmonic COM separation, Dirichlet relative-coordinate
+h-transform, and importance-sampled DMC proposal logic from `[Foulkes2001QMC]`
+and `[UmrigarNightingaleRunge1993DMC]`.
+
+Claim boundary:
+This is a proposal family, not a benchmark result. For \(N=2\) it uses the
+finite-grid relative h-transform. For \(N>2\), the independent nearest-neighbor
+gap product is an all-N proposal approximation. It is paper-eligible only if
+the unchanged RN target/weight, stationarity, population, density-accounting,
+and precision gates pass.
+
+### S11. Gap-H-Corrected Trapped Guide
+
+Code:
+[src/hrdmc/wavefunctions/guides/gap_h.py](src/hrdmc/wavefunctions/guides/gap_h.py)
+[src/hrdmc/wavefunctions/kernels/gap_h.py](src/hrdmc/wavefunctions/kernels/gap_h.py)
+
+Formula:
+
+The reduced TG guide uses
+
+$$
+u_i=x_i-a\left(i-\frac{N-1}{2}\right),
+\qquad
+\Psi_{\mathrm{TG}}
+=
+\exp\left[-\frac{\alpha}{2}\sum_i(u_i-x_0)^2\right]
+\prod_{i<j}(u_j-u_i).
+$$
+
+For every nearest-neighbor physical gap \(g_i=x_{i+1}-x_i\), the matched
+gap-H guide multiplies the TG backbone by the N=2 relative correction
+
+$$
+\Psi_{\mathrm{gapH}}
+=
+\Psi_{\mathrm{TG}}
+\prod_{i=1}^{N-1}
+\frac{h_2(g_i)}{h_{\mathrm{TG}}(g_i)},
+\qquad
+h_{\mathrm{TG}}(g)=(g-a)\exp\left[-\frac{\alpha}{4}(g-a)^2\right],
+$$
+
+where \(h_2(g)\) is the positive finite-grid ground state of
+
+$$
+H_{\mathrm{rel}}
+=
+-2\frac{d^2}{dg^2}
++\frac{1}{4}\omega^2g^2,
+\qquad g\ge a,\qquad h_2(a)=0.
+$$
+
+For \(N=2\), this restores the exact COM-separated relative guide up to the
+finite-grid interpolation. For \(N>2\), it is a nearest-neighbor product guide
+ansatz matched to the same gap table as the gap-H proposal. The RN target
+density is unchanged; this only changes importance sampling, drift, and guide
+local energy.
+
+Source basis:
+`Analytic identity`, harmonic COM separation, N=2 Dirichlet relative-coordinate
+ground state, and importance-sampled DMC guide logic from `[Foulkes2001QMC]`
+and `[UmrigarNightingaleRunge1993DMC]`.
+
+Claim boundary:
+This is a guide/proposal matching layer, not a final benchmark by itself.
+For all \(N\), benchmark eligibility still requires the standard RN weight,
+stationarity, population, density-accounting, and precision gates.
+
 ## Theory
 
 ### T1. Finite-N Homogeneous Ring Energy
@@ -597,7 +734,7 @@ count on the chosen grid; it does not prove LDA validity.
 ### W1. Homogeneous All-Pair Reduced Hard-Rod Trial
 
 Code:
-[src/hrdmc/wavefunctions/jastrow.py](src/hrdmc/wavefunctions/jastrow.py)
+[src/hrdmc/wavefunctions/trials/jastrow.py](src/hrdmc/wavefunctions/trials/jastrow.py)
 
 Formula:
 
@@ -635,7 +772,7 @@ exact wavefunction.
 ### W2. Nearest-Neighbor Ring Smoke Trial
 
 Code:
-[src/hrdmc/wavefunctions/jastrow.py](src/hrdmc/wavefunctions/jastrow.py)
+[src/hrdmc/wavefunctions/trials/jastrow.py](src/hrdmc/wavefunctions/trials/jastrow.py)
 
 Formula:
 
@@ -659,7 +796,7 @@ Smoke-test scaffold only. It must not be cited as a paper hard-rod trial.
 ### W3. Trapped VMC Diagnostic Trial
 
 Code:
-[src/hrdmc/wavefunctions/trapped.py](src/hrdmc/wavefunctions/trapped.py)
+[src/hrdmc/wavefunctions/trials/trapped.py](src/hrdmc/wavefunctions/trials/trapped.py)
 
 Formula:
 
@@ -681,7 +818,7 @@ VMC diagnostic trial only. It is not a final trapped benchmark wavefunction.
 ### W4. DMC Guide Protocol
 
 Code:
-[src/hrdmc/wavefunctions/guides.py](src/hrdmc/wavefunctions/guides.py)
+[src/hrdmc/wavefunctions/api.py](src/hrdmc/wavefunctions/api.py)
 
 Formula:
 
@@ -707,7 +844,7 @@ Protocol only. It defines what a DMC guide must provide.
 ### W5. Reduced TG-Like Trapped DMC Guide
 
 Code:
-[src/hrdmc/wavefunctions/trapped_guides.py](src/hrdmc/wavefunctions/trapped_guides.py)
+[src/hrdmc/wavefunctions/guides/trapped_tg.py](src/hrdmc/wavefunctions/guides/trapped_tg.py)
 
 Formula:
 
@@ -1012,8 +1149,10 @@ Source basis:
 `[GirardeauAstrakharchik2010TrappedHardSphere]`.
 
 Claim boundary:
-For DMC, current weighted RMS is a mixed-distribution candidate
-observable unless a pure-estimator path is added.
+For DMC, direct weighted \(R^2\)/RMS from sampled coordinates is a
+mixed-coordinate diagnostic only. Paper \(R^2\)/RMS must come from
+Hellmann-Feynman energy response or a transported auxiliary forward-walking
+estimator that passes its own gate.
 
 ### E6. Weighted DMC Observables
 
@@ -1038,8 +1177,11 @@ Source basis:
 
 Claim boundary:
 The estimator filters non-finite, invalid, and non-positive-weight samples.
-Energy is a mixed estimator. Density/RMS are mixed-distribution candidate
-observables unless pure estimation is implemented.
+Energy is the mixed Hamiltonian estimator. Direct weighted density, \(R^2\),
+RMS, pair-distance density, and \(S(k)\) are mixed-coordinate diagnostics for
+DMC. Paper coordinate observables require Hellmann-Feynman energy response for
+\(R^2\)/RMS or transported auxiliary forward walking for coordinate
+observables.
 
 ## Analysis And Validation Metrics
 
@@ -1366,10 +1508,11 @@ $$
 \right),
 $$
 
-where \(s\) indexes independent seeds and \(M\) is the seed count. If any
-observable has spread warnings, missing blocking plateaus, or correlated-error
-inflation, the case artifact reports a precision warning rather than silently
-trusting the seed standard error.
+where \(s\) indexes independent seeds and \(M\) is the seed count. Energy-side
+spread warnings, missing blocking plateaus, or correlated-error inflation make
+the energy case a precision warning rather than silently trusting the seed
+standard error. Mixed coordinate traces have a separate diagnostic status and
+do not veto the Hamiltonian energy corridor.
 
 Source basis:
 `Method paper`, autocorrelation/error-control logic aligned with

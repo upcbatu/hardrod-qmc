@@ -112,6 +112,8 @@ def integrated_autocorrelation_time(
 ) -> AutocorrelationResult:
     arr = np.asarray(values, dtype=float).reshape(-1)
     arr = arr[np.isfinite(arr)]
+    if _trace_is_constant(arr):
+        return AutocorrelationResult(0.5, 0, float(arr.size), "zero_variance", np.ones(1))
     acf = autocorrelation(arr)
     if acf.size < 2:
         if acf.size == 1:
@@ -147,6 +149,8 @@ def trace_stationarity_diagnostics(
     spread_warning_z_threshold: float = 4.0,
 ) -> TraceStationarityResult:
     times, values = finite_trace(times, values)
+    if _trace_is_constant(values):
+        return _constant_trace_stationarity(values)
     slope = linear_slope_statistics(times, values)
     acf = integrated_autocorrelation_time(values)
     n = int(values.size)
@@ -307,3 +311,45 @@ def _safe_abs_z(delta: float, stderr: float) -> float:
     if stderr > 0.0 and np.isfinite(stderr):
         return float(abs(delta) / stderr)
     return 0.0 if delta == 0.0 else float("inf")
+
+
+def _trace_is_constant(values: FloatArray) -> bool:
+    arr = np.asarray(values, dtype=float).reshape(-1)
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0:
+        return False
+    scale = max(1.0, float(np.max(np.abs(arr))))
+    return bool(float(np.max(arr) - np.min(arr)) <= 1.0e-12 * scale)
+
+
+def _constant_trace_stationarity(values: FloatArray) -> TraceStationarityResult:
+    arr = np.asarray(values, dtype=float).reshape(-1)
+    arr = arr[np.isfinite(arr)]
+    n = int(arr.size)
+    mean = float(np.mean(arr)) if n else float("nan")
+    block_count = 4
+    means = tuple(mean for _ in range(block_count)) if n >= 2 * block_count else ()
+    return TraceStationarityResult(
+        point_count=n,
+        slope=SlopeResult(0.0, 0.0, 0.0, True),
+        autocorrelation=AutocorrelationResult(0.5, 0, float(n), "zero_variance", np.ones(1)),
+        slope_stderr_autocorr_adjusted=0.0,
+        slope_z_autocorr_adjusted=0.0,
+        first_last_quarter_z=0.0,
+        late_cumulative_z=0.0,
+        first_last_blocking_z=0.0,
+        spread_blocking_z=0.0,
+        blocking_stderr=0.0,
+        first_half_mean=mean,
+        second_half_mean=mean,
+        first_second_half_z=0.0,
+        cumulative_mean_drift=0.0,
+        block_count=block_count,
+        block_means=means,
+        spread_warning=False,
+        spread_veto=False,
+        trend_clean=True,
+        blocking_clean=True,
+        cumulative_drift_clean=True,
+        stationarity_clean=True,
+    )

@@ -92,7 +92,17 @@ def log_collective_mixture_density(
 
 def _logsumexp(values: FloatArray, axis: int) -> FloatArray:
     vmax = np.max(values, axis=axis, keepdims=True)
-    return np.squeeze(vmax, axis=axis) + np.log(np.sum(np.exp(values - vmax), axis=axis))
+    finite_max = np.isfinite(vmax)
+    shifted = np.zeros_like(values, dtype=float)
+    mask = np.broadcast_to(finite_max, values.shape)
+    vmax_broadcast = np.broadcast_to(vmax, values.shape)
+    shifted[mask] = np.exp(values[mask] - vmax_broadcast[mask])
+    summed = np.sum(shifted, axis=axis)
+    base = np.squeeze(vmax, axis=axis)
+    valid = np.squeeze(finite_max, axis=axis) & (summed > 0.0)
+    out = np.full_like(base, -np.inf, dtype=float)
+    out[valid] = base[valid] + np.log(summed[valid])
+    return out
 
 
 def _as_batch(x: FloatArray) -> FloatArray:

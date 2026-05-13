@@ -22,9 +22,13 @@ This module owns only:
 - external potentials;
 - reduced-coordinate geometry identities such as `L' = L - N a`.
 - DMC target propagator interfaces tied to a system Hamiltonian.
+- system-owned target/proposal transition densities and samplers;
+- system-side hot array kernels under `systems/kernels/`.
 
 It does not own the homogeneous equation of state, chemical potential,
-excluded-volume LDA, or benchmark error logic.
+excluded-volume LDA, trial/guide amplitudes, estimator reducers, or benchmark
+error logic. `systems/` may own Green-kernel and coordinate-map mathematics;
+it must not own wavefunction log-amplitude mathematics.
 
 ### `wavefunctions/`
 
@@ -33,14 +37,21 @@ define trial states and guides used by the Monte Carlo layer.
 
 This module owns:
 
-- trial amplitude or log-amplitude evaluation;
-- DMC guide derivatives when a trial state is used for importance sampling;
+- diagnostic trial amplitude or log-amplitude evaluation under `trials/`;
+- DMC guide classes and guide parameters under `guides/`;
+- guide-owned hot array kernels under `kernels/`;
+- DMC guide derivatives when a guide is used for importance sampling;
 - local-energy ingredients derived from the guide;
 - rejection of invalid configurations;
 - tunable trial-state parameters;
 - trial forms used directly in VMC and as DMC input.
 
-The current trial forms are ring-oriented. Trapped calculations may need additional one-body trap factors or supervisor-provided trial forms.
+`wavefunctions/api.py` defines the guide interface consumed by DMC engines.
+Engines should depend on the protocol, not on concrete guide classes or kernel
+modules.
+
+`wavefunctions/` does not own proposal densities, RN log weights, population
+control, coordinate observable reducers, or gate logic.
 
 For production DMC, a "wavefunction" is not just an initializer. It controls
 the importance-sampling drift, local-energy variance, and practical projection
@@ -102,6 +113,26 @@ log K_sys - log Q_theta
 
 This prevents the collective block code from silently duplicating system
 physics and playing a separate dynamics game.
+
+Monte Carlo engines should call guide and transition interfaces only. They must
+not branch on optional numba availability and must not own guide/proposal
+formulas.
+
+### `numerics/`
+
+Purpose:
+centralize optional numerical backend plumbing.
+
+This module owns:
+
+- optional numba availability detection;
+- `njit` fallback helpers;
+- backend label helpers for artifacts.
+
+It does not own physics formulas, kernels, sampling, estimators, or gates.
+Formula owners keep hot array kernels under their own packages, such as
+`systems/kernels/` or `wavefunctions/kernels/`, and import backend helpers from
+`numerics/`.
 
 ### `estimators/`
 
@@ -208,11 +239,11 @@ orchestrate concrete runs through thin CLI entrypoints.
 Experiments are grouped by domain:
 
 ```text
-experiments/validation/
+experiments/anchors/
 experiments/dmc/rn_block/
 ```
 
-Only release-facing validation and RN-block DMC entrypoints belong here. Private
+Only release-facing anchor and RN-block DMC entrypoints belong here. Private
 diagnostic probes, tuning scans, and abandoned signal scripts are intentionally
 kept out of the public experiment surface.
 

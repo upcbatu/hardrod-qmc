@@ -6,7 +6,7 @@ from typing import Any, Protocol, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from hrdmc.wavefunctions import DMCGuide
+from hrdmc.wavefunctions.api import DMCGuide
 
 FloatArray = NDArray[np.float64]
 GuideBatchLog = Callable[[FloatArray], tuple[FloatArray, NDArray[np.bool_]]]

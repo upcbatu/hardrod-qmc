@@ -7,7 +7,6 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from hrdmc.analysis import RunningHistogram, RunningStats
 from hrdmc.monte_carlo.dmc.common.guide_api import evaluate_guide, guide_batch_backend, valid_rows
 from hrdmc.monte_carlo.dmc.common.numeric import (
     finite_max,
@@ -26,8 +25,14 @@ from hrdmc.monte_carlo.dmc.rn_block.checkpoint import (
     save_streaming_checkpoint,
 )
 from hrdmc.monte_carlo.dmc.rn_block.results import RNBlockStreamingSummary
+from hrdmc.numerics import RunningHistogram, RunningStats
 from hrdmc.systems.open_line import OpenLineHardRodSystem
-from hrdmc.wavefunctions import DMCGuide
+from hrdmc.systems.propagators import (
+    ProposalTransitionKernel,
+    TargetTransitionKernel,
+    transition_backend,
+)
+from hrdmc.wavefunctions.api import DMCGuide
 
 FloatArray = NDArray[np.float64]
 
@@ -289,6 +294,8 @@ class RNBlockStreamingState:
         ess_resample_fraction: float,
         include_guide_ratio: bool,
         guide: DMCGuide,
+        target_kernel: TargetTransitionKernel,
+        proposal_kernel: ProposalTransitionKernel,
     ) -> RNBlockStreamingSummary:
         if self.weight_denominator <= 0.0:
             raise RuntimeError("no positive-weight production samples were accumulated")
@@ -317,6 +324,8 @@ class RNBlockStreamingState:
                 ess_resample_fraction=ess_resample_fraction,
                 include_guide_ratio=include_guide_ratio,
                 guide=guide,
+                target_kernel=target_kernel,
+                proposal_kernel=proposal_kernel,
                 finite_fraction=finite_fraction,
                 valid_fraction=valid_fraction,
                 included_fraction=included_fraction,
@@ -398,6 +407,8 @@ class RNBlockStreamingState:
         ess_resample_fraction: float,
         include_guide_ratio: bool,
         guide: DMCGuide,
+        target_kernel: TargetTransitionKernel,
+        proposal_kernel: ProposalTransitionKernel,
         finite_fraction: float,
         valid_fraction: float,
         included_fraction: float,
@@ -431,6 +442,8 @@ class RNBlockStreamingState:
             "include_guide_ratio": include_guide_ratio,
             "summary_mode": "streaming",
             "guide_batch_backend": guide_batch_backend(guide),
+            "target_backend": transition_backend(target_kernel),
+            "proposal_backend": transition_backend(proposal_kernel),
         }
 
     def _checkpoint_metadata(

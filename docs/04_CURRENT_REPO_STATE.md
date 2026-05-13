@@ -14,19 +14,19 @@ collective-block DMC candidate.
 - homogeneous hard-rod EOS, finite ring energy, chemical potential, chemical-potential inversion, and LDA support;
   files: `src/hrdmc/theory/`
 - Jastrow-based trial-wavefunction implementation for the ring scaffold;
-  files: `src/hrdmc/wavefunctions/jastrow.py`
+  files: `src/hrdmc/wavefunctions/trials/jastrow.py`
 - initial homogeneous VMC workflow;
   files: `src/hrdmc/monte_carlo/vmc.py`
 - homogeneous ring validation benchmark over particle numbers and packing fractions;
-  files: `experiments/validation/homogeneous_ring.py`
+  files: `experiments/anchors/homogeneous_ring.py`
 - homogeneous finite-`a` exact ring validation grid including `N = 64`;
-  files: `experiments/validation/homogeneous_ring_exact_grid.py`
+  files: `experiments/anchors/homogeneous_ring_exact_grid.py`
 - local-energy validation for the all-pair reduced hard-rod trial;
-  files: `src/hrdmc/wavefunctions/jastrow.py`, `src/hrdmc/estimators/local_energy.py`
+  files: `src/hrdmc/wavefunctions/trials/jastrow.py`, `src/hrdmc/estimators/local_energy.py`
 - observable implementations for `g(r)`, `S(k)`, and periodic density `n(x)`;
   files: `src/hrdmc/estimators/`
 - open-line trapped hard-rod geometry, harmonic trap potential, and trapped diagnostic trial state;
-  files: `src/hrdmc/systems/open_line.py`, `src/hrdmc/systems/external_potential.py`, `src/hrdmc/wavefunctions/trapped.py`
+  files: `src/hrdmc/systems/open_line.py`, `src/hrdmc/systems/external_potential.py`, `src/hrdmc/wavefunctions/trials/trapped.py`
 - non-periodic density estimation plus raw and relative density L2 comparison;
   files: `src/hrdmc/estimators/observables/density.py`, `src/hrdmc/analysis/metrics.py`
 - trapped VMC diagnostic scripts were used during development but are no longer
@@ -55,7 +55,10 @@ collective-block DMC candidate.
   `src/hrdmc/analysis/chain_diagnostics.py`
 - exact trapped Tonks-Girardeau harmonic validation for RN-block DMC in the
   zero-rod-length limit;
-  files: `experiments/dmc/rn_block/exact_tg_trap.py`
+  files: `experiments/anchors/exact_tg_trap.py`
+- canonical exact validation packet for trapped TG RN-DMC anchors and
+  homogeneous finite-`a` exact ring anchors;
+  files: `experiments/anchors/exact_validation_packet.py`
 - compact RN-DMC candidate tables and a result manifest;
   files: `docs/tables/`, `tests/fixtures/rn_results_manifest.json`
 
@@ -78,17 +81,17 @@ utilities.
 files: `tests/`
 
 The homogeneous validation benchmark checks the exact all-pair trial local energy against finite-`N` ring references and can be run with `make validate-ring`.
-files: `experiments/validation/homogeneous_ring.py`
+files: `experiments/anchors/homogeneous_ring.py`
 
 The extended homogeneous exact ring grid checks the same finite-`N` hard-rod
 identity across a wider `N` and packing-fraction grid, including `N = 64`, and
 can be run with `make validate-ring-grid`.
-files: `experiments/validation/homogeneous_ring_exact_grid.py`
+files: `experiments/anchors/homogeneous_ring_exact_grid.py`
 
 The RN-DMC exact trapped validation checks the zero-length hard-core
 Tonks-Girardeau harmonic limit against \(E_0=N^2\omega/\sqrt{2}\) and can be
 run with `make validate-rn-exact`.
-files: `experiments/dmc/rn_block/exact_tg_trap.py`
+files: `experiments/anchors/exact_tg_trap.py`
 
 The trapped RN-DMC stationarity grid checks finite-`a` trapped runs for
 R-hat, effective independent samples, stationarity, density accounting, and

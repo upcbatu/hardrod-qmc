@@ -32,8 +32,12 @@ from hrdmc.monte_carlo.dmc.rn_block.transport import (
     com_rao_blackwell_r2_per_walker,
 )
 from hrdmc.systems.open_line import OpenLineHardRodSystem
-from hrdmc.systems.propagators import ProposalTransitionKernel, TargetTransitionKernel
-from hrdmc.wavefunctions import DMCGuide
+from hrdmc.systems.propagators import (
+    ProposalTransitionKernel,
+    TargetTransitionKernel,
+    transition_backend,
+)
+from hrdmc.wavefunctions.api import DMCGuide
 
 FloatArray = NDArray[np.float64]
 
@@ -160,6 +164,8 @@ def run_rn_block_dmc(
             "ess_resample_fraction": cfg.ess_resample_fraction,
             "include_guide_ratio": include_guide_ratio,
             "guide_batch_backend": guide_batch_backend(guide),
+            "target_backend": transition_backend(target_kernel),
+            "proposal_backend": transition_backend(proposal_kernel),
         },
     )
 
@@ -335,6 +341,8 @@ def run_rn_block_dmc_streaming(
         ess_resample_fraction=cfg.ess_resample_fraction,
         include_guide_ratio=include_guide_ratio,
         guide=guide,
+        target_kernel=target_kernel,
+        proposal_kernel=proposal_kernel,
     )
 
 

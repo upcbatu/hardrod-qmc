@@ -5,9 +5,6 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from hrdmc.analysis import TraceStationarityResult, trace_stationarity_diagnostics
-from hrdmc.estimators.mixed import WeightedObservableResult, estimate_weighted_observables
-
 FloatArray = NDArray[np.float64]
 
 
@@ -34,32 +31,3 @@ class WeightedDMCResult:
             raise ValueError("local_energies must have one value per sample")
         if weights.shape != (snapshots.shape[0],):
             raise ValueError("weights must have one value per sample")
-
-    def estimate_weighted_observables(
-        self,
-        *,
-        valid_mask: NDArray[np.bool_],
-        grid: FloatArray,
-        center: float,
-        n_particles: int,
-    ) -> WeightedObservableResult:
-        """Compute observables through the estimator owner."""
-
-        return estimate_weighted_observables(
-            self.snapshots,
-            self.local_energies,
-            self.weights,
-            valid_mask,
-            grid,
-            center=center,
-            n_particles=n_particles,
-        )
-
-    def trace_stationarity_diagnostics(
-        self,
-        times: FloatArray,
-        values: FloatArray,
-    ) -> TraceStationarityResult:
-        """Audit a stored observable trace through the analysis owner."""
-
-        return trace_stationarity_diagnostics(times, values)

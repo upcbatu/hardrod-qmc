@@ -25,7 +25,7 @@ from hrdmc.monte_carlo.dmc.rn_block.weights import (
 )
 from hrdmc.systems.open_line import OpenLineHardRodSystem
 from hrdmc.systems.propagators import ProposalTransitionKernel, TargetTransitionKernel
-from hrdmc.wavefunctions import DMCGuide
+from hrdmc.wavefunctions.api import DMCGuide
 
 FloatArray = NDArray[np.float64]
 
@@ -100,7 +100,9 @@ def advance_rn_block(
         increment = rn_log_increment(target_log_density, proposal.log_q_forward)
     trial_energies, valid = evaluate_guide(guide, proposal.x_new)
     killed = (~valid) | (~np.isfinite(increment))
-    next_log_weights = np.where(killed, -np.inf, log_weights + increment)
+    next_log_weights = np.full_like(log_weights, -np.inf, dtype=float)
+    live = ~killed
+    next_log_weights[live] = log_weights[live] + increment[live]
     require_live_weight(next_log_weights)
     return AdvanceResult(
         positions=np.where(killed[:, np.newaxis], old_positions, proposal.x_new),

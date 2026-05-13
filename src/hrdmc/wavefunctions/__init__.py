@@ -1,11 +1,11 @@
-from hrdmc.wavefunctions.guides import BatchedDMCGuide, DMCGuide
-from hrdmc.wavefunctions.jastrow import HardRodJastrowTrial
-from hrdmc.wavefunctions.trapped import TrappedHardRodTrial
-from hrdmc.wavefunctions.trapped_guides import ReducedTGHardRodGuide
+from hrdmc.wavefunctions.api import BatchedDMCGuide, DMCGuide
+from hrdmc.wavefunctions.guides import GapHCorrectedHardRodGuide, ReducedTGHardRodGuide
+from hrdmc.wavefunctions.trials import HardRodJastrowTrial, TrappedHardRodTrial
 
 __all__ = [
     "BatchedDMCGuide",
     "DMCGuide",
+    "GapHCorrectedHardRodGuide",
     "HardRodJastrowTrial",
     "ReducedTGHardRodGuide",
     "TrappedHardRodTrial",

@@ -27,7 +27,6 @@ from hrdmc.analysis.metrics import (
     relative_density_l2_error,
 )
 from hrdmc.analysis.stability import summarize_replicate_metrics
-from hrdmc.analysis.streaming import RunningHistogram, RunningStats
 from hrdmc.analysis.timeseries import (
     AutocorrelationResult,
     SlopeResult,
@@ -45,8 +44,6 @@ __all__ = [
     "BlockingPlateauResult",
     "ChainObservableDiagnostics",
     "CorrelatedErrorEstimate",
-    "RunningHistogram",
-    "RunningStats",
     "SlopeResult",
     "TraceStationarityResult",
     "TriangulatedErrorResult",

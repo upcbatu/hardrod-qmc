@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 
 from hrdmc.systems.external_potential import HarmonicTrap
 from hrdmc.systems.open_line import OpenLineHardRodSystem
-from hrdmc.wavefunctions.trapped_guide_kernels import (
+from hrdmc.wavefunctions.kernels.trapped_tg import (
     backend_name,
     reduced_tg_grad_lap_local_batch,
     reduced_tg_log_batch,

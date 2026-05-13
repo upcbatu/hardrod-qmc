@@ -38,6 +38,10 @@ class RNTransportEvent:
     energies are the post-step population after optional resampling. The
     pre-resampling log weights are kept for audit; post-resampling log weights
     define the normalized estimator weights for the emitted positions.
+
+    ``block_id`` is the number of RN collective events observed so far. It is
+    audit metadata, not a parent-map boundary. Parent maps have single-DMC-step
+    scope and must be consumed event by event.
     """
 
     step_id: int
@@ -53,10 +57,25 @@ class RNTransportEvent:
     weight_gauge_shift: float
     convention: RNTransportConvention = RNTransportConvention()
 
+    @property
+    def is_production(self) -> bool:
+        return self.production_step_id is not None
+
 
 class RNTransportObserver(Protocol):
     def record_transport_event(self, event: RNTransportEvent) -> None:
         """Consume a transport event without storing full histories by default."""
+
+
+@dataclass(frozen=True)
+class MultiplexedTransportObserver:
+    """Fan out RN transport events to independent estimator consumers."""
+
+    observers: tuple[RNTransportObserver, ...]
+
+    def record_transport_event(self, event: RNTransportEvent) -> None:
+        for observer in self.observers:
+            observer.record_transport_event(event)
 
 
 def identity_parent_indices(n_walkers: int) -> IntArray:

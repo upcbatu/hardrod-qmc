@@ -5,8 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from hrdmc.analysis import RunningStats
 from hrdmc.monte_carlo.dmc.common.results import WeightedDMCResult
+from hrdmc.numerics import RunningStats
 
 FloatArray = NDArray[np.float64]
 

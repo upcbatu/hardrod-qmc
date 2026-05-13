@@ -14,6 +14,7 @@ from hrdmc.monte_carlo.dmc.rn_block.transitions import (
     euler_drift_diffusion_step,
 )
 from hrdmc.monte_carlo.dmc.rn_block.transport import (
+    MultiplexedTransportObserver,
     RNTransportConvention,
     RNTransportEvent,
     RNTransportObserver,
@@ -22,6 +23,7 @@ from hrdmc.monte_carlo.dmc.rn_block.weights import rn_log_increment
 
 __all__ = [
     "CollectiveProposal",
+    "MultiplexedTransportObserver",
     "RNBlockDMCConfig",
     "RNBlockDMCResult",
     "RNBlockLocalStepResult",

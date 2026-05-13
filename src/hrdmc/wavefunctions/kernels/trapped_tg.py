@@ -3,14 +3,9 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-FloatArray = NDArray[np.float64]
+from hrdmc.numerics.numba_backend import NUMBA_AVAILABLE, njit
 
-try:
-    from numba import njit
-except ModuleNotFoundError:  # pragma: no cover - depends on optional extra
-    NUMBA_AVAILABLE = False
-else:
-    NUMBA_AVAILABLE = True
+FloatArray = NDArray[np.float64]
 
 
 def backend_name() -> str:
@@ -199,7 +194,7 @@ def _reduced_tg_grad_lap_local_batch_python(
 
 if NUMBA_AVAILABLE:
 
-    @njit(cache=False, fastmath=False)
+    @njit(cache=True, fastmath=False)
     def _valid_batch_numba(x: FloatArray, rod_length: float) -> NDArray[np.bool_]:
         walkers, n_particles = x.shape
         valid = np.empty(walkers, dtype=np.bool_)
@@ -218,7 +213,7 @@ if NUMBA_AVAILABLE:
             valid[walker] = ok
         return valid
 
-    @njit(cache=False, fastmath=False)
+    @njit(cache=True, fastmath=False)
     def _reduced_tg_log_batch_numba(
         x: FloatArray,
         offsets: FloatArray,
@@ -265,7 +260,7 @@ if NUMBA_AVAILABLE:
                 finite[walker] = False
         return log_values, finite
 
-    @njit(cache=False, fastmath=False)
+    @njit(cache=True, fastmath=False)
     def _reduced_tg_grad_lap_local_batch_numba(
         x: FloatArray,
         offsets: FloatArray,
@@ -322,4 +317,3 @@ if NUMBA_AVAILABLE:
             local[walker] = value
             finite[walker] = row_finite and np.isfinite(value)
         return grad, lap, local, finite
-
