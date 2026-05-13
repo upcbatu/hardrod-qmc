@@ -38,6 +38,7 @@ class TransportedLagResult:
     bias_bracket: tuple[LagValue, LagValue] | None
     plateau_status: str
     schema_status: str
+    plateau_diagnostics: dict[str, object]
     metadata: dict[str, object]
 
     def to_summary_dict(self) -> dict[str, Any]:
@@ -62,6 +63,7 @@ class TransportedLagResult:
             else (_json_value(self.bias_bracket[0]), _json_value(self.bias_bracket[1])),
             "plateau_status": self.plateau_status,
             "schema_status": self.schema_status,
+            "plateau_diagnostics": _json_dict(self.plateau_diagnostics),
             "metadata": self.metadata,
         }
 
@@ -92,4 +94,18 @@ def _json_value(value: LagValue | None) -> object:
         return None
     if isinstance(value, np.ndarray):
         return value.tolist()
+    return value
+
+
+def _json_dict(values: dict[str, object]) -> dict[str, object]:
+    return {key: _json_nested(value) for key, value in values.items()}
+
+
+def _json_nested(value: object) -> object:
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, dict):
+        return {str(key): _json_nested(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_nested(item) for item in value]
     return value

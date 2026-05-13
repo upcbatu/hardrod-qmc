@@ -8,7 +8,6 @@ from hrdmc.estimators.pure.forward_walking.diagnostics import (
     plateau_summary,
     rms_delta_stderr,
     schema_status,
-    variance_inflation,
 )
 from hrdmc.estimators.pure.forward_walking.results import (
     LagValue,
@@ -18,52 +17,35 @@ from hrdmc.estimators.pure.forward_walking.results import (
 FloatArray = NDArray[np.float64]
 
 
-def assemble_observable_result(
+def assemble_observable_result_from_stats(
     *,
     config: PureWalkingConfig,
     observable: str,
-    block_values_by_lag: dict[int, list[FloatArray]],
-    block_weight_ess_by_lag: dict[int, list[float]],
+    block_mean_by_lag: dict[int, FloatArray],
+    block_stderr_by_lag: dict[int, FloatArray],
+    block_count_by_lag: dict[int, int],
+    weight_ess_min_by_lag: dict[int, float],
+    weight_ess_mean_by_lag: dict[int, float],
+    variance_by_lag: dict[int, float],
+    mixed_observable_reference: LagValue | None,
     mixed_r2_reference: float | None,
     mixed_rms_radius_reference: float | None,
 ) -> TransportedLagResult:
+    """Assemble a lag result from online block statistics."""
+
     values_by_lag: dict[int, LagValue] = {}
     stderr_by_lag: dict[int, LagValue] = {}
-    block_count_by_lag: dict[int, int] = {}
-    weight_ess_min_by_lag: dict[int, float] = {}
-    weight_ess_mean_by_lag: dict[int, float] = {}
-    variance_by_lag: dict[int, float] = {}
     for lag in config.lag_steps:
-        values = np.asarray(block_values_by_lag.get(lag, []), dtype=float)
-        if values.ndim == 1:
-            values = values[:, np.newaxis]
-        finite_mask = (
-            np.all(np.isfinite(values), axis=1)
-            if values.size
-            else np.zeros(0, dtype=bool)
-        )
-        finite = values[finite_mask]
-        block_count_by_lag[lag] = int(finite.shape[0])
-        ess_values = np.asarray(block_weight_ess_by_lag.get(lag, []), dtype=float)
-        finite_ess = ess_values[np.isfinite(ess_values)]
-        weight_ess_min_by_lag[lag] = (
-            float(np.min(finite_ess)) if finite_ess.size else 0.0
-        )
-        weight_ess_mean_by_lag[lag] = (
-            float(np.mean(finite_ess)) if finite_ess.size else 0.0
-        )
-        if finite.shape[0] == 0:
+        count = block_count_by_lag.get(lag, 0)
+        if count <= 0:
             dim = _observable_dimension(config, observable)
             nan_vec = np.full(dim, np.nan, dtype=float)
             values_by_lag[lag] = _as_result_value(nan_vec)
             stderr_by_lag[lag] = _as_result_value(nan_vec)
-            variance_by_lag[lag] = float("inf")
-            continue
-        mean = np.mean(finite, axis=0)
-        stderr = _vector_standard_error(finite)
-        values_by_lag[lag] = _as_result_value(mean)
-        stderr_by_lag[lag] = _as_result_value(stderr)
-        variance_by_lag[lag] = variance_inflation(np.mean(finite, axis=1))
+        else:
+            values_by_lag[lag] = _as_result_value(block_mean_by_lag[lag])
+            stderr_by_lag[lag] = _as_result_value(block_stderr_by_lag[lag])
+
     rms_by_lag = None
     rms_stderr_by_lag = None
     if observable == "r2":
@@ -79,14 +61,23 @@ def assemble_observable_result(
         }
     schema = schema_status(
         config=config,
+        observable=observable,
         values_by_lag=values_by_lag,
+        mixed_observable_reference=mixed_observable_reference,
         mixed_r2_reference=mixed_r2_reference if observable == "r2" else None,
         mixed_rms_radius_reference=mixed_rms_radius_reference
         if observable == "r2"
         else None,
     )
-    plateau_value, plateau_stderr, bias_bracket, plateau_status = plateau_summary(
+    (
+        plateau_value,
+        plateau_stderr,
+        bias_bracket,
+        plateau_status,
+        plateau_diagnostics,
+    ) = plateau_summary(
         config=config,
+        observable=observable,
         values_by_lag=values_by_lag,
         stderr_by_lag=stderr_by_lag,
         block_count_by_lag=block_count_by_lag,
@@ -100,6 +91,15 @@ def assemble_observable_result(
             _scalar_result_value(plateau_value),
             _scalar_result_value(plateau_stderr),
         )
+    metadata = _observable_metadata(config, observable)
+    metadata.update(
+        _schema_reference_metadata(
+            config=config,
+            observable=observable,
+            lag0_value=values_by_lag.get(0),
+            mixed_observable_reference=mixed_observable_reference,
+        )
+    )
     return TransportedLagResult(
         observable=observable,
         lag_steps=config.lag_steps,
@@ -119,32 +119,9 @@ def assemble_observable_result(
         bias_bracket=bias_bracket,
         plateau_status=plateau_status,
         schema_status=schema,
-        metadata=_observable_metadata(config, observable),
+        plateau_diagnostics=plateau_diagnostics,
+        metadata=metadata,
     )
-
-
-def assemble_r2_result(
-    *,
-    config: PureWalkingConfig,
-    block_values_by_lag: dict[int, list[FloatArray]],
-    block_weight_ess_by_lag: dict[int, list[float]],
-    mixed_r2_reference: float | None,
-    mixed_rms_radius_reference: float | None,
-) -> TransportedLagResult:
-    return assemble_observable_result(
-        config=config,
-        observable="r2",
-        block_values_by_lag=block_values_by_lag,
-        block_weight_ess_by_lag=block_weight_ess_by_lag,
-        mixed_r2_reference=mixed_r2_reference,
-        mixed_rms_radius_reference=mixed_rms_radius_reference,
-    )
-
-
-def _vector_standard_error(values: FloatArray) -> FloatArray:
-    if values.shape[0] < 2:
-        return np.full(values.shape[1], np.nan, dtype=float)
-    return np.std(values, axis=0, ddof=1) / np.sqrt(values.shape[0])
 
 
 def _as_result_value(value: FloatArray) -> LagValue:
@@ -192,3 +169,40 @@ def _observable_metadata(config: PureWalkingConfig, observable: str) -> dict[str
     if observable == "r2":
         return {"paper_rms_radius": "sqrt(aggregated_pure_r2)"}
     return {}
+
+
+def _schema_reference_metadata(
+    *,
+    config: PureWalkingConfig,
+    observable: str,
+    lag0_value: LagValue | None,
+    mixed_observable_reference: LagValue | None,
+) -> dict[str, object]:
+    metadata: dict[str, object] = {
+        "lag0_identity_required": (
+            "lag0_identity" in config.transport_invariant_tests_passed
+        ),
+        "lag0_reference_available": mixed_observable_reference is not None,
+    }
+    if lag0_value is None or mixed_observable_reference is None:
+        return metadata
+    lag0 = np.asarray(lag0_value, dtype=float)
+    reference = np.asarray(mixed_observable_reference, dtype=float)
+    if lag0.shape != reference.shape:
+        metadata["lag0_identity_metric"] = float("inf")
+        metadata["lag0_identity_norm"] = "shape_mismatch"
+        return metadata
+    if observable == "density":
+        edges = np.asarray(config.density_bin_edges, dtype=float)
+        widths = np.diff(edges)
+        if widths.shape == lag0.shape:
+            scale = float(np.sqrt(np.sum(reference * reference * widths)))
+            if scale > 0.0 and np.isfinite(scale):
+                metadata["lag0_identity_metric"] = float(
+                    np.sqrt(np.sum((lag0 - reference) ** 2 * widths)) / scale
+                )
+                metadata["lag0_identity_norm"] = "relative_l2"
+                return metadata
+    metadata["lag0_identity_metric"] = float(np.max(np.abs(lag0 - reference)))
+    metadata["lag0_identity_norm"] = "max_abs"
+    return metadata

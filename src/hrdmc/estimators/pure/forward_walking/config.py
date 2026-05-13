@@ -27,6 +27,7 @@ class PureWalkingConfig:
     center: float = 0.0
     plateau_sigma_threshold: float = 1.0
     plateau_abs_tolerance: float = 0.0
+    density_plateau_relative_l2_tolerance: float = 0.03
     schema_atol: float = 1.0e-12
     schema_rtol: float = 1.0e-12
     transport_invariant_tests_passed: tuple[str, ...] = ()
@@ -64,6 +65,8 @@ class PureWalkingConfig:
             raise ValueError("min_walker_weight_ess must be positive")
         if self.block_size_steps <= 0:
             raise ValueError("block_size_steps must be positive")
+        if self.density_plateau_relative_l2_tolerance < 0.0:
+            raise ValueError("density_plateau_relative_l2_tolerance must be non-negative")
         if self.transport_mode != "post_resample_auxiliary":
             raise ValueError("unsupported transport_mode")
         if self.collection_mode != "single_point":

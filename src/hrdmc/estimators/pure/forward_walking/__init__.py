@@ -1,6 +1,5 @@
 from hrdmc.estimators.pure.forward_walking.assembly import (
-    assemble_observable_result,
-    assemble_r2_result,
+    assemble_observable_result_from_stats,
 )
 from hrdmc.estimators.pure.forward_walking.config import PureWalkingConfig
 from hrdmc.estimators.pure.forward_walking.contributions import (
@@ -25,8 +24,7 @@ __all__ = [
     "PureWalkingResult",
     "TransportedAuxiliaryForwardWalking",
     "TransportedLagResult",
-    "assemble_observable_result",
-    "assemble_r2_result",
+    "assemble_observable_result_from_stats",
     "density_profile_matrix",
     "estimate_transported_auxiliary_forward_walking",
     "event_contribution_matrix",
