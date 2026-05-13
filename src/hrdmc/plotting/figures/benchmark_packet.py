@@ -72,9 +72,17 @@ def _write_density_comparison(
     *,
     formats: tuple[str, ...],
 ) -> list[Path]:
-    fig, ax = plt.subplots(figsize=(8.2, 5.0))
+    fig, axes = plt.subplots(
+        2,
+        1,
+        figsize=(8.7, 6.3),
+        sharex=True,
+        gridspec_kw={"height_ratios": (2.35, 1.0)},
+        constrained_layout=False,
+    )
     draw_case_header(fig, payload)
-    draw_density_panel(ax, payload)
+    draw_density_panel(axes[0], payload, residual_ax=axes[1])
+    fig.subplots_adjust(top=0.9, bottom=0.08, left=0.08, right=0.985, hspace=0.12)
     paths = save_figure(fig, plot_dir / "density_comparison", formats)
     plt.close(fig)
     return paths
@@ -226,7 +234,17 @@ def _write_one_page_packet(
         observable="rms",
         precision_status=_precision_status(payload),
     )
-    draw_density_panel(fig.add_subplot(spec[1, :]), payload)
+    density_spec = spec[1, :].subgridspec(
+        2,
+        1,
+        height_ratios=(2.2, 0.8),
+        hspace=0.06,
+    )
+    draw_density_panel(
+        fig.add_subplot(density_spec[0, 0]),
+        payload,
+        residual_ax=fig.add_subplot(density_spec[1, 0]),
+    )
     draw_chain_panel(fig.add_subplot(spec[2, :2]), fig.add_subplot(spec[2, 2]), payload)
     draw_fw_lag_panel(fig.add_subplot(spec[3, :]), payload)
     fig.text(

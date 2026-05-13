@@ -23,10 +23,10 @@ def draw_case_header(fig: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
     fig.suptitle(
         text,
         x=0.01,
-        y=0.995,
+        y=0.985,
         ha="left",
         va="top",
-        fontsize=8,
+        fontsize=7.2,
         family="monospace",
         color=tokens.INK_SOFT,
     )
