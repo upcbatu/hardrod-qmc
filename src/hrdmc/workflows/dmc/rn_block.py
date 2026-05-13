@@ -34,6 +34,7 @@ from hrdmc.runners import run_seed_batch
 from hrdmc.systems import (
     HarmonicMehlerKernel,
     HarmonicTrap,
+    OpenHardRodTrapGapHProductTargetKernel,
     OpenHardRodTrapGapHTransformProposalKernel,
     OpenHardRodTrapPrimitiveKernel,
     OpenLineHardRodSystem,
@@ -53,7 +54,7 @@ RN_GRID_SCHEMA_VERSION = "rn_block_grid_v1"
 RN_SINGLE_CASE_SCHEMA_VERSION = "rn_block_single_case_v1"
 RN_PROPOSAL_FAMILIES = ("harmonic-mehler", "gap-h-transform")
 RN_GUIDE_FAMILIES = ("auto", "reduced-tg", "gap-h-corrected")
-RN_TARGET_FAMILIES = ("primitive", "n2-exact-relative")
+RN_TARGET_FAMILIES = ("primitive", "gap-h-product", "n2-exact-relative")
 DEFAULT_RN_PROPOSAL_FAMILY = "gap-h-transform"
 DEFAULT_RN_GUIDE_FAMILY = "auto"
 DEFAULT_RN_TARGET_FAMILY = "primitive"
@@ -173,7 +174,9 @@ def build_case_objects(
     OpenLineHardRodSystem,
     HarmonicTrap,
     ReducedTGHardRodGuide | GapHCorrectedHardRodGuide,
-    OpenHardRodTrapPrimitiveKernel | OpenN2HardRodTrapExactKernel,
+    OpenHardRodTrapPrimitiveKernel
+    | OpenHardRodTrapGapHProductTargetKernel
+    | OpenN2HardRodTrapExactKernel,
     HarmonicMehlerKernel | OpenHardRodTrapGapHTransformProposalKernel,
 ]:
     if proposal_family not in RN_PROPOSAL_FAMILIES:
@@ -206,11 +209,12 @@ def build_case_objects(
         if proposal_family == "harmonic-mehler"
         else OpenHardRodTrapGapHTransformProposalKernel(system=system, trap=trap)
     )
-    target_kernel = (
-        OpenN2HardRodTrapExactKernel(system=system, trap=trap)
-        if target_family == "n2-exact-relative"
-        else OpenHardRodTrapPrimitiveKernel(system=system, trap=trap)
-    )
+    if target_family == "n2-exact-relative":
+        target_kernel = OpenN2HardRodTrapExactKernel(system=system, trap=trap)
+    elif target_family == "gap-h-product":
+        target_kernel = OpenHardRodTrapGapHProductTargetKernel(system=system, trap=trap)
+    else:
+        target_kernel = OpenHardRodTrapPrimitiveKernel(system=system, trap=trap)
     return (
         system,
         trap,
