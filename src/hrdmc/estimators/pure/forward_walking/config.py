@@ -74,8 +74,12 @@ class PureWalkingConfig:
             raise ValueError("unsupported transport_mode")
         if self.collection_mode not in {"single_point", "sliding_window"}:
             raise ValueError("unsupported transported FW collection_mode")
-        if self.collection_mode == "sliding_window" and self.block_size_steps != 1:
-            raise ValueError("sliding_window FW requires block_size_steps=1")
+        if (
+            self.collection_mode == "sliding_window"
+            and any(lag > 0 for lag in self.lag_steps)
+            and self.block_size_steps != 1
+        ):
+            raise ValueError("lagged sliding_window FW requires block_size_steps=1")
         if (
             self.collection_mode == "single_point"
             and any(lag > 0 for lag in self.lag_steps)

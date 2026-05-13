@@ -244,7 +244,7 @@ class TransportedAuxiliaryForwardWalking:
     ) -> LagState:
         state_cls = (
             SlidingLagState
-            if self.config.collection_mode == "sliding_window"
+            if self.config.collection_mode == "sliding_window" and lag > 0
             else LagState
         )
         return state_cls(
