@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from numbers import Real
 from typing import Any
 
 import numpy as np
@@ -205,6 +206,8 @@ def _bin_averaged_trapped_tg_density(
 
 def _optional_float(value: object) -> float | None:
     if value is None:
+        return None
+    if not isinstance(value, Real | str):
         return None
     try:
         parsed = float(value)

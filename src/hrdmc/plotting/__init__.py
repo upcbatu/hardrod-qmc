@@ -1,8 +1,8 @@
 from hrdmc.plotting.figures import (
     write_benchmark_packet_plots,
     write_claim_matrix_plot,
-    write_exact_validation_packet_plots,
     write_exact_tg_trap_plots,
+    write_exact_validation_packet_plots,
 )
 
 __all__ = [

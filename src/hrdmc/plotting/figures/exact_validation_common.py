@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from numbers import Real
 from typing import Any
 
 import numpy as np
@@ -200,6 +201,8 @@ def anchor_label(anchor: dict[str, Any]) -> str:
 
 
 def finite_value(value: object) -> float:
+    if not isinstance(value, Real | str):
+        return float("nan")
     try:
         parsed = float(value)
     except (TypeError, ValueError):

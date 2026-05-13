@@ -3,8 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 from hrdmc.plotting.components import (
     draw_case_header,
     draw_chain_panel,
