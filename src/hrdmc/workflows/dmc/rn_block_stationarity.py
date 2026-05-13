@@ -20,7 +20,7 @@ from hrdmc.workflows.dmc.rn_block import (
     RNCase,
     RNCollectiveProposalControls,
     RNRunControls,
-    build_case_objects,
+    build_case_geometry,
     make_grid,
     resolve_parallel_workers,
     run_streaming_seed,
@@ -32,6 +32,8 @@ TRIANGULATED_ERROR_GO = "TRIANGULATED_2_OF_3"
 TRIANGULATED_ERROR_WARNING = "DISAGREE_HONEST_LARGE"
 TRIANGULATED_ERROR_UNAVAILABLE = "CORRELATED_ERROR_UNAVAILABLE"
 TRIANGULATED_PRECISION_WARNING = "TRIANGULATED_PRECISION_WARNING"
+MIXED_OBSERVABLE_WARNING = "MIXED_OBSERVABLE_WARNING"
+MIXED_COORDINATE_DIAGNOSTIC = "PASS_CANDIDATE_MIXED_COORDINATE_DIAGNOSTIC"
 BLOCKING_CURVE_MIN_BLOCKS = 16
 BLOCKING_PLATEAU_MIN_BLOCKS = 32
 BLOCKING_PLATEAU_WINDOW = 3
@@ -52,6 +54,8 @@ def summarize_stationarity_case(
     log_weight_span_warning: float = 50.0,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
+    proposal_family: str = "harmonic-mehler",
+    guide_family: str = "auto",
 ) -> dict[str, Any]:
     initialization = RNInitializationControls() if initialization is None else initialization
     proposal = RNCollectiveProposalControls() if proposal is None else proposal
@@ -67,8 +71,52 @@ def summarize_stationarity_case(
         progress=progress,
         initialization=initialization,
         proposal=proposal,
+        proposal_family=proposal_family,
+        guide_family=guide_family,
     )
-    system, trap, _guide, _target, _proposal = build_case_objects(case)
+    return summarize_stationarity_from_seed_summaries(
+        case,
+        controls,
+        seeds,
+        grid,
+        seed_summaries,
+        actual_worker_count,
+        requested_worker_count=worker_count,
+        trace_output_dir=trace_output_dir,
+        ess_warning_fraction=ess_warning_fraction,
+        ess_no_go_fraction=ess_no_go_fraction,
+        log_weight_span_warning=log_weight_span_warning,
+        initialization=initialization,
+        proposal=proposal,
+        proposal_family=proposal_family,
+        guide_family=guide_family,
+    )
+
+
+def summarize_stationarity_from_seed_summaries(
+    case: RNCase,
+    controls: RNRunControls,
+    seeds: list[int],
+    grid: np.ndarray,
+    seed_summaries: list[RNBlockStreamingSummary],
+    actual_worker_count: int,
+    *,
+    requested_worker_count: int | None = None,
+    trace_output_dir: Any | None = None,
+    ess_warning_fraction: float = 0.20,
+    ess_no_go_fraction: float = 0.10,
+    log_weight_span_warning: float = 50.0,
+    initialization: RNInitializationControls,
+    proposal: RNCollectiveProposalControls,
+    proposal_family: str = "harmonic-mehler",
+    guide_family: str = "auto",
+) -> dict[str, Any]:
+    """Aggregate stationarity gates from already-run seed summaries."""
+
+    if requested_worker_count is None:
+        requested_worker_count = actual_worker_count
+
+    system, trap = build_case_geometry(case)
     density = np.mean([summary.density for summary in seed_summaries], axis=0)
     energy_values = np.asarray([summary.mixed_energy for summary in seed_summaries])
     rms_values = np.asarray([summary.rms_radius for summary in seed_summaries])
@@ -150,7 +198,8 @@ def summarize_stationarity_case(
     case_gate = final_classification in {
         "PASS_CANDIDATE",
         "WEAK_TRAP_WARNING",
-        "MIXED_OBSERVABLE_WARNING",
+        MIXED_OBSERVABLE_WARNING,
+        MIXED_COORDINATE_DIAGNOSTIC,
         TRIANGULATED_PRECISION_WARNING,
     }
     classification = classify_case(
@@ -173,6 +222,13 @@ def summarize_stationarity_case(
         "breathing_preburn_steps": initialization.breathing_preburn_steps,
         "breathing_preburn_log_step": initialization.breathing_preburn_log_step,
         **proposal.to_metadata(),
+        "proposal_family": proposal_family,
+        "guide_family": guide_family,
+        "resolved_guide_family": ",".join(
+            sorted(
+                {str(summary.metadata.get("resolved_guide_family")) for summary in seed_summaries}
+                )
+        ),
         "target_initial_rms": seed_summaries[0].metadata.get("target_initial_rms", float("nan")),
         "initializer_scope": seed_summaries[0].metadata.get("initializer_scope", ""),
         "case_gate": case_gate,
@@ -189,10 +245,28 @@ def summarize_stationarity_case(
         ),
         "gate_split_precision": precision_gate_status(final_classification),
         "gate_split_combined": final_classification,
+        "energy_estimator_scope": (
+            "mixed local-energy Hamiltonian estimator; candidate paper estimator "
+            "after RN-DMC methodology gates"
+        ),
+        "mixed_coordinate_observable_scope": (
+            "diagnostic only; paper R2/RMS require Hellmann-Feynman energy response "
+            "or transported auxiliary forward walking"
+        ),
+        "mixed_coordinate_diagnostic_status": mixed_coordinate_diagnostic_status(
+            rms=spread["rms"],
+            r2=spread["r2"],
+            diagnostics=diagnostics,
+            stationarity_audit=stationarity_audit,
+        ),
+        "paper_r2_estimator_status": "NOT_EVALUATED_HF_OR_FW_REQUIRED",
+        "paper_rms_estimator_status": "NOT_EVALUATED_HF_OR_FW_REQUIRED",
+        "paper_density_estimator_status": "NOT_EVALUATED_TRANSPORTED_FW_REQUIRED",
+        "paper_pair_structure_estimator_status": "NOT_EVALUATED_TRANSPORTED_FW_REQUIRED",
         "seeds": seeds,
         "seed_count": len(seeds),
         "parallel_workers": actual_worker_count,
-        "parallel_workers_requested": worker_count,
+        "parallel_workers_requested": requested_worker_count,
         "effective_grid_extent": float(max(abs(grid[0]), abs(grid[-1]))),
         "mixed_energy": mean(energy_values),
         "mixed_energy_seed_stderr": stderr(energy_values),
@@ -228,8 +302,15 @@ def summarize_stationarity_case(
         "rms_dmc_minus_lda": mean(rms_values) - lda_rms,
         "density_relative_l2": relative_density_l2_error(grid, density, lda.n_x),
         "density_relative_l2_seed_stderr": stderr(density_l2_values),
-        "uncertainty_status": case_uncertainty_status(
-            [energy_uncertainty, rms_uncertainty, r2_uncertainty]
+        "density_profile": {
+            "x": grid.tolist(),
+            "mixed_n_x": density.tolist(),
+            "lda_n_x": lda.n_x.tolist(),
+            "estimator": "mixed coordinate diagnostic; paper density requires transported FW",
+        },
+        "uncertainty_status": case_uncertainty_status([energy_uncertainty]),
+        "mixed_coordinate_uncertainty_status": case_uncertainty_status(
+            [rms_uncertainty, r2_uncertainty]
         ),
         "max_spread_blocking_z": max_spread_blocking_z(diagnostics),
         "blocking_plateau_energy": spread["energy"]["plateau_all"],
@@ -300,9 +381,9 @@ def summarize_stationarity_case(
         "correlated_error_r2_triangulated_seed_count": correlated_errors["r2"][
             "triangulated_seed_count"
         ],
-        "spread_warning_count": int(
-            diagnostics["energy"]["spread_warning_count"]
-            + diagnostics["rms"]["spread_warning_count"]
+        "spread_warning_count": int(diagnostics["energy"]["spread_warning_count"]),
+        "mixed_coordinate_spread_warning_count": int(
+            diagnostics["rms"]["spread_warning_count"]
             + diagnostics["r2"]["spread_warning_count"]
         ),
         "ess_fraction_min": ess_fraction_min,
@@ -321,6 +402,22 @@ def summarize_stationarity_case(
         ),
         "guide_batch_backend": ",".join(
             sorted({str(summary.metadata["guide_batch_backend"]) for summary in seed_summaries})
+        ),
+        "target_backend": ",".join(
+            sorted(
+                {
+                    str(summary.metadata.get("target_backend", ""))
+                    for summary in seed_summaries
+                }
+            )
+        ),
+        "proposal_backend": ",".join(
+            sorted(
+                {
+                    str(summary.metadata.get("proposal_backend", ""))
+                    for summary in seed_summaries
+                }
+            )
         ),
         "trace_artifacts": trace_artifacts,
         "seed_summaries": [
@@ -366,6 +463,10 @@ def summarize_stationarity_case(
                 ],
                 **breathing_trace_summary(summary),
                 "guide_batch_backend": summary.metadata["guide_batch_backend"],
+                "target_backend": summary.metadata.get("target_backend", ""),
+                "proposal_backend": summary.metadata.get("proposal_backend", ""),
+                "guide_family": summary.metadata.get("guide_family", ""),
+                "resolved_guide_family": summary.metadata.get("resolved_guide_family", ""),
             }
             for seed, summary in zip(seeds, seed_summaries, strict=True)
         ],
@@ -385,6 +486,8 @@ def run_stationarity_seeds(
     progress: ProgressBar | None,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
+    proposal_family: str = "harmonic-mehler",
+    guide_family: str = "auto",
 ) -> tuple[list[RNBlockStreamingSummary], int]:
     initialization = RNInitializationControls() if initialization is None else initialization
     proposal = RNCollectiveProposalControls() if proposal is None else proposal
@@ -402,6 +505,8 @@ def run_stationarity_seeds(
             progress_queue,
             initialization,
             proposal,
+            proposal_family,
+            guide_family,
         ),
         run_serial_seed=lambda seed: run_streaming_seed(
             case,
@@ -411,6 +516,8 @@ def run_stationarity_seeds(
             progress=progress,
             initialization=initialization,
             proposal=proposal,
+            proposal_family=proposal_family,
+            guide_family=guide_family,
         ),
     )
 
@@ -423,6 +530,8 @@ def run_seed_worker(
     progress_queue: Any | None = None,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
+    proposal_family: str = "harmonic-mehler",
+    guide_family: str = "auto",
 ) -> tuple[int, RNBlockStreamingSummary]:
     initialization = RNInitializationControls() if initialization is None else initialization
     proposal = RNCollectiveProposalControls() if proposal is None else proposal
@@ -437,6 +546,8 @@ def run_seed_worker(
             progress=worker_progress,
             initialization=initialization,
             proposal=proposal,
+            proposal_family=proposal_family,
+            guide_family=guide_family,
         )
     finally:
         if worker_progress is not None:
@@ -634,11 +745,12 @@ def classify_case(
     if case_gate:
         if final_classification == TRIANGULATED_PRECISION_WARNING:
             return "RN_TRAPPED_STATIONARITY_PRECISION_WARNING"
-        if final_classification in {"MIXED_OBSERVABLE_WARNING", "WEAK_TRAP_WARNING"}:
+        if final_classification in {"WEAK_TRAP_WARNING", MIXED_OBSERVABLE_WARNING}:
             return "RN_TRAPPED_STATIONARITY_WARNING"
+        if final_classification == MIXED_COORDINATE_DIAGNOSTIC:
+            return "RN_TRAPPED_ENERGY_CORRIDOR_GO"
         if any(
-            diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY"
-            for name in ("energy", "rms", "r2")
+            diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY" for name in ("energy",)
         ):
             return "RN_TRAPPED_STATIONARITY_WARNING"
         return "RN_TRAPPED_STATIONARITY_GO"
@@ -680,7 +792,10 @@ def blocked_metric_diagnostics(
     *,
     blocked_z_threshold: float = 3.0,
 ) -> dict[str, Any]:
-    means = np.asarray([float(np.mean(trace[np.isfinite(trace)])) for trace in traces], dtype=float)
+    means = np.asarray(
+        [float(np.mean(trace[np.isfinite(trace)])) for trace in traces],
+        dtype=float,
+    )
     rows: list[dict[str, Any]] = []
     plateau_flags: list[bool] = []
     blocked_zscores: list[float] = []
@@ -753,7 +868,7 @@ def classify_blocked_case(
         return "RN_WEIGHT_NO_GO"
     if not hygiene_gate:
         return "HYGIENE_NO_GO"
-    if hard_chain_no_go(diagnostics, stationarity_audit):
+    if hard_chain_no_go(diagnostics, stationarity_audit, metrics=("energy",)):
         return "NO_GO_STATIONARITY"
 
     energy_problem = metric_precision_problem(energy, diagnostics["energy"])
@@ -764,8 +879,6 @@ def classify_blocked_case(
         energy_problem,
         correlated_errors["energy"],
     )
-    rms_repairable = metric_precision_repairable(rms_problem, correlated_errors["rms"])
-    r2_repairable = metric_precision_repairable(r2_problem, correlated_errors["r2"])
 
     if energy_problem and not energy_repairable:
         if not energy["plateau_all"]:
@@ -774,15 +887,23 @@ def classify_blocked_case(
             return "SPREAD_VETO_NO_GO"
         return "NO_GO_NO_BLOCKING_PLATEAU"
 
-    if (rms_problem and not rms_repairable) or (r2_problem and not r2_repairable):
-        return "MIXED_OBSERVABLE_WARNING"
-
-    if energy_problem or rms_problem or r2_problem:
+    if energy_problem:
         return TRIANGULATED_PRECISION_WARNING
 
+    if mixed_coordinate_methodology_no_go(diagnostics, stationarity_audit):
+        return MIXED_COORDINATE_DIAGNOSTIC
+    if rms_problem or r2_problem:
+        coordinate_repairable = metric_precision_repairable(
+            rms_problem,
+            correlated_errors["rms"],
+        ) and metric_precision_repairable(
+            r2_problem,
+            correlated_errors["r2"],
+        )
+        return MIXED_COORDINATE_DIAGNOSTIC if coordinate_repairable else MIXED_OBSERVABLE_WARNING
+
     if any(
-        diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY"
-        for name in ("energy", "rms", "r2")
+        diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY" for name in ("energy",)
     ):
         return "WEAK_TRAP_WARNING"
     return "PASS_CANDIDATE"
@@ -807,18 +928,58 @@ def correlated_error_available(metric: dict[str, Any]) -> bool:
 def hard_chain_no_go(
     diagnostics: dict[str, dict],
     stationarity_audit: dict[str, dict[str, Any]],
+    *,
+    metrics: tuple[str, ...] = ("energy", "rms", "r2"),
 ) -> bool:
     if any(
         diagnostics[name]["classification"] in {"NO_GO_RHAT", "NO_GO_NEFF"}
-        for name in ("energy", "rms", "r2")
+        for name in metrics
     ):
         return True
     return any(
         stationarity_audit[name]["reason"]
         not in {"GO", "SPREAD_WARNING"}
         and diagnostics[name]["classification"] == "NO_GO_STATIONARITY"
-        for name in ("energy", "rms", "r2")
+        for name in metrics
     )
+
+
+def mixed_coordinate_methodology_no_go(
+    diagnostics: dict[str, dict],
+    stationarity_audit: dict[str, dict[str, Any]],
+) -> bool:
+    """Return whether diagnostic mixed coordinate traces failed their own checks.
+
+    Mixed coordinate observables do not authorize paper R2/RMS/density claims.
+    Their stationarity failures must stay visible, but they do not veto the
+    Hamiltonian energy corridor.
+    """
+
+    return hard_chain_no_go(diagnostics, stationarity_audit, metrics=("rms", "r2"))
+
+
+def mixed_coordinate_diagnostic_status(
+    *,
+    rms: dict[str, Any],
+    r2: dict[str, Any],
+    diagnostics: dict[str, dict],
+    stationarity_audit: dict[str, dict[str, Any]],
+) -> str:
+    """Classify mixed coordinate traces without feeding the energy gate."""
+
+    if mixed_coordinate_methodology_no_go(diagnostics, stationarity_audit):
+        return "MIXED_COORDINATE_DIAGNOSTIC_STATIONARITY_WARNING"
+    if metric_precision_problem(rms, diagnostics["rms"]) or metric_precision_problem(
+        r2,
+        diagnostics["r2"],
+    ):
+        return "MIXED_COORDINATE_DIAGNOSTIC_PRECISION_WARNING"
+    if any(
+        diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY"
+        for name in ("rms", "r2")
+    ):
+        return "MIXED_COORDINATE_DIAGNOSTIC_SPREAD_WARNING"
+    return "MIXED_COORDINATE_DIAGNOSTIC_GO"
 
 
 def methodology_gate_status(
@@ -835,7 +996,7 @@ def methodology_gate_status(
         return "HYGIENE_NO_GO"
     if rn_weight_status == "RN_WEIGHT_NO_GO":
         return "RN_WEIGHT_NO_GO"
-    if hard_chain_no_go(diagnostics, stationarity_audit):
+    if hard_chain_no_go(diagnostics, stationarity_audit, metrics=("energy",)):
         return "STATIONARITY_NO_GO"
     return "GO"
 
@@ -845,8 +1006,10 @@ def precision_gate_status(final_classification: str) -> str:
         return "GO"
     if final_classification == TRIANGULATED_PRECISION_WARNING:
         return "WARNING_BLOCKING_PLATEAU_ABSENT_TRIANGULATED_ERROR"
-    if final_classification == "MIXED_OBSERVABLE_WARNING":
-        return "WARNING_MIXED_COORDINATE_OBSERVABLE"
+    if final_classification == MIXED_COORDINATE_DIAGNOSTIC:
+        return "GO"
+    if final_classification == MIXED_OBSERVABLE_WARNING:
+        return "WARNING_MIXED_COORDINATE_OBSERVABLES"
     if final_classification == "WEAK_TRAP_WARNING":
         return "WARNING_SPREAD_ONLY"
     return "NOT_EVALUATED_DUE_TO_METHODOLOGY_NO_GO"
@@ -903,7 +1066,9 @@ def seed_trace_dict(summary: RNBlockStreamingSummary) -> dict[str, np.ndarray]:
         "ess_fraction": require_trace(summary.ess_fraction_trace),
         "invalid_proposal_fraction": require_trace(summary.invalid_proposal_fraction_trace),
         "hard_wall_kill_fraction": require_trace(summary.hard_wall_kill_fraction_trace),
-        "zero_weight_excluded_fraction": require_trace(summary.zero_weight_excluded_fraction_trace),
+        "zero_weight_excluded_fraction": require_trace(
+            summary.zero_weight_excluded_fraction_trace
+        ),
         "rn_logk_mean": require_trace(summary.rn_logk_mean_trace),
         "rn_logq_mean": require_trace(summary.rn_logq_mean_trace),
         "rn_logw_increment_mean": require_trace(summary.rn_logw_increment_mean_trace),

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from typing import Protocol
+
 import numpy as np
 
-from hrdmc.wavefunctions import ReducedTGHardRodGuide
+from hrdmc.systems.open_line import OpenLineHardRodSystem
+from hrdmc.wavefunctions.api import DMCGuide
 from hrdmc.workflows.dmc.rn_block_initial_conditions.geometry import (
     array_min_or_none,
     hard_core_preserving_breathing_scale,
@@ -10,9 +13,14 @@ from hrdmc.workflows.dmc.rn_block_initial_conditions.geometry import (
 )
 
 
+class SystemBackedGuide(DMCGuide, Protocol):
+    @property
+    def system(self) -> OpenLineHardRodSystem: ...
+
+
 def breathing_preburn_walkers(
     walkers: np.ndarray,
-    guide: ReducedTGHardRodGuide,
+    guide: SystemBackedGuide,
     rng: np.random.Generator,
     *,
     steps: int,

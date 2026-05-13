@@ -164,6 +164,8 @@ def write_response_point_table(output_dir: Path, rows: list[dict[str, Any]]) -> 
         "density_accounting_clean",
         "valid_finite_clean",
         "guide_batch_backend",
+        "target_backend",
+        "proposal_backend",
         "source_summary",
     ]
     path = ensure_dir(output_dir) / "energy_response_points.csv"
@@ -220,6 +222,8 @@ def _point_row_from_case_row(
         "density_accounting_clean": row.get("density_accounting_clean", False),
         "valid_finite_clean": row.get("valid_finite_clean", False),
         "guide_batch_backend": row.get("guide_batch_backend", ""),
+        "target_backend": row.get("target_backend", ""),
+        "proposal_backend": row.get("proposal_backend", ""),
         "source_summary": str(source_summary),
     }
     out["energy_point_gate"] = energy_point_gate_from_row(row)

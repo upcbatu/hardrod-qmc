@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 
 from hrdmc.analysis import relative_density_l2_error
+from hrdmc.estimators.mixed import estimate_weighted_observables
 from hrdmc.io.artifacts import (
     build_run_provenance,
     config_fingerprint,
@@ -25,6 +26,7 @@ from hrdmc.io.progress import (
 from hrdmc.monte_carlo.dmc.rn_block import (
     RNBlockDMCConfig,
     RNBlockStreamingSummary,
+    RNTransportObserver,
     run_rn_block_dmc,
     run_rn_block_dmc_streaming,
 )
@@ -32,11 +34,12 @@ from hrdmc.runners import run_seed_batch
 from hrdmc.systems import (
     HarmonicMehlerKernel,
     HarmonicTrap,
+    OpenHardRodTrapGapHTransformProposalKernel,
     OpenHardRodTrapPrimitiveKernel,
     OpenLineHardRodSystem,
 )
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
-from hrdmc.wavefunctions import ReducedTGHardRodGuide
+from hrdmc.wavefunctions.guides import GapHCorrectedHardRodGuide, ReducedTGHardRodGuide
 from hrdmc.workflows.dmc.rn_block_initial_conditions import (
     RNInitializationControls,
     initial_walkers,
@@ -47,6 +50,8 @@ CASE_RE = re.compile(r"^N(?P<n>\d+)_a(?P<a>[0-9.]+)_omega(?P<omega>[0-9.]+)$")
 MAX_AUTO_WORKERS = 6
 RN_GRID_SCHEMA_VERSION = "rn_block_grid_v1"
 RN_SINGLE_CASE_SCHEMA_VERSION = "rn_block_single_case_v1"
+RN_PROPOSAL_FAMILIES = ("harmonic-mehler", "gap-h-transform")
+RN_GUIDE_FAMILIES = ("auto", "reduced-tg", "gap-h-corrected")
 
 
 @dataclass(frozen=True)
@@ -153,26 +158,57 @@ def resolve_parallel_workers(
 
 def build_case_objects(
     case: RNCase,
+    *,
+    proposal_family: str = "harmonic-mehler",
+    guide_family: str = "auto",
 ) -> tuple[
     OpenLineHardRodSystem,
     HarmonicTrap,
-    ReducedTGHardRodGuide,
+    ReducedTGHardRodGuide | GapHCorrectedHardRodGuide,
     OpenHardRodTrapPrimitiveKernel,
-    HarmonicMehlerKernel,
+    HarmonicMehlerKernel | OpenHardRodTrapGapHTransformProposalKernel,
 ]:
-    system = OpenLineHardRodSystem(n_particles=case.n_particles, rod_length=case.rod_length)
-    trap = HarmonicTrap(omega=case.omega)
-    guide = ReducedTGHardRodGuide(
-        system=system,
-        trap=trap,
-        alpha=case.omega / np.sqrt(2.0),
+    if proposal_family not in RN_PROPOSAL_FAMILIES:
+        raise ValueError(f"unknown RN proposal family: {proposal_family}")
+    if guide_family not in RN_GUIDE_FAMILIES:
+        raise ValueError(f"unknown RN guide family: {guide_family}")
+    system, trap = build_case_geometry(case)
+    resolved_guide_family = guide_family
+    if guide_family == "auto":
+        resolved_guide_family = (
+            "gap-h-corrected" if proposal_family == "gap-h-transform" else "reduced-tg"
+        )
+    guide = (
+        GapHCorrectedHardRodGuide(
+            system=system,
+            trap=trap,
+            alpha=case.omega / np.sqrt(2.0),
+        )
+        if resolved_guide_family == "gap-h-corrected"
+        else ReducedTGHardRodGuide(
+            system=system,
+            trap=trap,
+            alpha=case.omega / np.sqrt(2.0),
+        )
+    )
+    proposal_kernel = (
+        HarmonicMehlerKernel(trap=trap)
+        if proposal_family == "harmonic-mehler"
+        else OpenHardRodTrapGapHTransformProposalKernel(system=system, trap=trap)
     )
     return (
         system,
         trap,
         guide,
         OpenHardRodTrapPrimitiveKernel(system=system, trap=trap),
-        HarmonicMehlerKernel(trap=trap),
+        proposal_kernel,
+    )
+
+
+def build_case_geometry(case: RNCase) -> tuple[OpenLineHardRodSystem, HarmonicTrap]:
+    return (
+        OpenLineHardRodSystem(n_particles=case.n_particles, rod_length=case.rod_length),
+        HarmonicTrap(omega=case.omega),
     )
 
 
@@ -180,7 +216,7 @@ def make_grid(controls: RNRunControls, case: RNCase | None = None) -> np.ndarray
     extent = controls.grid_extent
     if case is None:
         return np.linspace(-extent, extent, controls.n_bins)
-    system, trap, _guide, _target, _proposal = build_case_objects(case)
+    system, trap = build_case_geometry(case)
     for _attempt in range(8):
         grid = np.linspace(-extent, extent, controls.n_bins)
         try:
@@ -203,7 +239,7 @@ def make_grid(controls: RNRunControls, case: RNCase | None = None) -> np.ndarray
 
 
 def lda_target_rms(case: RNCase, controls: RNRunControls, grid: np.ndarray) -> float:
-    system, trap, _guide, _target, _proposal = build_case_objects(case)
+    system, trap = build_case_geometry(case)
     lda = lda_density_profile(
         grid,
         trap.values(grid),
@@ -225,9 +261,17 @@ def run_streaming_seed(
     resume: bool = False,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
+    proposal_family: str = "harmonic-mehler",
+    guide_family: str = "auto",
+    transport_observer: RNTransportObserver | None = None,
+    transport_com_variance: float | None = None,
 ) -> RNBlockStreamingSummary:
     rng = np.random.default_rng(seed)
-    system, _trap, guide, target_kernel, proposal_kernel = build_case_objects(case)
+    system, _trap, guide, target_kernel, proposal_kernel = build_case_objects(
+        case,
+        proposal_family=proposal_family,
+        guide_family=guide_family,
+    )
     grid = make_grid(controls, case) if density_grid is None else density_grid
     initialization = RNInitializationControls() if initialization is None else initialization
     proposal = RNCollectiveProposalControls() if proposal is None else proposal
@@ -270,9 +314,14 @@ def run_streaming_seed(
         checkpoint_path=checkpoint_path,
         checkpoint_every_steps=checkpoint_every_steps,
         resume=resume,
+        transport_observer=transport_observer,
+        transport_com_variance=transport_com_variance,
     )
     summary.metadata.update(initial.metadata)
     summary.metadata.update(proposal.to_metadata())
+    summary.metadata["proposal_family"] = proposal_family
+    summary.metadata["guide_family"] = guide_family
+    summary.metadata["resolved_guide_family"] = _guide_family_name(guide)
     initial_rms_value = initial.metadata["initial_rms_mean"]
     if not isinstance(initial_rms_value, int | float):
         raise RuntimeError("initial_rms_mean metadata must be numeric")
@@ -289,8 +338,14 @@ def validate_streaming_against_raw(
     seed: int,
     *,
     progress: ProgressBar | None = None,
+    proposal_family: str = "harmonic-mehler",
+    guide_family: str = "auto",
 ) -> dict[str, Any]:
-    system, _trap, guide, target_kernel, proposal_kernel = build_case_objects(case)
+    system, _trap, guide, target_kernel, proposal_kernel = build_case_objects(
+        case,
+        proposal_family=proposal_family,
+        guide_family=guide_family,
+    )
     grid = make_grid(controls, case)
     raw_rng = np.random.default_rng(seed)
     raw_initial = initial_walkers(system, controls.walkers, raw_rng)
@@ -336,9 +391,12 @@ def validate_streaming_against_raw(
         progress=progress,
     )
     valid_mask = np.asarray([system.is_valid(snapshot) for snapshot in raw.snapshots], dtype=bool)
-    raw_observables = raw.estimate_weighted_observables(
-        valid_mask=valid_mask,
-        grid=grid,
+    raw_observables = estimate_weighted_observables(
+        raw.snapshots,
+        raw.local_energies,
+        raw.weights,
+        valid_mask,
+        grid,
         center=system.center,
         n_particles=system.n_particles,
     )
@@ -359,6 +417,9 @@ def validate_streaming_against_raw(
         "raw_sample_count": int(raw.snapshots.shape[0]),
         "raw_guide_batch_backend": raw.metadata["guide_batch_backend"],
         "streaming_guide_batch_backend": streaming.metadata["guide_batch_backend"],
+        "proposal_family": proposal_family,
+        "guide_family": guide_family,
+        "resolved_guide_family": _guide_family_name(guide),
     }
 
 
@@ -372,6 +433,8 @@ def summarize_case(
     checkpoint_dir: Path | None = None,
     checkpoint_every_steps: int | None = None,
     resume_seed_checkpoints: bool = False,
+    proposal_family: str = "harmonic-mehler",
+    guide_family: str = "auto",
 ) -> dict[str, Any]:
     grid = make_grid(controls, case)
     worker_count = resolve_parallel_workers(len(seeds), parallel_workers)
@@ -385,11 +448,17 @@ def summarize_case(
         checkpoint_dir=checkpoint_dir,
         checkpoint_every_steps=checkpoint_every_steps,
         resume_seed_checkpoints=resume_seed_checkpoints,
+        proposal_family=proposal_family,
+        guide_family=guide_family,
     )
     density = np.mean([summary.density for summary in seed_summaries], axis=0)
     energy_values = np.asarray([summary.mixed_energy for summary in seed_summaries], dtype=float)
     rms_values = np.asarray([summary.rms_radius for summary in seed_summaries], dtype=float)
-    system, trap, _guide, _target, _proposal = build_case_objects(case)
+    system, trap, _guide, _target, _proposal = build_case_objects(
+        case,
+        proposal_family=proposal_family,
+        guide_family=guide_family,
+    )
     lda = lda_density_profile(
         grid,
         trap.values(grid),
@@ -421,8 +490,27 @@ def summarize_case(
         "seed_count": len(seeds),
         "parallel_workers": actual_worker_count,
         "parallel_workers_requested": worker_count,
+        "proposal_family": proposal_family,
+        "guide_family": guide_family,
+        "resolved_guide_family": _guide_family_name(_guide),
         "guide_batch_backend": ",".join(
             sorted({str(summary.metadata["guide_batch_backend"]) for summary in seed_summaries})
+        ),
+        "target_backend": ",".join(
+            sorted(
+                {
+                    str(summary.metadata.get("target_backend", ""))
+                    for summary in seed_summaries
+                }
+            )
+        ),
+        "proposal_backend": ",".join(
+            sorted(
+                {
+                    str(summary.metadata.get("proposal_backend", ""))
+                    for summary in seed_summaries
+                }
+            )
         ),
         "seed_summaries": [
             {
@@ -437,6 +525,8 @@ def summarize_case(
                 "ess_mean": summary.metadata["ess_mean"],
                 "ess_fraction_min": summary.metadata["ess_fraction_min"],
                 "guide_batch_backend": summary.metadata["guide_batch_backend"],
+                "target_backend": summary.metadata.get("target_backend", ""),
+                "proposal_backend": summary.metadata.get("proposal_backend", ""),
             }
             for seed, summary in zip(seeds, seed_summaries, strict=True)
         ],
@@ -454,6 +544,8 @@ def _run_seed_summaries(
     checkpoint_dir: Path | None,
     checkpoint_every_steps: int | None,
     resume_seed_checkpoints: bool,
+    proposal_family: str,
+    guide_family: str,
 ) -> tuple[list[RNBlockStreamingSummary], int]:
     return run_seed_batch(
         seeds,
@@ -469,6 +561,8 @@ def _run_seed_summaries(
             checkpoint_dir,
             checkpoint_every_steps,
             resume_seed_checkpoints,
+            proposal_family,
+            guide_family,
         ),
         run_serial_seed=lambda seed: run_streaming_seed(
             case,
@@ -479,6 +573,8 @@ def _run_seed_summaries(
             checkpoint_dir=checkpoint_dir,
             checkpoint_every_steps=checkpoint_every_steps,
             resume=resume_seed_checkpoints,
+            proposal_family=proposal_family,
+            guide_family=guide_family,
         ),
     )
 
@@ -492,6 +588,8 @@ def _run_seed_worker(
     checkpoint_dir: Path | None = None,
     checkpoint_every_steps: int | None = None,
     resume_seed_checkpoints: bool = False,
+    proposal_family: str = "harmonic-mehler",
+    guide_family: str = "auto",
 ) -> tuple[int, RNBlockStreamingSummary]:
     worker_progress = QueuedProgress(progress_queue) if progress_queue is not None else None
     try:
@@ -504,6 +602,8 @@ def _run_seed_worker(
             checkpoint_dir=checkpoint_dir,
             checkpoint_every_steps=checkpoint_every_steps,
             resume=resume_seed_checkpoints,
+            proposal_family=proposal_family,
+            guide_family=guide_family,
         )
     finally:
         if worker_progress is not None:
@@ -524,6 +624,14 @@ def controls_to_dict(controls: RNRunControls) -> dict[str, float | int]:
         "grid_extent": controls.grid_extent,
         "n_bins": controls.n_bins,
     }
+
+
+def _guide_family_name(guide: object) -> str:
+    if isinstance(guide, GapHCorrectedHardRodGuide):
+        return "gap-h-corrected"
+    if isinstance(guide, ReducedTGHardRodGuide):
+        return "reduced-tg"
+    return type(guide).__name__
 
 
 def rn_run_config(
@@ -568,7 +676,12 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> Path | Non
         "lda_rms_radius",
         "rms_dmc_minus_lda",
         "lost_out_of_grid_sample_count_total",
+        "proposal_family",
+        "guide_family",
+        "resolved_guide_family",
         "guide_batch_backend",
+        "target_backend",
+        "proposal_backend",
     ]
     path = ensure_dir(output_dir) / "case_table.csv"
     with path.open("w", newline="") as file:

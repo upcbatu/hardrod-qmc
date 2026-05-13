@@ -10,6 +10,8 @@ from hrdmc.io import progress_requested
 from hrdmc.io.artifacts import build_run_provenance, ensure_dir, write_run_manifest
 from hrdmc.io.schema import to_jsonable
 from hrdmc.workflows.dmc.rn_block import (
+    RN_GUIDE_FAMILIES,
+    RN_PROPOSAL_FAMILIES,
     RNCollectiveProposalControls,
     RNRunControls,
     controls_to_dict,
@@ -51,6 +53,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ess-warning-fraction", type=float, default=0.20)
     parser.add_argument("--ess-no-go-fraction", type=float, default=0.10)
     parser.add_argument("--log-weight-span-warning", type=float, default=50.0)
+    parser.add_argument(
+        "--proposal-family",
+        choices=RN_PROPOSAL_FAMILIES,
+        default="harmonic-mehler",
+        help="RN base proposal family; RN collective scaling still applies.",
+    )
+    parser.add_argument(
+        "--guide-family",
+        choices=RN_GUIDE_FAMILIES,
+        default="auto",
+        help=(
+            "DMC guide family. auto uses gap-h-corrected guide with gap-h-transform "
+            "proposal and reduced-tg otherwise."
+        ),
+    )
     parser.add_argument(
         "--component-log-scales",
         default="-0.02,0,0.02",
@@ -130,6 +147,8 @@ def main() -> None:
                 log_weight_span_warning=args.log_weight_span_warning,
                 initialization=initialization,
                 proposal=proposal,
+                proposal_family=args.proposal_family,
+                guide_family=args.guide_family,
             )
             for case in cases
         ]
@@ -150,6 +169,8 @@ def main() -> None:
         "breathing_preburn_log_step": args.breathing_preburn_log_step,
         "component_log_scales": list(component_log_scales),
         "component_probabilities": list(component_probabilities),
+        "proposal_family": args.proposal_family,
+        "guide_family": args.guide_family,
         "case_count": len(rows),
         "cases": rows,
     }
@@ -178,6 +199,8 @@ def main() -> None:
                 "breathing_preburn_log_step": args.breathing_preburn_log_step,
                 "component_log_scales": list(component_log_scales),
                 "component_probabilities": list(component_probabilities),
+                "proposal_family": args.proposal_family,
+                "guide_family": args.guide_family,
             },
             artifacts=artifacts,
             schema_version="rn_block_trapped_stationarity_grid_v1",

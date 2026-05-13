@@ -6,8 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from hrdmc.systems.external_potential import HarmonicTrap
-from hrdmc.wavefunctions.jastrow import HardRodJastrowTrial
-from hrdmc.wavefunctions.trapped import TrappedHardRodTrial
+from hrdmc.wavefunctions.trials import HardRodJastrowTrial, TrappedHardRodTrial
 
 FloatArray = NDArray[np.float64]
 

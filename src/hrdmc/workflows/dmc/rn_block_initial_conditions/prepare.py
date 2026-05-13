@@ -3,18 +3,20 @@ from __future__ import annotations
 import numpy as np
 
 from hrdmc.systems.open_line import OpenLineHardRodSystem
-from hrdmc.wavefunctions import ReducedTGHardRodGuide
 from hrdmc.workflows.dmc.rn_block_initial_conditions.controls import RNInitializationControls
 from hrdmc.workflows.dmc.rn_block_initial_conditions.lattice import (
     InitialWalkerBatch,
     initial_walkers_with_metadata,
 )
-from hrdmc.workflows.dmc.rn_block_initial_conditions.preburn import breathing_preburn_walkers
+from hrdmc.workflows.dmc.rn_block_initial_conditions.preburn import (
+    SystemBackedGuide,
+    breathing_preburn_walkers,
+)
 
 
 def prepare_initial_walkers(
     system: OpenLineHardRodSystem,
-    guide: ReducedTGHardRodGuide,
+    guide: SystemBackedGuide,
     walkers: int,
     rng: np.random.Generator,
     *,
