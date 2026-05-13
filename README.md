@@ -37,7 +37,7 @@ src/hrdmc/workflows/      method workflow composition above engines
 src/hrdmc/artifacts/      canonical result routing
 src/hrdmc/io/             JSON / NPZ outputs
 src/hrdmc/plotting/       figures
-experiments/validation/   exact and analytic validation entrypoints
+experiments/anchors/      exact and analytic anchor entrypoints
 experiments/dmc/rn_block/ RN-block DMC release entrypoints
 tests/                    regression tests
 data/                     external/reference inputs, usually untracked
@@ -58,7 +58,8 @@ Install development tooling with `python3 -m pip install -e ".[dev]"`.
 
 - homogeneous periodic hard-rod geometry is implemented
 - exact homogeneous ring reference energies and hard-rod EOS utilities are implemented in `theory/`
-- the homogeneous ring validation benchmark compares all-pair trial local energy against exact finite-`N` references
+- the anchor validation entrypoints compare exact/analytic references against
+  the public engine and estimator surfaces through thin CLIs
 - VMC remains available in the package as scaffold code, but development VMC
   experiment scripts are no longer part of the public experiment surface
 - observable estimators for local energy, `g(r)`, `S(k)`, and ring-based `n(x)` exist

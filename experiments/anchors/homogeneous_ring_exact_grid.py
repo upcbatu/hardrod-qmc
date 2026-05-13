@@ -17,7 +17,7 @@ from hrdmc.theory import (
     hard_rod_energy_per_particle,
     hard_rod_finite_ring_energy_per_particle,
 )
-from hrdmc.wavefunctions.jastrow import HardRodJastrowTrial
+from hrdmc.wavefunctions.trials import HardRodJastrowTrial
 
 
 @dataclass(frozen=True)

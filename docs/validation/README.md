@@ -50,7 +50,7 @@ is also printed in the run output, but only as contextual information. It is not
 Command:
 
 ```bash
-PYTHONPATH=src python3 experiments/validation/homogeneous_ring.py
+PYTHONPATH=src python3 experiments/anchors/homogeneous_ring.py
 ```
 
 Output artifact:
@@ -115,7 +115,9 @@ Before using the code for thesis-level trapped-system conclusions, the following
 
 ### DMC Readiness
 
-- Use `experiments/dmc/rn_block/exact_tg_trap.py` for the zero-rod-length
+- Use `experiments/anchors/exact_validation_packet.py` for the canonical exact
+  validation packet.
+- Use `experiments/anchors/exact_tg_trap.py` for the zero-rod-length
   trapped TG harmonic validation.
 - Use `experiments/dmc/rn_block/trapped_stationarity_grid.py` for finite-`a`
   trapped RN-DMC stationarity and gate diagnostics.
