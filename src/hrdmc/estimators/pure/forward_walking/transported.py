@@ -12,7 +12,7 @@ from hrdmc.estimators.pure.forward_walking.contributions import (
     event_contribution_matrix,
     weighted_density_profile,
 )
-from hrdmc.estimators.pure.forward_walking.lag_state import LagState
+from hrdmc.estimators.pure.forward_walking.lag_state import LagState, SlidingLagState
 from hrdmc.estimators.pure.forward_walking.protocols import FloatArray, TransportEventLike
 from hrdmc.estimators.pure.forward_walking.results import (
     LagValue,
@@ -60,9 +60,8 @@ class TransportedAuxiliaryForwardWalking:
             }
             self._lag_states = {
                 observable: {
-                    lag: LagState(
-                        lag_steps=lag,
-                        block_size_steps=self.config.block_size_steps,
+                    lag: self._new_lag_state(
+                        lag=lag,
                         n_walkers=n_walkers,
                         dimension=self._observable_dimensions[observable],
                     )
@@ -194,6 +193,7 @@ class TransportedAuxiliaryForwardWalking:
             "lag_steps": list(self.config.lag_steps),
             "lag_unit": self.config.lag_unit,
             "block_size_steps": self.config.block_size_steps,
+            "collection_stride_steps": self.config.collection_stride_steps,
             "observable_source": self.config.observable_source,
             "observables": list(self.config.observables),
             "transport_mode": self.config.transport_mode,
@@ -234,6 +234,26 @@ class TransportedAuxiliaryForwardWalking:
             raise ValueError("unsupported event parent convention")
         if convention.parent_map_scope != "single_dmc_step":
             raise ValueError("unsupported event parent map scope")
+
+    def _new_lag_state(
+        self,
+        *,
+        lag: int,
+        n_walkers: int,
+        dimension: int,
+    ) -> LagState:
+        state_cls = (
+            SlidingLagState
+            if self.config.collection_mode == "sliding_window"
+            else LagState
+        )
+        return state_cls(
+            lag_steps=lag,
+            block_size_steps=self.config.block_size_steps,
+            n_walkers=n_walkers,
+            dimension=dimension,
+            collection_stride_steps=self.config.collection_stride_steps,
+        )
 
     def _observable_dimension(self, observable: str) -> int:
         if observable == "r2":

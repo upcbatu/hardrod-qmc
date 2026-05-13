@@ -17,8 +17,10 @@ from hrdmc.workflows.dmc.pure_walking import (
     write_pure_walking_seed_table,
 )
 from hrdmc.workflows.dmc.rn_block import (
+    DEFAULT_RN_TARGET_FAMILY,
     RN_GUIDE_FAMILIES,
     RN_PROPOSAL_FAMILIES,
+    RN_TARGET_FAMILIES,
     RNCollectiveProposalControls,
     RNRunControls,
     controls_to_dict,
@@ -67,6 +69,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="auto",
     )
     parser.add_argument(
+        "--target-family",
+        choices=RN_TARGET_FAMILIES,
+        default=DEFAULT_RN_TARGET_FAMILY,
+    )
+    parser.add_argument(
         "--component-log-scales",
         default="-0.015,-0.010,-0.004,0.000,0.004,0.010,0.015",
     )
@@ -82,6 +89,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--observable-source", choices=("raw_r2", "r2_rb"), default="raw_r2")
     parser.add_argument("--block-size-steps", type=int, default=1)
+    parser.add_argument("--collection-stride-steps", type=int, default=1)
     parser.add_argument("--min-block-count", type=int, default=30)
     parser.add_argument("--min-walker-weight-ess", type=float, default=30.0)
     parser.add_argument("--parallel-workers", type=int, default=0)
@@ -138,6 +146,7 @@ def main() -> None:
         min_block_count=args.min_block_count,
         min_walker_weight_ess=args.min_walker_weight_ess,
         block_size_steps=args.block_size_steps,
+        collection_stride_steps=args.collection_stride_steps,
         transport_invariant_tests_passed=(
             "lag0_identity",
             "deterministic_parent_map",
@@ -164,6 +173,7 @@ def main() -> None:
             proposal=proposal,
             proposal_family=args.proposal_family,
             guide_family=args.guide_family,
+            target_family=args.target_family,
         )
     payload["claim_boundary"] = (
         "transported auxiliary FW candidate pure estimator; paper coordinate "
@@ -190,6 +200,7 @@ def main() -> None:
                 "component_probabilities": list(proposal.component_probabilities),
                 "proposal_family": args.proposal_family,
                 "guide_family": args.guide_family,
+                "target_family": args.target_family,
                 "pure_config": payload["pure_config"],
             },
             artifacts=[summary_path, seed_table],

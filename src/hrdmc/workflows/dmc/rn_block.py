@@ -37,6 +37,7 @@ from hrdmc.systems import (
     OpenHardRodTrapGapHTransformProposalKernel,
     OpenHardRodTrapPrimitiveKernel,
     OpenLineHardRodSystem,
+    OpenN2HardRodTrapExactKernel,
 )
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
 from hrdmc.wavefunctions.guides import GapHCorrectedHardRodGuide, ReducedTGHardRodGuide
@@ -52,6 +53,12 @@ RN_GRID_SCHEMA_VERSION = "rn_block_grid_v1"
 RN_SINGLE_CASE_SCHEMA_VERSION = "rn_block_single_case_v1"
 RN_PROPOSAL_FAMILIES = ("harmonic-mehler", "gap-h-transform")
 RN_GUIDE_FAMILIES = ("auto", "reduced-tg", "gap-h-corrected")
+RN_TARGET_FAMILIES = ("primitive", "n2-exact-relative")
+DEFAULT_RN_PROPOSAL_FAMILY = "gap-h-transform"
+DEFAULT_RN_GUIDE_FAMILY = "auto"
+DEFAULT_RN_TARGET_FAMILY = "primitive"
+DEFAULT_COMPONENT_LOG_SCALES = (-0.015, -0.010, -0.004, 0.0, 0.004, 0.010, 0.015)
+DEFAULT_COMPONENT_PROBABILITIES = (0.03, 0.10, 0.22, 0.30, 0.22, 0.10, 0.03)
 
 
 @dataclass(frozen=True)
@@ -88,8 +95,8 @@ class RNRunControls:
 
 @dataclass(frozen=True)
 class RNCollectiveProposalControls:
-    component_log_scales: tuple[float, ...] = (-0.02, 0.0, 0.02)
-    component_probabilities: tuple[float, ...] = (0.25, 0.5, 0.25)
+    component_log_scales: tuple[float, ...] = DEFAULT_COMPONENT_LOG_SCALES
+    component_probabilities: tuple[float, ...] = DEFAULT_COMPONENT_PROBABILITIES
 
     def validate(self) -> None:
         if not self.component_log_scales:
@@ -159,19 +166,22 @@ def resolve_parallel_workers(
 def build_case_objects(
     case: RNCase,
     *,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> tuple[
     OpenLineHardRodSystem,
     HarmonicTrap,
     ReducedTGHardRodGuide | GapHCorrectedHardRodGuide,
-    OpenHardRodTrapPrimitiveKernel,
+    OpenHardRodTrapPrimitiveKernel | OpenN2HardRodTrapExactKernel,
     HarmonicMehlerKernel | OpenHardRodTrapGapHTransformProposalKernel,
 ]:
     if proposal_family not in RN_PROPOSAL_FAMILIES:
         raise ValueError(f"unknown RN proposal family: {proposal_family}")
     if guide_family not in RN_GUIDE_FAMILIES:
         raise ValueError(f"unknown RN guide family: {guide_family}")
+    if target_family not in RN_TARGET_FAMILIES:
+        raise ValueError(f"unknown RN target family: {target_family}")
     system, trap = build_case_geometry(case)
     resolved_guide_family = guide_family
     if guide_family == "auto":
@@ -196,11 +206,16 @@ def build_case_objects(
         if proposal_family == "harmonic-mehler"
         else OpenHardRodTrapGapHTransformProposalKernel(system=system, trap=trap)
     )
+    target_kernel = (
+        OpenN2HardRodTrapExactKernel(system=system, trap=trap)
+        if target_family == "n2-exact-relative"
+        else OpenHardRodTrapPrimitiveKernel(system=system, trap=trap)
+    )
     return (
         system,
         trap,
         guide,
-        OpenHardRodTrapPrimitiveKernel(system=system, trap=trap),
+        target_kernel,
         proposal_kernel,
     )
 
@@ -261,8 +276,9 @@ def run_streaming_seed(
     resume: bool = False,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
     transport_observer: RNTransportObserver | None = None,
     transport_com_variance: float | None = None,
 ) -> RNBlockStreamingSummary:
@@ -271,6 +287,7 @@ def run_streaming_seed(
         case,
         proposal_family=proposal_family,
         guide_family=guide_family,
+        target_family=target_family,
     )
     grid = make_grid(controls, case) if density_grid is None else density_grid
     initialization = RNInitializationControls() if initialization is None else initialization
@@ -321,6 +338,7 @@ def run_streaming_seed(
     summary.metadata.update(proposal.to_metadata())
     summary.metadata["proposal_family"] = proposal_family
     summary.metadata["guide_family"] = guide_family
+    summary.metadata["target_family"] = target_family
     summary.metadata["resolved_guide_family"] = _guide_family_name(guide)
     initial_rms_value = initial.metadata["initial_rms_mean"]
     if not isinstance(initial_rms_value, int | float):
@@ -338,13 +356,15 @@ def validate_streaming_against_raw(
     seed: int,
     *,
     progress: ProgressBar | None = None,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> dict[str, Any]:
     system, _trap, guide, target_kernel, proposal_kernel = build_case_objects(
         case,
         proposal_family=proposal_family,
         guide_family=guide_family,
+        target_family=target_family,
     )
     grid = make_grid(controls, case)
     raw_rng = np.random.default_rng(seed)
@@ -358,8 +378,8 @@ def validate_streaming_against_raw(
         config=RNBlockDMCConfig(
             tau_block=controls.tau_block,
             rn_cadence_tau=controls.rn_cadence_tau,
-            component_log_scales=(-0.02, 0.0, 0.02),
-            component_probabilities=(0.25, 0.5, 0.25),
+            component_log_scales=DEFAULT_COMPONENT_LOG_SCALES,
+            component_probabilities=DEFAULT_COMPONENT_PROBABILITIES,
         ),
         rng=raw_rng,
         dt=controls.dt,
@@ -380,8 +400,8 @@ def validate_streaming_against_raw(
         config=RNBlockDMCConfig(
             tau_block=controls.tau_block,
             rn_cadence_tau=controls.rn_cadence_tau,
-            component_log_scales=(-0.02, 0.0, 0.02),
-            component_probabilities=(0.25, 0.5, 0.25),
+            component_log_scales=DEFAULT_COMPONENT_LOG_SCALES,
+            component_probabilities=DEFAULT_COMPONENT_PROBABILITIES,
         ),
         rng=streaming_rng,
         dt=controls.dt,
@@ -419,6 +439,7 @@ def validate_streaming_against_raw(
         "streaming_guide_batch_backend": streaming.metadata["guide_batch_backend"],
         "proposal_family": proposal_family,
         "guide_family": guide_family,
+        "target_family": target_family,
         "resolved_guide_family": _guide_family_name(guide),
     }
 
@@ -433,8 +454,9 @@ def summarize_case(
     checkpoint_dir: Path | None = None,
     checkpoint_every_steps: int | None = None,
     resume_seed_checkpoints: bool = False,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> dict[str, Any]:
     grid = make_grid(controls, case)
     worker_count = resolve_parallel_workers(len(seeds), parallel_workers)
@@ -450,6 +472,7 @@ def summarize_case(
         resume_seed_checkpoints=resume_seed_checkpoints,
         proposal_family=proposal_family,
         guide_family=guide_family,
+        target_family=target_family,
     )
     density = np.mean([summary.density for summary in seed_summaries], axis=0)
     energy_values = np.asarray([summary.mixed_energy for summary in seed_summaries], dtype=float)
@@ -458,6 +481,7 @@ def summarize_case(
         case,
         proposal_family=proposal_family,
         guide_family=guide_family,
+        target_family=target_family,
     )
     lda = lda_density_profile(
         grid,
@@ -492,6 +516,7 @@ def summarize_case(
         "parallel_workers_requested": worker_count,
         "proposal_family": proposal_family,
         "guide_family": guide_family,
+        "target_family": target_family,
         "resolved_guide_family": _guide_family_name(_guide),
         "guide_batch_backend": ",".join(
             sorted({str(summary.metadata["guide_batch_backend"]) for summary in seed_summaries})
@@ -527,6 +552,7 @@ def summarize_case(
                 "guide_batch_backend": summary.metadata["guide_batch_backend"],
                 "target_backend": summary.metadata.get("target_backend", ""),
                 "proposal_backend": summary.metadata.get("proposal_backend", ""),
+                "target_family": summary.metadata.get("target_family", target_family),
             }
             for seed, summary in zip(seeds, seed_summaries, strict=True)
         ],
@@ -546,6 +572,7 @@ def _run_seed_summaries(
     resume_seed_checkpoints: bool,
     proposal_family: str,
     guide_family: str,
+    target_family: str,
 ) -> tuple[list[RNBlockStreamingSummary], int]:
     return run_seed_batch(
         seeds,
@@ -563,6 +590,7 @@ def _run_seed_summaries(
             resume_seed_checkpoints,
             proposal_family,
             guide_family,
+            target_family,
         ),
         run_serial_seed=lambda seed: run_streaming_seed(
             case,
@@ -575,6 +603,7 @@ def _run_seed_summaries(
             resume=resume_seed_checkpoints,
             proposal_family=proposal_family,
             guide_family=guide_family,
+            target_family=target_family,
         ),
     )
 
@@ -588,8 +617,9 @@ def _run_seed_worker(
     checkpoint_dir: Path | None = None,
     checkpoint_every_steps: int | None = None,
     resume_seed_checkpoints: bool = False,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> tuple[int, RNBlockStreamingSummary]:
     worker_progress = QueuedProgress(progress_queue) if progress_queue is not None else None
     try:
@@ -604,6 +634,7 @@ def _run_seed_worker(
             resume=resume_seed_checkpoints,
             proposal_family=proposal_family,
             guide_family=guide_family,
+            target_family=target_family,
         )
     finally:
         if worker_progress is not None:
@@ -678,6 +709,7 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> Path | Non
         "lost_out_of_grid_sample_count_total",
         "proposal_family",
         "guide_family",
+        "target_family",
         "resolved_guide_family",
         "guide_batch_backend",
         "target_backend",

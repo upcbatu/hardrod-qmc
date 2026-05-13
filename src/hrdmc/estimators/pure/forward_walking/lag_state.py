@@ -6,6 +6,7 @@ import numpy as np
 
 from hrdmc.estimators.pure.forward_walking.contributions import (
     add_density_profile_to_auxiliary,
+    density_profile_matrix,
     weighted_density_profile,
 )
 from hrdmc.estimators.pure.forward_walking.protocols import FloatArray, IntArray
@@ -27,6 +28,7 @@ class LagState:
     block_size_steps: int
     n_walkers: int
     dimension: int
+    collection_stride_steps: int = 1
     auxiliary: FloatArray = field(init=False)
     weighted_collect_sum: FloatArray = field(init=False)
     collect_count: int = 0
@@ -157,6 +159,13 @@ class LagState:
         self.collect_count += 1
 
     def _record_block(self, block_value: FloatArray) -> None:
+        self._record_block_with_weight_ess(block_value, self.min_weight_ess)
+
+    def _record_block_with_weight_ess(
+        self,
+        block_value: FloatArray,
+        weight_ess_min: float,
+    ) -> None:
         self.block_count += 1
         delta = block_value - self.block_mean
         self.block_mean += delta / self.block_count
@@ -165,8 +174,8 @@ class LagState:
         scalar_delta = scalar - self.block_scalar_mean
         self.block_scalar_mean += scalar_delta / self.block_count
         self.block_scalar_m2 += scalar_delta * (scalar - self.block_scalar_mean)
-        self.block_weight_ess_min = min(self.block_weight_ess_min, self.min_weight_ess)
-        self.block_weight_ess_sum += self.min_weight_ess
+        self.block_weight_ess_min = min(self.block_weight_ess_min, weight_ess_min)
+        self.block_weight_ess_sum += weight_ess_min
 
     def _reset_window(self) -> None:
         self.auxiliary.fill(0.0)
@@ -182,3 +191,116 @@ def _variance_inflation_from_scalar(mean: float, variance: float, count: int) ->
     if mean == 0.0:
         return 1.0
     return max(1.0, variance / (mean * mean))
+
+
+@dataclass
+class SlidingLagState(LagState):
+    active_auxiliaries: list[FloatArray] = field(default_factory=list)
+    active_ages: list[int] = field(default_factory=list)
+    active_weight_ess_min: list[float] = field(default_factory=list)
+    event_index: int = 0
+
+    def step(
+        self,
+        *,
+        parent_indices: IntArray,
+        parent_is_identity: bool,
+        observable_values: FloatArray,
+        normalized_weights: FloatArray,
+    ) -> None:
+        weight_ess = float(1.0 / np.sum(normalized_weights * normalized_weights))
+        should_collect = self._should_collect()
+        if self.lag_steps == 0:
+            block_value = np.sum(
+                normalized_weights[:, np.newaxis] * observable_values,
+                axis=0,
+            )
+            self._record_block_with_weight_ess(block_value, weight_ess)
+            self.event_index += 1
+            return
+        self._advance_active(
+            parent_indices=parent_indices,
+            parent_is_identity=parent_is_identity,
+            normalized_weights=normalized_weights,
+            weight_ess=weight_ess,
+        )
+        if should_collect:
+            self._append_active(observable_values, weight_ess)
+        self.event_index += 1
+
+    def step_density(
+        self,
+        *,
+        parent_indices: IntArray,
+        parent_is_identity: bool,
+        positions: FloatArray,
+        bin_edges: FloatArray | None,
+        normalized_weights: FloatArray,
+    ) -> None:
+        weight_ess = float(1.0 / np.sum(normalized_weights * normalized_weights))
+        should_collect = self._should_collect()
+        if self.lag_steps == 0:
+            block_value = weighted_density_profile(
+                positions,
+                bin_edges=bin_edges,
+                walker_weights=normalized_weights,
+            )
+            self._record_block_with_weight_ess(block_value, weight_ess)
+            self.event_index += 1
+            return
+        self._advance_active(
+            parent_indices=parent_indices,
+            parent_is_identity=parent_is_identity,
+            normalized_weights=normalized_weights,
+            weight_ess=weight_ess,
+        )
+        if should_collect:
+            self._append_active(
+                density_profile_matrix(positions, bin_edges=bin_edges),
+                weight_ess,
+            )
+        self.event_index += 1
+
+    def _advance_active(
+        self,
+        *,
+        parent_indices: IntArray,
+        parent_is_identity: bool,
+        normalized_weights: FloatArray,
+        weight_ess: float,
+    ) -> None:
+        if not self.active_auxiliaries:
+            return
+        next_auxiliaries: list[FloatArray] = []
+        next_ages: list[int] = []
+        next_weight_ess: list[float] = []
+        for auxiliary, age, ess_min in zip(
+            self.active_auxiliaries,
+            self.active_ages,
+            self.active_weight_ess_min,
+            strict=True,
+        ):
+            transported = auxiliary if parent_is_identity else auxiliary[parent_indices]
+            new_age = age + 1
+            new_ess_min = min(ess_min, weight_ess)
+            if new_age >= self.lag_steps:
+                block_value = np.sum(
+                    normalized_weights[:, np.newaxis] * transported,
+                    axis=0,
+                )
+                self._record_block_with_weight_ess(block_value, new_ess_min)
+            else:
+                next_auxiliaries.append(transported)
+                next_ages.append(new_age)
+                next_weight_ess.append(new_ess_min)
+        self.active_auxiliaries = next_auxiliaries
+        self.active_ages = next_ages
+        self.active_weight_ess_min = next_weight_ess
+
+    def _append_active(self, values: FloatArray, weight_ess: float) -> None:
+        self.active_auxiliaries.append(np.asarray(values, dtype=float).copy())
+        self.active_ages.append(0)
+        self.active_weight_ess_min.append(weight_ess)
+
+    def _should_collect(self) -> bool:
+        return self.event_index % self.collection_stride_steps == 0

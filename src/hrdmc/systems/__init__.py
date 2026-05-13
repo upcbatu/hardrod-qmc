@@ -1,5 +1,8 @@
 from hrdmc.systems.external_potential import CosinePotential, HarmonicTrap, ZeroPotential
-from hrdmc.systems.gap_h_transform import OpenHardRodTrapGapHTransformProposalKernel
+from hrdmc.systems.gap_h_transform import (
+    OpenHardRodTrapGapHTransformProposalKernel,
+    OpenN2HardRodTrapExactKernel,
+)
 from hrdmc.systems.hard_rods import HardRodSystem
 from hrdmc.systems.harmonic_com_transition import harmonic_com_ground_variance
 from hrdmc.systems.open_line import OpenLineHardRodSystem
@@ -25,6 +28,7 @@ __all__ = [
     "HarmonicTrap",
     "OpenLineHardRodSystem",
     "OpenHardRodTrapGapHTransformProposalKernel",
+    "OpenN2HardRodTrapExactKernel",
     "OpenHardRodTrapPrimitiveKernel",
     "OrderedHarmonicMehlerKernel",
     "OrderedHarmonicOscillatorHeatKernel",

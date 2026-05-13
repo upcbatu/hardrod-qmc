@@ -14,6 +14,9 @@ from hrdmc.io.progress import ProgressBar
 from hrdmc.monte_carlo.dmc.rn_block import RNBlockStreamingSummary
 from hrdmc.systems.harmonic_com_transition import harmonic_com_ground_variance
 from hrdmc.workflows.dmc.rn_block import (
+    DEFAULT_RN_GUIDE_FAMILY,
+    DEFAULT_RN_PROPOSAL_FAMILY,
+    DEFAULT_RN_TARGET_FAMILY,
     RNCase,
     RNCollectiveProposalControls,
     RNRunControls,
@@ -49,8 +52,9 @@ def run_pure_walking_seed(
     progress: ProgressBar | None = None,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> dict[str, Any]:
     """Run one RN-DMC seed while consuming transport events with pure FW."""
 
@@ -65,6 +69,7 @@ def run_pure_walking_seed(
         proposal=proposal,
         proposal_family=proposal_family,
         guide_family=guide_family,
+        target_family=target_family,
     ).to_payload()
 
 
@@ -78,8 +83,9 @@ def run_pure_walking_seed_run(
     progress: ProgressBar | None = None,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> PureWalkingSeedRun:
     """Run one RN-DMC seed and keep both RN summary and FW result."""
 
@@ -94,6 +100,7 @@ def run_pure_walking_seed_run(
         proposal=proposal,
         proposal_family=proposal_family,
         guide_family=guide_family,
+        target_family=target_family,
         transport_observer=observer,
         transport_com_variance=_transport_com_variance(case, pure_config),
     )
@@ -135,6 +142,7 @@ def compact_rn_seed_summary(summary: RNBlockStreamingSummary) -> dict[str, Any]:
             "target_backend": summary.metadata.get("target_backend"),
             "proposal_backend": summary.metadata.get("proposal_backend"),
             "resolved_guide_family": summary.metadata.get("resolved_guide_family"),
+            "target_family": summary.metadata.get("target_family"),
         },
     }
 

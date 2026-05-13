@@ -10,8 +10,14 @@ from hrdmc.io import progress_requested
 from hrdmc.io.artifacts import build_run_provenance, ensure_dir, write_run_manifest
 from hrdmc.io.schema import to_jsonable
 from hrdmc.workflows.dmc.rn_block import (
+    DEFAULT_COMPONENT_LOG_SCALES,
+    DEFAULT_COMPONENT_PROBABILITIES,
+    DEFAULT_RN_GUIDE_FAMILY,
+    DEFAULT_RN_PROPOSAL_FAMILY,
+    DEFAULT_RN_TARGET_FAMILY,
     RN_GUIDE_FAMILIES,
     RN_PROPOSAL_FAMILIES,
+    RN_TARGET_FAMILIES,
     RNCollectiveProposalControls,
     RNRunControls,
     controls_to_dict,
@@ -45,10 +51,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--initialization-mode",
         choices=("tight-lattice", "lda-rms-lattice", "lda-rms-logspread"),
-        default="tight-lattice",
+        default="lda-rms-logspread",
     )
     parser.add_argument("--init-width-log-sigma", type=float, default=0.10)
-    parser.add_argument("--breathing-preburn-steps", type=int, default=0)
+    parser.add_argument("--breathing-preburn-steps", type=int, default=1000)
     parser.add_argument("--breathing-preburn-log-step", type=float, default=0.04)
     parser.add_argument("--ess-warning-fraction", type=float, default=0.20)
     parser.add_argument("--ess-no-go-fraction", type=float, default=0.10)
@@ -56,26 +62,32 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--proposal-family",
         choices=RN_PROPOSAL_FAMILIES,
-        default="harmonic-mehler",
+        default=DEFAULT_RN_PROPOSAL_FAMILY,
         help="RN base proposal family; RN collective scaling still applies.",
     )
     parser.add_argument(
         "--guide-family",
         choices=RN_GUIDE_FAMILIES,
-        default="auto",
+        default=DEFAULT_RN_GUIDE_FAMILY,
         help=(
             "DMC guide family. auto uses gap-h-corrected guide with gap-h-transform "
             "proposal and reduced-tg otherwise."
         ),
     )
     parser.add_argument(
+        "--target-family",
+        choices=RN_TARGET_FAMILIES,
+        default=DEFAULT_RN_TARGET_FAMILY,
+        help="RN target kernel family.",
+    )
+    parser.add_argument(
         "--component-log-scales",
-        default="-0.02,0,0.02",
+        default=",".join(f"{value:g}" for value in DEFAULT_COMPONENT_LOG_SCALES),
         help="Comma-separated RN collective log-scale mixture components.",
     )
     parser.add_argument(
         "--component-probabilities",
-        default="0.25,0.5,0.25",
+        default=",".join(f"{value:g}" for value in DEFAULT_COMPONENT_PROBABILITIES),
         help="Comma-separated RN collective mixture probabilities.",
     )
     parser.add_argument(
@@ -149,6 +161,7 @@ def main() -> None:
                 proposal=proposal,
                 proposal_family=args.proposal_family,
                 guide_family=args.guide_family,
+                target_family=args.target_family,
             )
             for case in cases
         ]
@@ -171,6 +184,7 @@ def main() -> None:
         "component_probabilities": list(component_probabilities),
         "proposal_family": args.proposal_family,
         "guide_family": args.guide_family,
+        "target_family": args.target_family,
         "case_count": len(rows),
         "cases": rows,
     }
@@ -201,6 +215,7 @@ def main() -> None:
                 "component_probabilities": list(component_probabilities),
                 "proposal_family": args.proposal_family,
                 "guide_family": args.guide_family,
+                "target_family": args.target_family,
             },
             artifacts=artifacts,
             schema_version="rn_block_trapped_stationarity_grid_v1",

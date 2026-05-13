@@ -20,6 +20,12 @@ from hrdmc.theory.lda import (
     lda_support_edges,
     lda_total_energy,
 )
+from hrdmc.theory.trapped_n2_finite_a import (
+    TrappedN2FiniteAReference,
+    trapped_n2_finite_a_bin_averaged_density,
+    trapped_n2_finite_a_density_profile,
+    trapped_n2_finite_a_reference,
+)
 
 __all__ = [
     "LDADensityProfile",
@@ -38,4 +44,8 @@ __all__ = [
     "trapped_tg_energy_total",
     "trapped_tg_r2_radius",
     "trapped_tg_rms_radius",
+    "TrappedN2FiniteAReference",
+    "trapped_n2_finite_a_bin_averaged_density",
+    "trapped_n2_finite_a_density_profile",
+    "trapped_n2_finite_a_reference",
 ]

@@ -25,6 +25,9 @@ from hrdmc.workflows.dmc.pure_walking.seed import (
     run_pure_walking_seed_run,
 )
 from hrdmc.workflows.dmc.rn_block import (
+    DEFAULT_RN_GUIDE_FAMILY,
+    DEFAULT_RN_PROPOSAL_FAMILY,
+    DEFAULT_RN_TARGET_FAMILY,
     RNCase,
     RNCollectiveProposalControls,
     RNRunControls,
@@ -50,8 +53,9 @@ def summarize_benchmark_packet_case(
     log_weight_span_warning: float = 50.0,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> dict[str, Any]:
     """Run one RN-DMC packet and derive energy gates plus transported FW."""
 
@@ -77,6 +81,7 @@ def summarize_benchmark_packet_case(
             proposal,
             proposal_family,
             guide_family,
+            target_family,
         ),
         run_serial_seed=lambda seed: run_pure_walking_seed_run(
             case,
@@ -89,6 +94,7 @@ def summarize_benchmark_packet_case(
             proposal=proposal,
             proposal_family=proposal_family,
             guide_family=guide_family,
+            target_family=target_family,
         ),
     )
     seed_payloads = [run.to_payload() for run in seed_runs]
@@ -110,6 +116,7 @@ def summarize_benchmark_packet_case(
         proposal=proposal,
         proposal_family=proposal_family,
         guide_family=guide_family,
+        target_family=target_family,
     )
     pure_summary = summarize_pure_seed_payloads(seed_payloads)
     energy_status = energy_claim_status(stationarity)
@@ -134,6 +141,7 @@ def summarize_benchmark_packet_case(
         **proposal.to_metadata(),
         "proposal_family": proposal_family,
         "guide_family": guide_family,
+        "target_family": target_family,
         "pure_config": pure_config_metadata(config),
         "energy_claim_status": energy_status,
         "pure_fw_claim_status": pure_status,
@@ -344,6 +352,7 @@ def _run_benchmark_seed_worker(
     proposal: RNCollectiveProposalControls,
     proposal_family: str,
     guide_family: str,
+    target_family: str,
 ) -> tuple[int, PureWalkingSeedRun]:
     worker_progress = QueuedProgress(progress_queue) if progress_queue is not None else None
     try:
@@ -358,6 +367,7 @@ def _run_benchmark_seed_worker(
             proposal=proposal,
             proposal_family=proposal_family,
             guide_family=guide_family,
+            target_family=target_family,
         )
     finally:
         if worker_progress is not None:

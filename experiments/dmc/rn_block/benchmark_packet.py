@@ -19,8 +19,10 @@ from hrdmc.workflows.dmc.benchmark_packet import (
     write_benchmark_packet_table,
 )
 from hrdmc.workflows.dmc.rn_block import (
+    DEFAULT_RN_TARGET_FAMILY,
     RN_GUIDE_FAMILIES,
     RN_PROPOSAL_FAMILIES,
+    RN_TARGET_FAMILIES,
     RNCollectiveProposalControls,
     RNRunControls,
     controls_to_dict,
@@ -64,6 +66,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--guide-family", choices=RN_GUIDE_FAMILIES, default="auto")
     parser.add_argument(
+        "--target-family",
+        choices=RN_TARGET_FAMILIES,
+        default=DEFAULT_RN_TARGET_FAMILY,
+    )
+    parser.add_argument(
         "--component-log-scales",
         default="-0.015,-0.010,-0.004,0.000,0.004,0.010,0.015",
     )
@@ -85,6 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="raw_r2",
     )
     parser.add_argument("--pure-fw-block-size-steps", type=int, default=1)
+    parser.add_argument("--pure-fw-collection-stride-steps", type=int, default=1)
     parser.add_argument("--pure-fw-min-block-count", type=int, default=30)
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
     parser.add_argument(
@@ -143,6 +151,7 @@ def main() -> None:
         min_block_count=args.pure_fw_min_block_count,
         min_walker_weight_ess=args.pure_fw_min_walker_weight_ess,
         block_size_steps=args.pure_fw_block_size_steps,
+        collection_stride_steps=args.pure_fw_collection_stride_steps,
         transport_invariant_tests_passed=(
             "lag0_identity",
             "deterministic_parent_map",
@@ -174,6 +183,7 @@ def main() -> None:
             proposal=proposal,
             proposal_family=args.proposal_family,
             guide_family=args.guide_family,
+            target_family=args.target_family,
         )
     if not args.skip_write:
         plot_paths: list[str] = []
@@ -206,6 +216,7 @@ def main() -> None:
                 "component_probabilities": list(proposal.component_probabilities),
                 "proposal_family": args.proposal_family,
                 "guide_family": args.guide_family,
+                "target_family": args.target_family,
                 "pure_config": payload["pure_config"],
                 "plot_formats": list(_parse_str_tuple(args.plot_formats)),
             },

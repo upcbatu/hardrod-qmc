@@ -17,6 +17,9 @@ from hrdmc.monte_carlo.dmc.rn_block import RNBlockStreamingSummary
 from hrdmc.runners import run_seed_batch
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
 from hrdmc.workflows.dmc.rn_block import (
+    DEFAULT_RN_GUIDE_FAMILY,
+    DEFAULT_RN_PROPOSAL_FAMILY,
+    DEFAULT_RN_TARGET_FAMILY,
     RNCase,
     RNCollectiveProposalControls,
     RNRunControls,
@@ -54,8 +57,9 @@ def summarize_stationarity_case(
     log_weight_span_warning: float = 50.0,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> dict[str, Any]:
     initialization = RNInitializationControls() if initialization is None else initialization
     proposal = RNCollectiveProposalControls() if proposal is None else proposal
@@ -73,6 +77,7 @@ def summarize_stationarity_case(
         proposal=proposal,
         proposal_family=proposal_family,
         guide_family=guide_family,
+        target_family=target_family,
     )
     return summarize_stationarity_from_seed_summaries(
         case,
@@ -90,6 +95,7 @@ def summarize_stationarity_case(
         proposal=proposal,
         proposal_family=proposal_family,
         guide_family=guide_family,
+        target_family=target_family,
     )
 
 
@@ -108,8 +114,9 @@ def summarize_stationarity_from_seed_summaries(
     log_weight_span_warning: float = 50.0,
     initialization: RNInitializationControls,
     proposal: RNCollectiveProposalControls,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> dict[str, Any]:
     """Aggregate stationarity gates from already-run seed summaries."""
 
@@ -224,6 +231,7 @@ def summarize_stationarity_from_seed_summaries(
         **proposal.to_metadata(),
         "proposal_family": proposal_family,
         "guide_family": guide_family,
+        "target_family": target_family,
         "resolved_guide_family": ",".join(
             sorted(
                 {str(summary.metadata.get("resolved_guide_family")) for summary in seed_summaries}
@@ -465,6 +473,7 @@ def summarize_stationarity_from_seed_summaries(
                 "guide_batch_backend": summary.metadata["guide_batch_backend"],
                 "target_backend": summary.metadata.get("target_backend", ""),
                 "proposal_backend": summary.metadata.get("proposal_backend", ""),
+                "target_family": summary.metadata.get("target_family", target_family),
                 "guide_family": summary.metadata.get("guide_family", ""),
                 "resolved_guide_family": summary.metadata.get("resolved_guide_family", ""),
             }
@@ -486,8 +495,9 @@ def run_stationarity_seeds(
     progress: ProgressBar | None,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> tuple[list[RNBlockStreamingSummary], int]:
     initialization = RNInitializationControls() if initialization is None else initialization
     proposal = RNCollectiveProposalControls() if proposal is None else proposal
@@ -507,6 +517,7 @@ def run_stationarity_seeds(
             proposal,
             proposal_family,
             guide_family,
+            target_family,
         ),
         run_serial_seed=lambda seed: run_streaming_seed(
             case,
@@ -518,6 +529,7 @@ def run_stationarity_seeds(
             proposal=proposal,
             proposal_family=proposal_family,
             guide_family=guide_family,
+            target_family=target_family,
         ),
     )
 
@@ -530,8 +542,9 @@ def run_seed_worker(
     progress_queue: Any | None = None,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> tuple[int, RNBlockStreamingSummary]:
     initialization = RNInitializationControls() if initialization is None else initialization
     proposal = RNCollectiveProposalControls() if proposal is None else proposal
@@ -548,6 +561,7 @@ def run_seed_worker(
             proposal=proposal,
             proposal_family=proposal_family,
             guide_family=guide_family,
+            target_family=target_family,
         )
     finally:
         if worker_progress is not None:

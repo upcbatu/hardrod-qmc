@@ -117,6 +117,9 @@ Before using the code for thesis-level trapped-system conclusions, the following
 
 - Use `experiments/anchors/exact_validation_packet.py` for the canonical exact
   validation packet.
+- Use `experiments/anchors/finite_a_n2_reference_packet.py` for the finite-`a`
+  trapped N=2 deterministic reference packet before extrapolating trust to
+  larger trapped systems.
 - Use `experiments/anchors/exact_tg_trap.py` for the zero-rod-length
   trapped TG harmonic validation.
 - Use `experiments/dmc/rn_block/trapped_stationarity_grid.py` for finite-`a`

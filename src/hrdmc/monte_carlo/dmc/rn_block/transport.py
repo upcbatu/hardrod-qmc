@@ -19,8 +19,8 @@ class RNTransportConvention:
     gauge_convention: str = "log_weights_pre_resample_are_recentered_max_subtracted"
     snapshot_alignment: str = "on_every_dmc_step"
     parent_map_scope: str = "single_dmc_step"
-    collection_mode: str = "single_point"
-    future_collection_modes: tuple[str, ...] = ("sliding_window",)
+    collection_mode: str = "event_stream_consumer_defined"
+    future_collection_modes: tuple[str, ...] = ()
     required_invariants: tuple[str, ...] = (
         "lag0_identity",
         "deterministic_parent_map",

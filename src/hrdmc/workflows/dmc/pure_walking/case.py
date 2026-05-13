@@ -9,6 +9,9 @@ from hrdmc.io.progress import ProgressBar, QueuedProgress
 from hrdmc.runners import run_seed_batch
 from hrdmc.workflows.dmc.pure_walking.seed import run_pure_walking_seed
 from hrdmc.workflows.dmc.rn_block import (
+    DEFAULT_RN_GUIDE_FAMILY,
+    DEFAULT_RN_PROPOSAL_FAMILY,
+    DEFAULT_RN_TARGET_FAMILY,
     RNCase,
     RNCollectiveProposalControls,
     RNRunControls,
@@ -29,8 +32,9 @@ def summarize_pure_walking_case(
     progress: ProgressBar | None = None,
     initialization: RNInitializationControls | None = None,
     proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = "harmonic-mehler",
-    guide_family: str = "auto",
+    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
+    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
+    target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> dict[str, Any]:
     """Run a reproducible transported-FW case packet."""
 
@@ -56,6 +60,7 @@ def summarize_pure_walking_case(
             proposal,
             proposal_family,
             guide_family,
+            target_family,
         ),
         run_serial_seed=lambda seed: run_pure_walking_seed(
             case,
@@ -68,6 +73,7 @@ def summarize_pure_walking_case(
             proposal=proposal,
             proposal_family=proposal_family,
             guide_family=guide_family,
+            target_family=target_family,
         ),
     )
     return {
@@ -88,6 +94,7 @@ def summarize_pure_walking_case(
         **proposal.to_metadata(),
         "proposal_family": proposal_family,
         "guide_family": guide_family,
+        "target_family": target_family,
         "pure_config": pure_config_metadata(config),
         "status": case_status(seed_payloads),
         "seed_results": seed_payloads,
@@ -105,6 +112,7 @@ def _run_pure_walking_seed_worker(
     proposal: RNCollectiveProposalControls,
     proposal_family: str,
     guide_family: str,
+    target_family: str,
 ) -> tuple[int, dict[str, Any]]:
     worker_progress = QueuedProgress(progress_queue) if progress_queue is not None else None
     try:
@@ -119,6 +127,7 @@ def _run_pure_walking_seed_worker(
             proposal=proposal,
             proposal_family=proposal_family,
             guide_family=guide_family,
+            target_family=target_family,
         )
     finally:
         if worker_progress is not None:
@@ -147,6 +156,7 @@ def pure_config_metadata(config: PureWalkingConfig) -> dict[str, Any]:
         "min_block_count": config.min_block_count,
         "min_walker_weight_ess": config.min_walker_weight_ess,
         "block_size_steps": config.block_size_steps,
+        "collection_stride_steps": config.collection_stride_steps,
         "transport_mode": config.transport_mode,
         "collection_mode": config.collection_mode,
         "center": config.center,
@@ -182,6 +192,7 @@ def pure_config_with_density_edges_if_needed(
         min_block_count=config.min_block_count,
         min_walker_weight_ess=config.min_walker_weight_ess,
         block_size_steps=config.block_size_steps,
+        collection_stride_steps=config.collection_stride_steps,
         transport_mode=config.transport_mode,
         collection_mode=config.collection_mode,
         center=config.center,

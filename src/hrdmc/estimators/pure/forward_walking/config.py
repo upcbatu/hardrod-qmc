@@ -21,9 +21,10 @@ class PureWalkingConfig:
     structure_k_values: FloatArray | None = None
     min_block_count: int = 30
     min_walker_weight_ess: float = 30.0
-    block_size_steps: int = 20
+    block_size_steps: int = 1
+    collection_stride_steps: int = 1
     transport_mode: str = "post_resample_auxiliary"
-    collection_mode: str = "single_point"
+    collection_mode: str = "sliding_window"
     center: float = 0.0
     plateau_sigma_threshold: float = 1.0
     plateau_abs_tolerance: float = 0.0
@@ -65,16 +66,21 @@ class PureWalkingConfig:
             raise ValueError("min_walker_weight_ess must be positive")
         if self.block_size_steps <= 0:
             raise ValueError("block_size_steps must be positive")
+        if self.collection_stride_steps <= 0:
+            raise ValueError("collection_stride_steps must be positive")
         if self.density_plateau_relative_l2_tolerance < 0.0:
             raise ValueError("density_plateau_relative_l2_tolerance must be non-negative")
         if self.transport_mode != "post_resample_auxiliary":
             raise ValueError("unsupported transport_mode")
-        if self.collection_mode != "single_point":
-            raise ValueError(
-                "transported auxiliary FW currently supports "
-                "collection_mode='single_point'"
-            )
-        if any(lag > 0 for lag in self.lag_steps) and self.block_size_steps != 1:
+        if self.collection_mode not in {"single_point", "sliding_window"}:
+            raise ValueError("unsupported transported FW collection_mode")
+        if self.collection_mode == "sliding_window" and self.block_size_steps != 1:
+            raise ValueError("sliding_window FW requires block_size_steps=1")
+        if (
+            self.collection_mode == "single_point"
+            and any(lag > 0 for lag in self.lag_steps)
+            and self.block_size_steps != 1
+        ):
             raise ValueError(
                 "single_point lagged FW requires block_size_steps=1; "
                 "use sliding_window before collecting multi-step blocks"

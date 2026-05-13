@@ -32,6 +32,7 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> None:
         "parallel_workers",
         "proposal_family",
         "guide_family",
+        "target_family",
         "resolved_guide_family",
         "mixed_energy",
         "mixed_energy_seed_stderr",
