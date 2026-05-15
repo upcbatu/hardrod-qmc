@@ -162,6 +162,7 @@ def pure_config_metadata(config: PureWalkingConfig) -> dict[str, Any]:
         "center": config.center,
         "plateau_sigma_threshold": config.plateau_sigma_threshold,
         "plateau_abs_tolerance": config.plateau_abs_tolerance,
+        "plateau_window_lag_count": config.plateau_window_lag_count,
         "density_plateau_relative_l2_tolerance": (
             config.density_plateau_relative_l2_tolerance
         ),
@@ -198,6 +199,7 @@ def pure_config_with_density_edges_if_needed(
         center=config.center,
         plateau_sigma_threshold=config.plateau_sigma_threshold,
         plateau_abs_tolerance=config.plateau_abs_tolerance,
+        plateau_window_lag_count=config.plateau_window_lag_count,
         density_plateau_relative_l2_tolerance=config.density_plateau_relative_l2_tolerance,
         schema_atol=config.schema_atol,
         schema_rtol=config.schema_rtol,

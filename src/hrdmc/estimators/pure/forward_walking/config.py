@@ -28,6 +28,7 @@ class PureWalkingConfig:
     center: float = 0.0
     plateau_sigma_threshold: float = 1.0
     plateau_abs_tolerance: float = 0.0
+    plateau_window_lag_count: int = 4
     density_plateau_relative_l2_tolerance: float = 0.03
     schema_atol: float = 1.0e-12
     schema_rtol: float = 1.0e-12
@@ -70,6 +71,8 @@ class PureWalkingConfig:
             raise ValueError("collection_stride_steps must be positive")
         if self.density_plateau_relative_l2_tolerance < 0.0:
             raise ValueError("density_plateau_relative_l2_tolerance must be non-negative")
+        if self.plateau_window_lag_count < 2:
+            raise ValueError("plateau_window_lag_count must be at least 2")
         if self.transport_mode != "post_resample_auxiliary":
             raise ValueError("unsupported transport_mode")
         if self.collection_mode not in {"single_point", "sliding_window"}:

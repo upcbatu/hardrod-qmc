@@ -92,6 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--collection-stride-steps", type=int, default=1)
     parser.add_argument("--min-block-count", type=int, default=30)
     parser.add_argument("--min-walker-weight-ess", type=float, default=30.0)
+    parser.add_argument("--plateau-window-lag-count", type=int, default=4)
     parser.add_argument("--parallel-workers", type=int, default=0)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--progress", action="store_true")
@@ -145,6 +146,7 @@ def main() -> None:
         ),
         min_block_count=args.min_block_count,
         min_walker_weight_ess=args.min_walker_weight_ess,
+        plateau_window_lag_count=args.plateau_window_lag_count,
         block_size_steps=args.block_size_steps,
         collection_stride_steps=args.collection_stride_steps,
         transport_invariant_tests_passed=(

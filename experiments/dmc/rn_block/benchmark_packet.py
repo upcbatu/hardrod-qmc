@@ -95,6 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pure-fw-collection-stride-steps", type=int, default=1)
     parser.add_argument("--pure-fw-min-block-count", type=int, default=30)
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
+    parser.add_argument("--pure-fw-plateau-window-lag-count", type=int, default=4)
     parser.add_argument(
         "--pure-fw-pair-max",
         type=float,
@@ -150,6 +151,7 @@ def main() -> None:
         structure_k_values=_parse_float_array(args.pure_fw_k_values),
         min_block_count=args.pure_fw_min_block_count,
         min_walker_weight_ess=args.pure_fw_min_walker_weight_ess,
+        plateau_window_lag_count=args.pure_fw_plateau_window_lag_count,
         block_size_steps=args.pure_fw_block_size_steps,
         collection_stride_steps=args.pure_fw_collection_stride_steps,
         transport_invariant_tests_passed=(

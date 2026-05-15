@@ -51,6 +51,7 @@ def pure_config_payload(config: PureWalkingConfig) -> dict[str, Any]:
         "collection_mode": config.collection_mode,
         "plateau_sigma_threshold": config.plateau_sigma_threshold,
         "plateau_abs_tolerance": config.plateau_abs_tolerance,
+        "plateau_window_lag_count": config.plateau_window_lag_count,
         "density_plateau_relative_l2_tolerance": (
             config.density_plateau_relative_l2_tolerance
         ),

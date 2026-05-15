@@ -201,6 +201,7 @@ class TransportedAuxiliaryForwardWalking:
             "block_storage_mode": "online_mean_variance_no_block_history",
             "plateau_sigma_threshold": self.config.plateau_sigma_threshold,
             "plateau_abs_tolerance": self.config.plateau_abs_tolerance,
+            "plateau_window_lag_count": self.config.plateau_window_lag_count,
             "density_plateau_relative_l2_tolerance": (
                 self.config.density_plateau_relative_l2_tolerance
             ),

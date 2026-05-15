@@ -101,6 +101,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pure-fw-min-block-count", type=int, default=20)
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
     parser.add_argument("--pure-fw-collection-stride-steps", type=int, default=1)
+    parser.add_argument("--pure-fw-plateau-window-lag-count", type=int, default=4)
     parser.add_argument(
         "--density-plateau-relative-l2-tolerance",
         type=float,
@@ -202,6 +203,7 @@ def _build_payload(
         observable_source=args.pure_fw_observable_source,
         min_block_count=args.pure_fw_min_block_count,
         min_walker_weight_ess=args.pure_fw_min_walker_weight_ess,
+        plateau_window_lag_count=args.pure_fw_plateau_window_lag_count,
         block_size_steps=1,
         collection_stride_steps=args.pure_fw_collection_stride_steps,
         density_plateau_relative_l2_tolerance=(
