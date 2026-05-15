@@ -119,9 +119,10 @@ def _write_single_density_plot(
         exact_plot_x,
         exact_plot_y,
         color=tokens.LDA_PREDICTION,
-        linewidth=1.15,
-        alpha=0.55,
+        linewidth=0.9,
+        alpha=0.18,
         label="exact TG smooth context",
+        zorder=1,
     )
     if exact_bin.size == x.size:
         _plot_binned_density(
@@ -130,10 +131,14 @@ def _write_single_density_plot(
             exact_bin,
             bin_edges=bin_edges,
             color=tokens.LDA_PREDICTION,
-            linestyle=(0, (5, 2)),
-            linewidth=1.7,
-            label="exact TG bin avg",
-            zorder=2,
+            linestyle="-",
+            linewidth=2.35,
+            label="exact TG bin average (gate)",
+            marker="s",
+            marker_every=max(1, int(x.size // 32)),
+            marker_size=3.0,
+            marker_alpha=0.9,
+            zorder=5,
         )
     if mixed.size == x.size:
         _plot_binned_density(
@@ -143,9 +148,13 @@ def _write_single_density_plot(
             bin_edges=bin_edges,
             color=tokens.DMC_DIAGNOSTIC,
             linestyle=(0, (1, 2)),
-            linewidth=1.9,
-            label="mixed diagnostic",
-            zorder=4,
+            linewidth=1.8,
+            label="mixed diagnostic (bin)",
+            marker="x",
+            marker_every=max(1, int(x.size // 18)),
+            marker_size=3.0,
+            marker_alpha=0.85,
+            zorder=3,
         )
     if pure.size == x.size:
         _plot_binned_density(
@@ -155,14 +164,18 @@ def _write_single_density_plot(
             bin_edges=bin_edges,
             color=tokens.DMC_PRIMARY,
             linestyle="-",
-            linewidth=2.1,
-            label="transported FW",
-            zorder=3,
+            linewidth=1.95,
+            label="transported FW (bin)",
+            marker="o",
+            marker_every=max(1, int(x.size // 24)),
+            marker_size=2.8,
+            marker_alpha=0.85,
+            zorder=4,
         )
     ax.text(
         0.01,
         0.02,
-        "FW/mixed/exact-bin are plotted as histogram-bin values; smooth exact is context only.",
+        "Gate comparison uses histogram-bin values; smooth exact is visual context only.",
         transform=ax.transAxes,
         fontsize=7,
         color=tokens.INK_SOFT,
@@ -207,7 +220,10 @@ def _draw_density_residuals(
             color=tokens.DMC_PRIMARY,
             linestyle="-",
             linewidth=1.5,
-            label="FW - exact bin avg",
+            label="FW - exact bin average",
+            marker="o",
+            marker_every=max(1, int(x.size // 24)),
+            marker_size=2.4,
         )
     if mixed.size == x.size:
         _plot_binned_density(
@@ -219,7 +235,11 @@ def _draw_density_residuals(
             linestyle=(0, (1, 2)),
             linewidth=1.5,
             alpha=0.95,
-            label="mixed - exact bin avg",
+            label="mixed - exact bin average",
+            marker="x",
+            marker_every=max(1, int(x.size // 18)),
+            marker_size=2.6,
+            marker_alpha=0.85,
         )
     ax.axhline(0.0, color=tokens.INK_SOFT, linewidth=0.8)
     ax.legend(loc="best", fontsize=7)
@@ -237,6 +257,10 @@ def _plot_binned_density(
     label: str,
     alpha: float = 1.0,
     zorder: int | None = None,
+    marker: str | None = None,
+    marker_every: int = 1,
+    marker_size: float = 2.2,
+    marker_alpha: float = 0.7,
 ) -> None:
     if bin_edges.size == values.size + 1:
         ax.stairs(
@@ -249,16 +273,18 @@ def _plot_binned_density(
             alpha=alpha,
             zorder=zorder,
         )
-        ax.plot(
-            x,
-            values,
-            marker="o",
-            linestyle="None",
-            markersize=2.2,
-            color=color,
-            alpha=0.7 * alpha,
-            zorder=zorder,
-        )
+        if marker is not None:
+            ax.plot(
+                x,
+                values,
+                marker=marker,
+                linestyle="None",
+                markevery=max(1, marker_every),
+                markersize=marker_size,
+                color=color,
+                alpha=marker_alpha * alpha,
+                zorder=zorder,
+            )
         return
     ax.step(
         x,
@@ -271,6 +297,18 @@ def _plot_binned_density(
         alpha=alpha,
         zorder=zorder,
     )
+    if marker is not None:
+        ax.plot(
+            x,
+            values,
+            marker=marker,
+            linestyle="None",
+            markevery=max(1, marker_every),
+            markersize=marker_size,
+            color=color,
+            alpha=marker_alpha * alpha,
+            zorder=zorder,
+        )
 
 
 def _density_title(anchor: dict[str, Any]) -> str:

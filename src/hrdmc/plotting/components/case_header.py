@@ -8,7 +8,6 @@ from hrdmc.plotting import tokens
 def draw_case_header(fig: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
     controls = payload.get("controls", {})
     seeds = payload.get("seeds", [])
-    metadata = payload.get("stationarity", {})
     seed_text = f"{len(seeds)} seeds" if isinstance(seeds, list) else "seeds unavailable"
     text = (
         f"N={payload.get('n_particles', '?')}  "
@@ -17,8 +16,7 @@ def draw_case_header(fig: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
         f"dt={controls.get('dt', '?')}  "
         f"M={controls.get('walkers', '?')}  "
         f"{seed_text}  "
-        f"prod_tau={controls.get('production_tau', '?')}  "
-        f"engine={metadata.get('engine_corridor', 'rn_block')}"
+        f"prod_tau={controls.get('production_tau', '?')}"
     )
     fig.suptitle(
         text,
@@ -26,7 +24,7 @@ def draw_case_header(fig: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
         y=0.985,
         ha="left",
         va="top",
-        fontsize=7.2,
+        fontsize=6.8,
         family="monospace",
         color=tokens.INK_SOFT,
     )

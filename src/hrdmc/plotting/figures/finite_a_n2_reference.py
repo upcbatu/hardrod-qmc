@@ -6,7 +6,7 @@ from typing import Any, cast
 import numpy as np
 
 from hrdmc.plotting import tokens
-from hrdmc.plotting.style import load_pyplot, save_figure
+from hrdmc.plotting.style import load_pyplot
 
 
 def write_finite_a_n2_reference_plots(
@@ -50,8 +50,12 @@ def _write_scorecard(
             value = _case_table_float(case, value_key)
             ratios[row, col] = value / tolerance if tolerance > 0.0 else np.nan
 
-    fig, ax = plt.subplots(figsize=(max(6.2, 1.5 * len(labels)), 3.9))
-    _draw_header(fig, payload, "Finite-a N=2 reference gate margins")
+    fig, ax = plt.subplots(
+        figsize=(max(6.2, 1.5 * len(labels)), 3.9),
+        constrained_layout=False,
+    )
+    _disable_auto_layout(fig)
+    _draw_header(fig, payload, "Finite-a N=2 exact-reference scorecard")
     fig.subplots_adjust(top=0.76, bottom=0.22)
     clipped = np.clip(ratios, 0.0, 1.5)
     image = ax.imshow(clipped, aspect="auto", vmin=0.0, vmax=1.5, cmap="RdYlGn_r")
@@ -67,7 +71,8 @@ def _write_scorecard(
             ax.text(col, row, label, ha="center", va="center", fontsize=8)
     cbar = fig.colorbar(image, ax=ax, fraction=0.035, pad=0.025)
     cbar.set_label("error / tolerance")
-    paths = save_figure(fig, plot_dir / "finite_a_n2_reference_scorecard", formats)
+    _disable_auto_layout(fig)
+    paths = _save_figure(fig, plot_dir / "finite_a_n2_reference_scorecard", formats)
     plt.close(fig)
     return paths
 
@@ -92,7 +97,8 @@ def _write_scalar_case(
             "pure_relative_error",
         ),
     ]
-    fig, axes = plt.subplots(1, 3, figsize=(10.5, 3.7))
+    fig, axes = plt.subplots(1, 3, figsize=(10.5, 3.7), constrained_layout=False)
+    _disable_auto_layout(fig)
     _draw_header(fig, payload, str(case.get("case_id", "")))
     fig.subplots_adjust(top=0.73, bottom=0.16, wspace=0.32)
     for ax, (title, data, value_key, reference_key, error_key) in zip(
@@ -140,7 +146,8 @@ def _write_scalar_case(
         )
         ax.legend(loc="best", fontsize=7)
     filename = f"finite_a_n2_scalars_{case.get('case_id', 'case')}"
-    paths = save_figure(fig, plot_dir / filename, formats)
+    _disable_auto_layout(fig)
+    paths = _save_figure(fig, plot_dir / filename, formats)
     plt.close(fig)
     return paths
 
@@ -167,54 +174,59 @@ def _write_density_case(
         figsize=(9.4, 6.2),
         gridspec_kw={"height_ratios": [2.75, 1.35]},
         sharex=True,
+        constrained_layout=False,
     )
-    _draw_header(fig, payload, f"{case.get('case_id', '')} density reference")
-    fig.subplots_adjust(top=0.84, bottom=0.10, hspace=0.12)
+    _disable_auto_layout(fig)
+    fig.subplots_adjust(top=0.93, bottom=0.10, hspace=0.12)
     ax = axes[0]
     residual_ax = axes[1]
     _plot_density_curve(
         ax,
         x,
         reference,
+        bin_edges=edges,
         color=tokens.INK,
-        linestyle=(0, (5, 2)),
-        marker=None,
-        label="N=2 reference bin avg",
-        linewidth=1.8,
-        zorder=2,
+        linestyle="-",
+        marker="s",
+        label="N=2 reference bin average (gate)",
+        linewidth=2.25,
+        zorder=5,
     )
     if pure is not None:
         _plot_density_curve(
             ax,
             x,
             pure,
+            bin_edges=edges,
             color=tokens.DMC_PRIMARY,
             linestyle="-",
             marker="o",
-            label="transported FW",
-            linewidth=2.0,
-            zorder=3,
+            label="transported FW (bin)",
+            linewidth=1.95,
+            zorder=4,
         )
     if mixed is not None:
         _plot_density_curve(
             ax,
             x,
             mixed,
+            bin_edges=edges,
             color=tokens.DMC_DIAGNOSTIC,
-            linestyle="None",
+            linestyle=(0, (1, 2)),
             marker="x",
-            label="mixed diagnostic",
-            linewidth=0.0,
-            zorder=4,
+            label="mixed diagnostic (bin)",
+            linewidth=1.7,
+            zorder=3,
         )
         _plot_density_curve(
             residual_ax,
             x,
             mixed - reference,
+            bin_edges=edges,
             color=tokens.DMC_DIAGNOSTIC,
             linestyle=(0, (1, 2)),
             marker="x",
-            label="mixed - reference",
+            label="mixed - reference bin average",
             linewidth=1.6,
         )
     if pure is not None:
@@ -222,27 +234,31 @@ def _write_density_case(
             residual_ax,
             x,
             pure - reference,
+            bin_edges=edges,
             color=tokens.DMC_PRIMARY,
             linestyle="-",
             marker="o",
-            label="FW - reference",
+            label="FW - reference bin average",
             linewidth=1.7,
         )
     _set_density_xlim(ax, residual_ax, x, reference, pure, mixed)
     _set_residual_ylim(residual_ax, reference, pure, mixed)
     ax.set_ylabel(r"$n(x)$")
+    ax.set_title(
+        "Density comparison: finite-a N=2 exact reference",
+        loc="left",
+        pad=6,
+    )
     ax.legend(loc="upper right", fontsize=8)
     _draw_density_metrics_box(residual_ax, case)
     residual_ax.axhline(0.0, color=tokens.INK_SOFT, linewidth=0.8)
     residual_ax.set_xlabel(r"$x$")
     residual_ax.set_ylabel(r"$n_\mathrm{est}-n_\mathrm{ref}$")
-    residual_ax.set_title(
-        "Residuals expose the estimator difference; top panel is intentionally near-degenerate.",
-        fontsize=8,
-    )
+    residual_ax.set_title("Residual to exact bin average", loc="left", pad=3, fontsize=8.5)
     residual_ax.legend(loc="upper right", fontsize=7)
     filename = f"finite_a_n2_density_{case.get('case_id', 'case')}"
-    paths = save_figure(fig, plot_dir / filename, formats)
+    _disable_auto_layout(fig)
+    paths = _save_figure(fig, plot_dir / filename, formats)
     plt.close(fig)
     return paths
 
@@ -252,6 +268,7 @@ def _plot_density_curve(
     x: np.ndarray,
     values: np.ndarray,
     *,
+    bin_edges: np.ndarray | None,
     color: str,
     linestyle: object,
     marker: str | None,
@@ -262,6 +279,29 @@ def _plot_density_curve(
     if x.shape != values.shape:
         return
     marker_every = max(1, x.size // 28)
+    if bin_edges is not None and bin_edges.size == values.size + 1:
+        ax.stairs(
+            values,
+            bin_edges,
+            color=color,
+            linestyle=linestyle,
+            linewidth=linewidth,
+            label=label,
+            zorder=zorder,
+        )
+        if marker is not None:
+            ax.plot(
+                x,
+                values,
+                color=color,
+                linestyle="None",
+                marker=marker,
+                markevery=marker_every,
+                markersize=3.4,
+                alpha=0.82,
+                zorder=zorder,
+            )
+        return
     ax.plot(
         x,
         values,
@@ -296,6 +336,28 @@ def _draw_header(fig: Any, payload: dict[str, Any], title: str) -> None:  # noqa
     )
 
 
+def _disable_auto_layout(fig: Any) -> None:  # noqa: ANN401
+    """Allow explicit report-style margins despite global constrained layout."""
+
+    if hasattr(fig, "set_layout_engine"):
+        fig.set_layout_engine("none")
+    elif hasattr(fig, "set_constrained_layout"):
+        fig.set_constrained_layout(False)
+
+
+def _save_figure(fig: Any, base_path: str | Path, formats: tuple[str, ...]) -> list[Path]:  # noqa: ANN401
+    base = Path(base_path)
+    base.parent.mkdir(parents=True, exist_ok=True)
+    paths: list[Path] = []
+    for fmt in formats:
+        _disable_auto_layout(fig)
+        suffix = fmt.lower().lstrip(".")
+        path = base.parent / f"{base.name}.{suffix}"
+        fig.savefig(path)
+        paths.append(path)
+    return paths
+
+
 def _draw_density_metrics_box(ax: Any, case: dict[str, Any]) -> None:  # noqa: ANN401
     ax.text(
         0.012,
@@ -325,7 +387,7 @@ def _density_status_text(case: dict[str, Any]) -> str:
         f"FW rel-L2={_number(l2)}   mixed rel-L2={_number(mixed_l2)}\n"
         f"FW closer on density: {'yes' if fw_closer else 'no'}   "
         f"density accounting abs={_number(accounting)}\n"
-        "Curves use bin averages; lines are visual guides."
+        "Gate comparison uses histogram-bin averages."
     )
 
 

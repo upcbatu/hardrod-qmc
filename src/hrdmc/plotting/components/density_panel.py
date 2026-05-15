@@ -5,11 +5,6 @@ from typing import Any
 import numpy as np
 
 from hrdmc.plotting import tokens
-from hrdmc.plotting.components.tier_badge import (
-    draw_tier_badge,
-    methodology_label,
-    precision_label,
-)
 from hrdmc.plotting.numerics import array_or_none, density_integral_status, finite_float
 
 
@@ -81,35 +76,14 @@ def draw_density_panel(
         )
     integral = finite_float(density.get("integral"))
     n_particles = int(payload.get("n_particles", 0) or 0)
-    ax.set_title(
-        f"Density n(x): {density_integral_status(integral, n_particles)}",
-        loc="left",
-        pad=5,
-    )
-    ax.text(
-        0.015,
-        0.955,
-        _density_message(x=x, value=value, lda_x=lda_x, lda_value=lda_value),
-        transform=ax.transAxes,
-        ha="left",
-        va="top",
-        fontsize=7.5,
-        color=tokens.INK_SOFT,
-        bbox={
-            "boxstyle": "round,pad=0.18",
-            "facecolor": "white",
-            "edgecolor": tokens.INK_FAINT,
-            "alpha": 0.84,
-        },
-        zorder=8,
-    )
+    ax.set_title(_density_title(payload), loc="left", pad=6)
     if residual_ax is None:
         ax.set_xlabel(r"$x$")
     else:
         ax.tick_params(labelbottom=False)
     ax.set_ylabel(r"$n(x)$")
-    ax.legend(loc="upper right", fontsize=8)
-    _draw_density_metrics(ax, x, value, lda_on_x, mixed_x, mixed_value)
+    ax.legend(loc="upper right", fontsize=7.4, frameon=False)
+    _draw_density_metrics(ax, x, value, lda_on_x, mixed_x, mixed_value, integral, n_particles)
     if (
         mixed_x is not None
         and mixed_value is not None
@@ -137,11 +111,6 @@ def draw_density_panel(
         _set_density_xlim(ax, residual_ax, x, value, lda_x, lda_value, mixed_x, mixed_value)
     elif bin_edges is not None:
         _set_density_xlim(ax, None, x, value, lda_x, lda_value, mixed_x, mixed_value)
-    draw_tier_badge(
-        ax,
-        methodology=methodology_label(str(density.get("status", "")), observable="density"),
-        precision=precision_label(str(payload.get("pure_fw_claim_status", ""))),
-    )
 
 
 def _should_draw_band(
@@ -153,17 +122,19 @@ def _should_draw_band(
     return stderr is not None and stderr.shape == value.shape and seed_count >= 5
 
 
-def _density_message(
-    *,
-    x: np.ndarray,
-    value: np.ndarray,
-    lda_x: np.ndarray | None,
-    lda_value: np.ndarray | None,
-) -> str:
-    if lda_x is not None and lda_value is not None:
-        if _has_two_peak_signal(x, value) and not _has_two_peak_signal(lda_x, lda_value):
-            return "finite-N two-peak FW density vs smooth trapped LDA envelope"
-    return "transported FW density vs trapped LDA envelope"
+def _density_title(payload: dict[str, Any]) -> str:
+    n_particles = payload.get("n_particles")
+    rod_length = payload.get("rod_length")
+    omega = payload.get("omega")
+    if n_particles is not None and rod_length is not None and omega is not None:
+        return (
+            f"Density comparison: N={int(n_particles)}, "
+            f"a={float(rod_length):g}, omega={float(omega):g}"
+        )
+    case_id = payload.get("case_id")
+    if isinstance(case_id, str) and case_id:
+        return f"Density comparison: {case_id}"
+    return r"Density $n(x)$"
 
 
 def _reference_on_grid(
@@ -190,10 +161,13 @@ def _draw_density_metrics(
     lda_on_x: np.ndarray | None,
     mixed_x: np.ndarray | None,
     mixed_value: np.ndarray | None,
+    integral: float,
+    n_particles: int,
 ) -> None:
+    lines = [density_integral_status(integral, n_particles)]
     if lda_on_x is None:
         return
-    lines = [f"FW-LDA rel L2: {_relative_l2(value, lda_on_x):.3f}"]
+    lines.append(f"FW-LDA rel L2: {_relative_l2(value, lda_on_x):.3f}")
     if mixed_x is not None and mixed_value is not None:
         mixed_on_x = np.interp(x, mixed_x, mixed_value)
         mixed_l2 = _relative_l2(mixed_on_x, lda_on_x)
@@ -204,11 +178,11 @@ def _draw_density_metrics(
             lines.append("FW farther from LDA than mixed")
     ax.text(
         0.015,
-        0.045,
+        0.955,
         "\n".join(lines),
         transform=ax.transAxes,
         ha="left",
-        va="bottom",
+        va="top",
         fontsize=7.2,
         color=tokens.INK_SOFT,
         bbox={
@@ -319,13 +293,3 @@ def _curves_overlap(
     interpolated = np.interp(x, mixed_x, mixed_value)
     scale = max(float(np.nanmax(np.abs(value))), 1.0)
     return bool(np.nanmax(np.abs(interpolated - value)) < 0.01 * scale)
-
-
-def _has_two_peak_signal(x: np.ndarray, y: np.ndarray) -> bool:
-    if x.size < 5 or y.size < 5:
-        return False
-    center_idx = int(np.argmin(np.abs(x)))
-    center_value = y[center_idx]
-    left = np.max(y[:center_idx]) if center_idx > 0 else center_value
-    right = np.max(y[center_idx + 1 :]) if center_idx + 1 < y.size else center_value
-    return bool(left > 1.12 * center_value and right > 1.12 * center_value)

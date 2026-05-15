@@ -10,11 +10,12 @@ def draw_tier_badge(
     *,
     methodology: str,
     precision: str,
-    loc: tuple[float, float] = (0.02, 0.98),
+    loc: tuple[float, float] = (0.985, 0.98),
 ) -> None:
     method_color = _combined_color(methodology, precision)
     x, y = loc
-    _badge(ax, x, y, f"M: {methodology}   P: {precision}", method_color)
+    label = methodology if precision == "N/A" else f"{methodology} / {precision}"
+    _badge(ax, x, y, label, method_color)
 
 
 def methodology_label(status: str, *, observable: str) -> str:
@@ -47,9 +48,9 @@ def _badge(ax: Any, x: float, y: float, label: str, color: str) -> None:  # noqa
         y,
         label,
         transform=ax.transAxes,
-        ha="left",
+        ha="right" if x > 0.5 else "left",
         va="top",
-        fontsize=6.2,
+        fontsize=6.5,
         color="white",
         bbox={
             "boxstyle": "round,pad=0.18,rounding_size=0.06",

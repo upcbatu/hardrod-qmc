@@ -80,9 +80,8 @@ def _write_density_comparison(
         gridspec_kw={"height_ratios": (2.35, 1.0)},
         constrained_layout=False,
     )
-    draw_case_header(fig, payload)
     draw_density_panel(axes[0], payload, residual_ax=axes[1])
-    fig.subplots_adjust(top=0.9, bottom=0.08, left=0.08, right=0.985, hspace=0.12)
+    fig.subplots_adjust(top=0.93, bottom=0.08, left=0.08, right=0.985, hspace=0.12)
     paths = save_figure(fig, plot_dir / "density_comparison", formats)
     plt.close(fig)
     return paths
