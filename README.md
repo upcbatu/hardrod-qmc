@@ -1,6 +1,6 @@
-# Trapped Hard-Rod QMC Thesis Scaffold
+# Trapped Hard-Rod QMC Thesis Codebase
 
-This repository is a computational-physics thesis scaffold for trapped one-dimensional hard-rod bosons.
+This repository is a computational-physics thesis codebase for trapped one-dimensional hard-rod bosons.
 
 The homogeneous hard-rod system on a ring is kept as a controlled QMC validation benchmark, because its excluded-volume mapping gives known reference energies and wavefunction structure. The main thesis target is the trapped system: compute benchmark observables with QMC, with DMC as the target production method and VMC as a baseline, then map where an excluded-volume local-density approximation succeeds or fails.
 
@@ -65,6 +65,10 @@ Install development tooling with `python3 -m pip install -e ".[dev]"`.
 - observable estimators for local energy, `g(r)`, `S(k)`, and ring-based `n(x)` exist
 - the DMC layer now has a generic contract package and an RN-block
   candidate implementation under `src/hrdmc/monte_carlo/dmc/rn_block/`
+- the active trapped-system progress report uses the RN-block workflow under
+  `experiments/dmc/rn_block/` plus transported forward walking under
+  `src/hrdmc/estimators/pure/forward_walking/`; older bootstrap DMC notes
+  should not be read as the active status for that report
 - compact validation tables, gated RN runners, and release-quality
   documentation are now present; release metadata and archived result bundles
   are still pending

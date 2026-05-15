@@ -439,7 +439,7 @@ Formula:
 For open-line coordinates define the center of mass and nearest-neighbor gaps
 
 $$
-Q=\frac{1}{N}\sum_i(x_i-x_0),
+X_{\mathrm{cm}}=\frac{1}{N}\sum_i(x_i-x_0),
 \qquad
 g_i=x_{i+1}-x_i.
 $$
@@ -449,16 +449,16 @@ The proposal factorizes as
 $$
 Q_{\mathrm{gap-h}}(\mathbf{x}'\mid\mathbf{x};\tau)
 =
-Q_{\mathrm{COM}}(Q'\mid Q;\tau)
+Q_{\mathrm{cm}}(X_{\mathrm{cm}}'\mid X_{\mathrm{cm}};\tau)
 \,
 \prod_{i=1}^{N-1}
 Q_{\mathrm{gap}}(g_i'\mid g_i;\tau),
 $$
 
-where \(Q_{\mathrm{COM}}\) is the exact harmonic COM h-transform,
+where \(Q_{\mathrm{cm}}\) is the exact harmonic COM h-transform,
 
 $$
-Q'=\rho Q + \sqrt{\sigma_Q^2(1-\rho^2)}\,\eta,
+X_{\mathrm{cm}}'=\rho X_{\mathrm{cm}} + \sqrt{\sigma_Q^2(1-\rho^2)}\,\eta,
 \qquad
 \rho=e^{-\sqrt{2}\omega\tau},
 \qquad

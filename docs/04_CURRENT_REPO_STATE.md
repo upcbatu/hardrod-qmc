@@ -64,8 +64,9 @@ collective-block DMC candidate.
 
 ## Not Yet Implemented
 
-- QMC/DMC versus LDA failure-map workflow;
-  expected area: `src/hrdmc/analysis/` and `experiments/`
+- final QMC/DMC versus LDA failure-map release workflow with closed
+  \(N=4,8,16,32\) production matrix and fixed-physical-FW timestep ladder;
+  expected area: `src/hrdmc/analysis/`, `experiments/`, and archived results
 - release-grade citation metadata and archived result bundle;
   expected area: repository root plus external archive at release time
 

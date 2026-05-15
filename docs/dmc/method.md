@@ -31,11 +31,15 @@ owned by `analysis/`.
 
 ## Why RN-Block DMC
 
-Pure local drift-diffusion moves equilibrate the weak-trap cloud width slowly.
-RN-block DMC keeps the standard full-coordinate DMC walker state but adds a
-collective proposal for slow cloud-size motion. The proposal is corrected by a
-Radon-Nikodym log-weight ratio, so changing the proposal does not change the
-Hamiltonian being sampled.
+Pure local drift-diffusion moves equilibrate the trapped cloud width slowly.
+RN-block DMC keeps the standard full-coordinate DMC walker state but separates
+the proposal used to move walkers from the target kernel used in the
+Radon-Nikodym correction. Here "target kernel" means the transition kernel in
+the change-of-measure correction, not a different physical Hamiltonian. For
+finite-\(a\), \(N>2\) trapped runs, the current gap-\(h\)-product target is a
+candidate numerical kernel construction rather than an exact many-body
+propagator, so its reliability is assessed through exact anchors, timestep
+checks, RN-weight diagnostics, stationarity gates, and pure-estimator gates.
 
 For a local DMC step,
 
@@ -77,17 +81,19 @@ that RN weights remain controlled.
 
 ## Current Candidate Corridor
 
-The current weak-trap candidate corridor is:
+The active trapped-system report uses:
 
 ```text
-dt = 0.00125
-RN cadence tau = 0.01
-safe010 fixed multiscale collective proposal
-LDA-RMS logspread initialization
-optional breathing preburn before production
+proposal = gap-h-transform
+target   = gap-h-product
+guide    = reduced-TG
+system   = open-line trapped hard rods
 ```
 
-The initialization and preburn only reduce transient breathing mismatch before
+For \(N=2\), the COM plus one-gap target is checked against a deterministic
+finite-\(a\) reference. For \(N>2\), the same family is treated as the current
+candidate production workflow only for rows passing the documented numerical
+gates. Initialization and preburn reduce transient breathing mismatch before
 production. They are not production estimators and do not change gate logic.
 
 ## Observables

@@ -2,11 +2,24 @@
 
 This note records the validation status of the numerical workflow. It is written as a thesis-facing summary: what was tested, what reference was used, what the result means, and what remains to be validated before using the code for trapped-system conclusions.
 
+## Current RN-DMC Status Note
+
+The homogeneous ring checks below remain the baseline validation layer. The
+active trapped-system progress report, however, refers to the newer RN-block
+DMC workflow under `experiments/dmc/rn_block/`, the exact anchor entrypoints
+under `experiments/anchors/`, and the transported forward-walking estimator
+under `src/hrdmc/estimators/pure/forward_walking/`.
+
+That active workflow has promoted candidate rows only when the relevant
+RN-weight, stationarity, density-accounting, and pure-estimator gates pass.
+These rows are still candidate/progress-note results, not final released LDA
+benchmark rows; timestep and closure runs remain part of the validation plan.
+
 ## 1. Purpose
 
 The thesis uses the homogeneous hard-rod gas on a ring as a controlled benchmark before moving to trapped one-dimensional hard rods. This is useful because the homogeneous hard-rod problem has an exact excluded-volume mapping. It therefore provides a clean validation point for the numerical pipeline.
 
-The current validation does not attempt to test the trapped system or the local-density approximation. It checks the homogeneous ring pipeline:
+The homogeneous validation layer checks the ring pipeline:
 
 ```text
 periodic hard-rod geometry
@@ -86,9 +99,9 @@ The energy error is at floating-point roundoff level. This indicates that the pe
 
 This validation establishes a controlled starting point for the code. It supports the use of the homogeneous ring as a benchmark for checking basic geometry, exclusion constraints, sampling, and energy-estimator consistency.
 
-It does not establish that the trapped-system calculations are correct. The trapped problem removes translational invariance, introduces an external potential, and requires non-periodic density observables. Those pieces must be validated separately.
+It does not by itself establish that the trapped-system calculations are correct. The trapped problem removes translational invariance, introduces an external potential, and requires non-periodic density observables. Those pieces are now validated through the separate exact trapped TG, finite-\(a\) \(N=2\), and RN-DMC stationarity/forward-walking gates listed below.
 
-It also does not validate DMC as a production reference. DMC should remain labeled as a candidate production method until its propagation, time-step behavior, and estimator behavior are checked.
+It also does not validate DMC as a final production reference. RN-DMC should remain labeled as a candidate production method until its propagation, time-step behavior, population behavior, and estimator behavior are checked in the targeted trapped workflow.
 
 ## 4. Remaining Validation Steps
 
