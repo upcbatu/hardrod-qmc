@@ -1,6 +1,8 @@
-# Trapped Hard-Rod QMC Thesis Codebase
+# Microscopic Description of Trapped Hard Rods
 
-This repository is a computational-physics thesis codebase for trapped one-dimensional hard-rod bosons.
+QMC/DMC thesis codebase for trapped one-dimensional hard rods, with homogeneous-ring validation and excluded-volume local-density comparisons.
+
+This repository is a computational-physics thesis codebase for the microscopic description of trapped one-dimensional hard-rod bosons.
 
 The homogeneous hard-rod system on a ring is kept as a controlled QMC validation benchmark, because its excluded-volume mapping gives known reference energies and wavefunction structure. The main thesis target is the trapped system: compute benchmark observables with QMC, with DMC as the target production method and VMC as a baseline, then map where an excluded-volume local-density approximation succeeds or fails.
 

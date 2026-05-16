@@ -2,7 +2,9 @@
 
 ## Title
 
-**Trapped One-Dimensional Hard-Rod Bosons: QMC Benchmarks of Excluded-Volume Local-Density Theory**
+**Microscopic description of trapped hard rods**
+
+Working technical scope: QMC/DMC benchmark calculations for trapped one-dimensional hard rods and comparison with excluded-volume local-density theory.
 
 ## Abstract
 

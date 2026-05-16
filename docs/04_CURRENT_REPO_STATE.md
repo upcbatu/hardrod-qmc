@@ -1,5 +1,7 @@
 # Current Repository State
 
+Active thesis title: **Microscopic description of trapped hard rods**.
+
 This repository is currently at a **promoted RN-DMC candidate package stage**.
 The `src/hrdmc` package exposes the original VMC scaffold, a generic DMC
 contract package, and an RN-corrected
