@@ -42,6 +42,10 @@ Every entry below has one of these statuses:
 - `[Astrakharchik2005LDA]` G. E. Astrakharchik, *Local density approximation for
   a perturbative equation of state*, **Phys. Rev. A 72**, 063620 (2005).
   DOI: [10.1103/PhysRevA.72.063620](https://doi.org/10.1103/PhysRevA.72.063620)
+- `[Girardeau1960TG]` M. Girardeau, *Relationship between systems of
+  impenetrable bosons and fermions in one dimension*, **J. Math. Phys. 1**,
+  516-523 (1960).
+  DOI: [10.1063/1.1703687](https://doi.org/10.1063/1.1703687)
 - `[GirardeauAstrakharchik2010TrappedHardSphere]` M. D. Girardeau and
   G. E. Astrakharchik, *Wave functions of the super-Tonks-Girardeau gas and the
   trapped one-dimensional hard-sphere Bose gas*, **Phys. Rev. A 81**,
@@ -63,6 +67,9 @@ Every entry below has one of these statuses:
 - `[KarlinMcGregor1959]` S. Karlin, J. McGregor, *Coincidence probabilities*,
   **Pacific J. Math. 9**, 1141-1164 (1959).
   DOI: [10.2140/pjm.1959.9.1141](https://doi.org/10.2140/pjm.1959.9.1141)
+- `[Doob1957HTransform]` J. L. Doob, *Conditional Brownian motion and the
+  boundary limits of harmonic functions*, **Bull. Soc. Math. France 85**,
+  431-458 (1957).
 - `[FlyvbjergPetersen1989Blocking]` H. Flyvbjerg, H. G. Petersen, *Error
   estimates on averages of correlated data*, **J. Chem. Phys. 91**, 461-466
   (1989). DOI: [10.1063/1.457480](https://doi.org/10.1063/1.457480)
@@ -367,8 +374,9 @@ $$
 
 Source basis:
 `Analytic identity`, harmonic oscillator spectrum plus the ordered
-Karlin-McGregor determinant `[KarlinMcGregor1959]` and trapped hard-core/TG
-mapping context from `[GirardeauAstrakharchik2010TrappedHardSphere]`.
+Karlin-McGregor determinant `[KarlinMcGregor1959]`, TG mapping from
+`[Girardeau1960TG]`, and trapped hard-core/TG context from
+`[GirardeauAstrakharchik2010TrappedHardSphere]`.
 
 Claim boundary:
 This is an exact validation anchor only for \(a=0\) in a harmonic trap. It
@@ -382,7 +390,8 @@ Code:
 Formula:
 
 $$
-u_i=x_i-a\left(i-\frac{N-1}{2}\right),
+u_i=x_i-a\left[(i-1)-\frac{N-1}{2}\right],
+\qquad i=1,\ldots,N,
 $$
 
 $$
@@ -495,21 +504,78 @@ g\ge a,
 \psi(a)=0.
 $$
 
-The implementation reconstructs positions from \(Q'\) and the sampled gaps.
-The RN engine still uses the primitive target density and exact mixture
-\(\log Q\); this proposal changes exploration, not the target definition.
+The implementation reconstructs positions from \(X'_{\mathrm{cm}}\) and the
+sampled gaps. This is the sampleable proposal family \(Q\). The RN target
+density \(K\) is selected separately by the workflow; current report runs use
+the gap-h-product target below rather than the older primitive target.
 
 Source basis:
 `Analytic identity`, harmonic COM separation, Dirichlet relative-coordinate
-h-transform, and importance-sampled DMC proposal logic from `[Foulkes2001QMC]`
-and `[UmrigarNightingaleRunge1993DMC]`.
+h-transform from `[Doob1957HTransform]`, and importance-sampled DMC proposal
+logic from `[Foulkes2001QMC]` and `[UmrigarNightingaleRunge1993DMC]`.
 
 Claim boundary:
 This is a proposal family, not a benchmark result. For \(N=2\) it uses the
 finite-grid relative h-transform. For \(N>2\), the independent nearest-neighbor
-gap product is an all-N proposal approximation. It is paper-eligible only if
-the unchanged RN target/weight, stationarity, population, density-accounting,
-and precision gates pass.
+gap product is a sampling approximation. It is paper-eligible only if the
+chosen RN target/weight, stationarity, population, density-accounting, cadence,
+timestep, and precision gates pass.
+
+### S10b. Gap-H Product RN Target
+
+Code:
+[src/hrdmc/systems/gap_h_transform.py](src/hrdmc/systems/gap_h_transform.py)
+
+Formula:
+
+The current finite-\(a\) report runs use a raw target density built from the
+same COM and nearest-neighbor gap h-transform factors. The target converts the
+normalized h-transform product back to a raw kernel:
+
+$$
+K_{\mathrm{product}}(\mathbf{x}'\mid\mathbf{x};\tau)
+=
+p_h(\mathbf{x}'\mid\mathbf{x};\tau)
+\exp[-\tau E_{\mathrm{product}}]
+\frac{\psi_{\mathrm{product}}(\mathbf{x})}
+     {\psi_{\mathrm{product}}(\mathbf{x}')}.
+$$
+
+In implementation terms,
+
+$$
+\log K_{\mathrm{product}}
+=
+\log p_h
+-
+\tau E_{\mathrm{product}}
++
+\log\psi_{\mathrm{product}}(\mathbf{x})
+-
+\log\psi_{\mathrm{product}}(\mathbf{x}').
+$$
+
+For \(N=2\), the COM and one-gap relative-coordinate Hamiltonian separate
+exactly, so this target reduces to the deterministic finite-\(a\) reference.
+For \(N>2\), it is a nearest-neighbor product target:
+
+$$
+K_{\mathrm{product}}
+\approx
+K_{\mathrm{cm}}
+\prod_{i=1}^{N-1}K_{\mathrm{gap}}(g_i'\mid g_i).
+$$
+
+Source basis:
+`Analytic identity`, N=2 COM/relative separation, Dirichlet h-transform from
+`[Doob1957HTransform]`, and DMC target-kernel usage from `[Foulkes2001QMC]` /
+`[UmrigarNightingaleRunge1993DMC]`.
+
+Claim boundary:
+Exact target only for the finite-\(a\), \(N=2\) one-gap trapped problem. For
+\(N>2\), this is the product target being tested; it is not an exact many-body
+propagator and requires cadence/timestep/population validation before final
+comparison use.
 
 ### S11. Gap-H-Corrected Trapped Guide
 
@@ -522,7 +588,8 @@ Formula:
 The reduced TG guide uses
 
 $$
-u_i=x_i-a\left(i-\frac{N-1}{2}\right),
+u_i=x_i-a\left[(i-1)-\frac{N-1}{2}\right],
+\qquad i=1,\ldots,N,
 \qquad
 \Psi_{\mathrm{TG}}
 =
@@ -556,18 +623,21 @@ $$
 For \(N=2\), this restores the exact COM-separated relative guide up to the
 finite-grid interpolation. For \(N>2\), it is a nearest-neighbor product guide
 ansatz matched to the same gap table as the gap-H proposal. The RN target
-density is unchanged; this only changes importance sampling, drift, and guide
-local energy.
+family is selected separately by the workflow; this guide only changes
+importance sampling, drift, guide ratio, and local energy.
 
 Source basis:
 `Analytic identity`, harmonic COM separation, N=2 Dirichlet relative-coordinate
-ground state, and importance-sampled DMC guide logic from `[Foulkes2001QMC]`
-and `[UmrigarNightingaleRunge1993DMC]`.
+ground state, h-transform context from `[Doob1957HTransform]`, and
+importance-sampled DMC guide logic from `[Foulkes2001QMC]` and
+`[UmrigarNightingaleRunge1993DMC]`.
 
 Claim boundary:
 This is a guide/proposal matching layer, not a final benchmark by itself.
-For all \(N\), benchmark eligibility still requires the standard RN weight,
-stationarity, population, density-accounting, and precision gates.
+For all \(N\), benchmark eligibility still requires the selected RN target,
+RN weight, stationarity, population, density-accounting, cadence/timestep, and
+precision gates. Current report runs using `reduced-tg` cite W5 below, while
+this entry maps the optional `gap-h-corrected` guide family.
 
 ## Theory
 
@@ -852,7 +922,8 @@ Code:
 Formula:
 
 $$
-y_i=x_i-a\left(i-\frac{N-1}{2}\right),
+y_i=x_i-a\left[(i-1)-\frac{N-1}{2}\right],
+\qquad i=1,\ldots,N,
 $$
 
 $$
@@ -880,7 +951,8 @@ V_{\mathrm{trap}}(\mathbf{x}).
 $$
 
 Source basis:
-`Primary physics` context from `[Mazzanti2008HardRods]` and
+`Primary physics` context from `[Mazzanti2008HardRods]`, TG mapping from
+`[Girardeau1960TG]`, and trapped hard-rod guide context from
 `[GirardeauAstrakharchik2010TrappedHardSphere]`; `Method paper` local-energy
 usage from `[Foulkes2001QMC]`.
 
@@ -1011,8 +1083,9 @@ $$
 Source basis:
 `Method paper`, DMC/importance-sampling basis from `[Foulkes2001QMC]` and
 `[UmrigarNightingaleRunge1993DMC]`; Radon-Nikodym/change-of-measure convention
-from `[Billingsley1995Probability]`; non-crossing target kernel component uses
-`[KarlinMcGregor1959]`.
+from `[Billingsley1995Probability]`. Target-specific kernel sources are mapped
+by the system-kernel entries above, for example S9 for the primitive target and
+S10b for the gap-h-product target used in the current report.
 
 Claim boundary:
 Candidate engine. It is DMC, but paper-level benchmark status requires
