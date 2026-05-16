@@ -50,6 +50,9 @@ Every entry below has one of these statuses:
 
 ### QMC And Statistics Methods
 
+- `[Billingsley1995Probability]` P. Billingsley, *Probability and Measure*,
+  3rd ed., Wiley (1995). Used here for the Radon-Nikodym derivative and
+  change-of-measure convention underlying likelihood-ratio reweighting.
 - `[Foulkes2001QMC]` W. M. C. Foulkes, L. Mitas, R. J. Needs, G. Rajagopal,
   *Quantum Monte Carlo simulations of solids*, **Rev. Mod. Phys. 73**, 33
   (2001). DOI: [10.1103/RevModPhys.73.33](https://doi.org/10.1103/RevModPhys.73.33)
@@ -979,6 +982,18 @@ $$
 \log Q_\theta(\mathbf{Y}\mid\mathbf{X}).
 $$
 
+This is the discrete Markov-kernel Radon-Nikodym derivative. For a trajectory
+generated under proposal \(Q\), the target-kernel path measure contributes the
+likelihood ratio
+
+$$
+\frac{d\mathbb{P}_K}{d\mathbb{P}_Q}
+=
+\prod_t
+\frac{K(x_{t+1}\mid x_t)}
+     {Q(x_{t+1}\mid x_t)}.
+$$
+
 Importance-sampled RN correction:
 
 $$
@@ -995,9 +1010,9 @@ $$
 
 Source basis:
 `Method paper`, DMC/importance-sampling basis from `[Foulkes2001QMC]` and
-`[UmrigarNightingaleRunge1993DMC]`; RN identity is the standard
-Radon-Nikodym/importance-sampling density-ratio identity; non-crossing target
-kernel component uses `[KarlinMcGregor1959]`.
+`[UmrigarNightingaleRunge1993DMC]`; Radon-Nikodym/change-of-measure convention
+from `[Billingsley1995Probability]`; non-crossing target kernel component uses
+`[KarlinMcGregor1959]`.
 
 Claim boundary:
 Candidate engine. It is DMC, but paper-level benchmark status requires
