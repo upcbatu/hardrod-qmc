@@ -2,7 +2,7 @@
 
 Active thesis title: **Microscopic description of trapped hard rods**.
 
-This repository is currently at a **promoted RN-DMC candidate package stage**.
+This repository is currently at an **RN-DMC candidate package stage**.
 The `src/hrdmc` package exposes the original VMC scaffold, a generic DMC
 contract package, and an RN-corrected
 collective-block DMC candidate.
@@ -66,7 +66,7 @@ collective-block DMC candidate.
 
 ## Not Yet Implemented
 
-- final QMC/DMC versus LDA failure-map release workflow with closed
+- final trapped hard-rod DMC/FW versus LDA failure-map release workflow with closed
   \(N=4,8,16,32\) production matrix and fixed-physical-FW timestep ladder;
   expected area: `src/hrdmc/analysis/`, `experiments/`, and archived results
 - release-grade citation metadata and archived result bundle;

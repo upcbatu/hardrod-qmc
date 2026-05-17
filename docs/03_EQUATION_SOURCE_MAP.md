@@ -46,6 +46,10 @@ Every entry below has one of these statuses:
   impenetrable bosons and fermions in one dimension*, **J. Math. Phys. 1**,
   516-523 (1960).
   DOI: [10.1063/1.1703687](https://doi.org/10.1063/1.1703687)
+- `[GirardeauWrightTriscari2001TrappedTG]` M. D. Girardeau, E. M. Wright, and
+  J. M. Triscari, *Ground-state properties of a one-dimensional system of
+  hard-core bosons in a harmonic trap*, **Phys. Rev. A 63**, 033601 (2001).
+  DOI: [10.1103/PhysRevA.63.033601](https://doi.org/10.1103/PhysRevA.63.033601)
 - `[GirardeauAstrakharchik2010TrappedHardSphere]` M. D. Girardeau and
   G. E. Astrakharchik, *Wave functions of the super-Tonks-Girardeau gas and the
   trapped one-dimensional hard-sphere Bose gas*, **Phys. Rev. A 81**,
@@ -119,6 +123,28 @@ Every entry below has one of these statuses:
   Correlated Regime in Quasi-One-Dimensional Bose Gases*, **Phys. Rev. Lett.
   95**, 190407 (2005).
   DOI: [10.1103/PhysRevLett.95.190407](https://doi.org/10.1103/PhysRevLett.95.190407)
+
+## Report-Facing Source Usage Summary
+
+This table is the compact source audit used by the report. It separates what a
+source contributes from what it does not prove.
+
+| source | used for in this repository/report | claim boundary |
+| --- | --- | --- |
+| `[Mazzanti2008HardRods]` | hard-rod potential, reduced length \(L'=L-Na\), homogeneous exact ring reference, homogeneous EOS | homogeneous exactness only; not a trapped finite-\(a\) exact solution |
+| `[AstrakharchikGiorgini2002TrappedCrossover]` | important trapped-QMC precedent for energies/radii and QMC-vs-LDA-style comparisons | not a hard-rod formula source and not direct validation of the present finite-\(a\) RN-DMC construction |
+| `[Astrakharchik2005LDA]` | LDA equation \(\mu=\mu_{\rm hom}(n)+V_{\rm ext}\), normalization, LDA density/energy/radius construction | LDA reference only; not an exact finite-\(N\) trapped benchmark |
+| `[Girardeau1960TG]`, `[GirardeauWrightTriscari2001TrappedTG]` | Tonks-Girardeau mapping and \(a=0\) trapped TG harmonic-trap exact-anchor logic | \(a=0\) impenetrable point-boson limit only; not finite-\(a\) hard rods |
+| `[GirardeauAstrakharchik2010TrappedHardSphere]` | trapped hard-sphere/super-Tonks context and finite-\(a\), \(N=2\) COM-relative reference motivation | supports \(N=2\) anchor and motivation; not an exact \(N>2\) propagator proof |
+| `[Foulkes2001QMC]` | importance-sampled DMC, local energy, mixed estimator conventions | general method source; not gap-\(h\)-product exactness |
+| `[UmrigarNightingaleRunge1993DMC]` | short-time DMC, drift-diffusion, timestep-bias caution | method and timestep source; not target-kernel exactness |
+| `[Billingsley1995Probability]` | Radon-Nikodym/change-of-measure \(K/Q\) weighting | \(K/Q\) corrects proposal to chosen target; it does not make the target exact |
+| `[KarlinMcGregor1959]` | ordered non-crossing determinant kernels | applies where the ordered-kernel assumptions match; not finite-\(a\), trapped \(N>2\) product exactness |
+| `[Doob1957HTransform]` | ground-state \(h\)-transform identity for normalized gap kernels | validates the transform identity; not the many-body product approximation |
+| `[CasullerasBoronat1995Pure]`, `[SarsaBoronatCasulleras2002Pure]` | mixed-vs-pure estimator split and forward-walking descendants | estimator-method basis; implementation still needs lag-zero and plateau gates |
+| `[FlyvbjergPetersen1989Blocking]`, `[Sokal1997MC]`, `[Geyer1992PracticalMCMC]`, `[Andrews1991HAC]`, `[PolitisRomano1995FlatTop]` | correlated-error, autocorrelation, \(N_{\rm eff}\), and error-bar triangulation | statistical precision only; not systematic-bias control |
+| `[Hellmann1937Quantenchemie]`, `[Feynman1939Forces]` | optional energy-response route to pure \(R^2\) | requires a controlled energy derivative; not a density estimator |
+| `[LiebLiniger1963GroundState]`, `[Lieb1963ExcitationSpectrum]`, `[Astrakharchik2005Quasi1DHardRods]` | optional background for future extensions and strongly correlated 1D context | optional only; not active hard-rod benchmark input |
 
 ## Units
 
@@ -265,9 +291,16 @@ A\cos\left(\frac{2\pi x}{\lambda}\right).
 $$
 
 Source basis:
-The harmonic trap is `Primary physics` / standard trapped-gas model with QMC
-context from `[AstrakharchikGiorgini2002TrappedCrossover]`. The zero and cosine
-potentials are `Repo convention` utilities.
+The harmonic trap is a standard trapped-gas model. 
+`[AstrakharchikGiorgini2002TrappedCrossover]` is an important trapped-QMC
+precedent rather than a direct validation source for the present finite-\(a\)
+hard-rod DMC construction. It shows how DMC can be used to compute trapped-gas
+energies and cloud radii and compare them with mean-field/LDA-type
+descriptions in a three- to one-dimensional crossover setting. The present
+thesis differs by focusing on the strictly one-dimensional finite-length
+hard-rod Hamiltonian and on the excluded-volume LDA built from the hard-rod
+equation of state. The zero and cosine potentials are `Repo convention`
+utilities.
 
 Claim boundary:
 The thesis trapped hard-rod path uses the harmonic trap. The cosine potential
@@ -375,7 +408,8 @@ $$
 Source basis:
 `Analytic identity`, harmonic oscillator spectrum plus the ordered
 Karlin-McGregor determinant `[KarlinMcGregor1959]`, TG mapping from
-`[Girardeau1960TG]`, and trapped hard-core/TG context from
+`[Girardeau1960TG]`, trapped harmonic TG exact-reference context from
+`[GirardeauWrightTriscari2001TrappedTG]`, and trapped hard-core/TG context from
 `[GirardeauAstrakharchik2010TrappedHardSphere]`.
 
 Claim boundary:
@@ -1232,9 +1266,11 @@ R_{\mathrm{rms}}=\sqrt{\langle R^2\rangle}.
 $$
 
 Source basis:
-`Primary physics`, trapped-cloud observable context from
-`[AstrakharchikGiorgini2002TrappedCrossover]`; hard-rod trapped context from
-`[GirardeauAstrakharchik2010TrappedHardSphere]`.
+`Primary physics` observable context: 
+`[AstrakharchikGiorgini2002TrappedCrossover]` is the important trapped-QMC
+precedent for energy/radius reporting and QMC-vs-LDA-style comparison;
+`[GirardeauAstrakharchik2010TrappedHardSphere]` supplies hard-rod trapped
+context.
 
 Claim boundary:
 For DMC, direct weighted \(R^2\)/RMS from sampled coordinates is a
