@@ -23,6 +23,114 @@ class LDADensityProfile:
     integrated_particles: float
 
 
+def hard_rod_lda_density_from_local_mu(
+    local_mu: float | FloatArray,
+    rod_length: float,
+) -> float | FloatArray:
+    """Invert the local hard-rod LDA equation in repository energy units.
+
+    The trapped LDA equation solved by this module is
+
+        local_mu = mu_HR(n)
+
+    where `local_mu = mu_0 - V(x)` and `mu_HR` is the homogeneous hard-rod
+    chemical potential in the repository convention hbar^2/(2m)=1. This helper
+    owns the local inversion used by the production LDA profile; it intentionally
+    preserves the existing monotone bisection implementation.
+    """
+
+    scalar_input = np.isscalar(local_mu)
+    values = np.atleast_1d(np.asarray(local_mu, dtype=float))
+    if rod_length < 0.0:
+        raise ValueError("rod_length must be non-negative")
+    if np.any(values < 0.0):
+        raise ValueError("local_mu must be non-negative")
+    densities = np.zeros_like(values, dtype=float)
+    positive = values > 0.0
+    densities[positive] = [
+        invert_hard_rod_chemical_potential(float(mu), rod_length)
+        for mu in values[positive]
+    ]
+    if scalar_input:
+        return float(densities[0])
+    return densities
+
+
+def hard_rod_lda_density_from_local_mu_cubic(
+    local_mu: float | FloatArray,
+    rod_length: float,
+) -> float | FloatArray:
+    """Solve the same local LDA equation through its explicit cubic form.
+
+    For `a = rod_length > 0`, set
+
+        y = a n / (1 - a n).
+
+    Then the hard-rod LDA equation becomes
+
+        2 y^3 + 3 y^2 = 3 a^2 local_mu / pi^2.
+
+    The physical density is recovered as `n = y / (a * (1 + y))`. This helper is
+    kept as an analytic cross-check of the production bisection inversion, not
+    as a replacement for it.
+    """
+
+    scalar_input = np.isscalar(local_mu)
+    values = np.atleast_1d(np.asarray(local_mu, dtype=float))
+    if rod_length < 0.0:
+        raise ValueError("rod_length must be non-negative")
+    if np.any(values < 0.0):
+        raise ValueError("local_mu must be non-negative")
+    if rod_length == 0.0:
+        densities = np.sqrt(values) / np.pi
+        return float(densities[0]) if scalar_input else densities
+
+    densities = np.zeros_like(values, dtype=float)
+    positive_indices = np.flatnonzero(values > 0.0)
+    for index in positive_indices:
+        scaled_mu = 3.0 * rod_length * rod_length * float(values[index]) / (np.pi**2)
+        roots = np.roots([2.0, 3.0, 0.0, -scaled_mu])
+        real_roots = roots[np.isclose(roots.imag, 0.0, atol=1e-10)].real
+        candidates = real_roots[real_roots >= 0.0]
+        if candidates.size == 0:
+            raise RuntimeError("failed to find physical hard-rod LDA cubic root")
+        y = float(np.min(candidates))
+        densities[index] = y / (rod_length * (1.0 + y))
+    if scalar_input:
+        return float(densities[0])
+    return densities
+
+
+def hard_rod_lda_density_small_a_expansion(
+    local_mu: float | FloatArray,
+    rod_length: float,
+) -> float | FloatArray:
+    """Return the fixed-chemical-potential small-`a` LDA density expansion.
+
+    In repository energy units,
+
+        n(local_mu, a) = sqrt(local_mu)/pi
+            - 4 a local_mu / (3 pi^2) + O(a^2).
+
+    In harmonic-oscillator energy units the same formula is obtained by passing
+    `local_mu_code = 2 * local_mu_ho`. The helper is a diagnostic expression for
+    the analytic small-rod limit; production profiles continue to use the exact
+    local inversion above.
+    """
+
+    scalar_input = np.isscalar(local_mu)
+    values = np.atleast_1d(np.asarray(local_mu, dtype=float))
+    if rod_length < 0.0:
+        raise ValueError("rod_length must be non-negative")
+    if np.any(values < 0.0):
+        raise ValueError("local_mu must be non-negative")
+    densities = np.sqrt(values) / np.pi - (4.0 * rod_length * values) / (3.0 * np.pi**2)
+    densities = np.maximum(densities, 0.0)
+    if scalar_input:
+        return float(densities[0])
+    return densities
+
+
 def _integrate(x: FloatArray, y: FloatArray) -> float:
     return float(np.trapezoid(y, x))
 
@@ -67,12 +175,7 @@ def lda_density_profile(
 
     def density_for_mu(global_mu: float) -> FloatArray:
         local_mu = np.maximum(global_mu - potential_x, 0.0)
-        densities = np.zeros_like(local_mu)
-        positive = local_mu > 0.0
-        densities[positive] = [
-            invert_hard_rod_chemical_potential(mu, rod_length) for mu in local_mu[positive]
-        ]
-        return densities
+        return np.asarray(hard_rod_lda_density_from_local_mu(local_mu, rod_length), dtype=float)
 
     def build_profile(global_mu: float, n_x: FloatArray, count: float) -> LDADensityProfile:
         if max(float(n_x[0]), float(n_x[-1])) > boundary_density_tolerance:

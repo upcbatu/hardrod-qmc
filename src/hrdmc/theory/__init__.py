@@ -14,6 +14,9 @@ from hrdmc.theory.harmonic_tg import (
 )
 from hrdmc.theory.lda import (
     LDADensityProfile,
+    hard_rod_lda_density_from_local_mu,
+    hard_rod_lda_density_from_local_mu_cubic,
+    hard_rod_lda_density_small_a_expansion,
     lda_density_profile,
     lda_mean_square_radius,
     lda_rms_radius,
@@ -41,6 +44,9 @@ __all__ = [
     "hard_rod_energy_density",
     "hard_rod_energy_per_particle",
     "hard_rod_finite_ring_energy_per_particle",
+    "hard_rod_lda_density_from_local_mu",
+    "hard_rod_lda_density_from_local_mu_cubic",
+    "hard_rod_lda_density_small_a_expansion",
     "invert_hard_rod_chemical_potential",
     "lda_density_profile",
     "lda_mean_square_radius",
