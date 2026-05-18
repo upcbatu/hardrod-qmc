@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +42,10 @@ from hrdmc.systems import (
     OpenN2HardRodTrapExactKernel,
 )
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
+from hrdmc.theory.units import (
+    HO_TRAP_OMEGA_IN_REPO_UNITS,
+    harmonic_oscillator_unit_metadata,
+)
 from hrdmc.wavefunctions.guides import GapHCorrectedHardRodGuide, ReducedTGHardRodGuide
 from hrdmc.workflows.dmc.rn_block_initial_conditions import (
     RNInitializationControls,
@@ -48,7 +53,7 @@ from hrdmc.workflows.dmc.rn_block_initial_conditions import (
     prepare_initial_walkers,
 )
 
-CASE_RE = re.compile(r"^N(?P<n>\d+)_a(?P<a>[0-9.]+)_omega(?P<omega>[0-9.]+)$")
+HO_CASE_RE = re.compile(r"^N(?P<n>\d+)_A(?P<A>[0-9.]+)$")
 MAX_AUTO_WORKERS = 6
 RN_GRID_SCHEMA_VERSION = "rn_block_grid_v1"
 RN_SINGLE_CASE_SCHEMA_VERSION = "rn_block_single_case_v1"
@@ -66,11 +71,44 @@ DEFAULT_COMPONENT_PROBABILITIES = (0.03, 0.10, 0.22, 0.30, 0.22, 0.10, 0.03)
 class RNCase:
     n_particles: int
     rod_length: float
-    omega: float
+    omega: float = HO_TRAP_OMEGA_IN_REPO_UNITS
+
+    def __post_init__(self) -> None:
+        if self.n_particles < 2:
+            raise ValueError("n_particles must be at least 2")
+        if self.rod_length < 0.0:
+            raise ValueError("rod_length must be non-negative")
+        if self.omega <= 0.0 or not math.isfinite(self.omega):
+            raise ValueError("omega must be finite and positive")
 
     @property
     def case_id(self) -> str:
+        if self.is_harmonic_oscillator_case:
+            return f"N{self.n_particles}_A{self.rod_length:g}"
         return f"N{self.n_particles}_a{self.rod_length:g}_omega{self.omega:g}"
+
+    @property
+    def is_harmonic_oscillator_case(self) -> bool:
+        return math.isclose(self.omega, HO_TRAP_OMEGA_IN_REPO_UNITS, rel_tol=0.0, abs_tol=1e-12)
+
+    @property
+    def rod_length_ho(self) -> float:
+        if not self.is_harmonic_oscillator_case:
+            raise ValueError("rod_length_ho is defined only for harmonic-oscillator cases")
+        return self.rod_length
+
+    def unit_metadata(self) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            **harmonic_oscillator_unit_metadata(),
+            "case_parameterization": (
+                "harmonic_oscillator_units"
+                if self.is_harmonic_oscillator_case
+                else "internal_trap_units"
+            ),
+            "rod_length_ho": self.rod_length if self.is_harmonic_oscillator_case else float("nan"),
+            "trap_omega_code": self.omega,
+        }
+        return metadata
 
 
 @dataclass(frozen=True)
@@ -120,13 +158,15 @@ class RNCollectiveProposalControls:
 
 
 def parse_case(case_id: str) -> RNCase:
-    match = CASE_RE.match(case_id)
-    if match is None:
-        raise ValueError(f"invalid case id: {case_id}")
-    return RNCase(
-        n_particles=int(match.group("n")),
-        rod_length=float(match.group("a")),
-        omega=float(match.group("omega")),
+    ho_match = HO_CASE_RE.match(case_id)
+    if ho_match is not None:
+        return RNCase(
+            n_particles=int(ho_match.group("n")),
+            rod_length=float(ho_match.group("A")),
+            omega=HO_TRAP_OMEGA_IN_REPO_UNITS,
+        )
+    raise ValueError(
+        f"invalid case id: {case_id}. Use N*_A* harmonic-oscillator units, e.g. N8_A0.2"
     )
 
 
@@ -340,6 +380,7 @@ def run_streaming_seed(
     )
     summary.metadata.update(initial.metadata)
     summary.metadata.update(proposal.to_metadata())
+    summary.metadata.update(case.unit_metadata())
     summary.metadata["proposal_family"] = proposal_family
     summary.metadata["guide_family"] = guide_family
     summary.metadata["target_family"] = target_family
@@ -498,6 +539,7 @@ def summarize_case(
         "n_particles": case.n_particles,
         "rod_length": case.rod_length,
         "omega": case.omega,
+        **case.unit_metadata(),
         "seeds": seeds,
         "controls": controls_to_dict(controls),
         "effective_grid_extent": float(max(abs(grid[0]), abs(grid[-1]))),
@@ -700,6 +742,9 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> Path | Non
     fields = [
         "case_id",
         "seed_count",
+        "case_parameterization",
+        "rod_length_ho",
+        "trap_omega_code",
         "mixed_energy",
         "mixed_energy_seed_stderr",
         "rms_radius",

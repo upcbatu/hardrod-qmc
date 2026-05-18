@@ -31,6 +31,7 @@ from hrdmc.theory import (
     trapped_tg_r2_radius,
     trapped_tg_rms_radius,
 )
+from hrdmc.theory.units import HO_TRAP_OMEGA_IN_REPO_UNITS
 from hrdmc.wavefunctions.guides import ReducedTGHardRodGuide
 from hrdmc.workflows.dmc.rn_block import (
     RNRunControls,
@@ -64,7 +65,12 @@ class ExactTGTrapConfig:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Validate RN-block DMC against exact trapped TG.")
     parser.add_argument("--n-particles", type=int, default=4)
-    parser.add_argument("--omega", type=float, default=0.1)
+    parser.add_argument(
+        "--omega",
+        type=float,
+        default=HO_TRAP_OMEGA_IN_REPO_UNITS,
+        help="Internal trap omega_code; sqrt(2) corresponds to harmonic-oscillator units.",
+    )
     parser.add_argument("--seeds", default="301,302,303,304")
     parser.add_argument("--dt", type=float, default=0.00125)
     parser.add_argument("--walkers", type=int, default=512)

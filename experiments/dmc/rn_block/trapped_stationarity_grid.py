@@ -30,14 +30,20 @@ from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationCont
 from hrdmc.workflows.dmc.rn_block_stationarity import classify_grid, summarize_stationarity_case
 from hrdmc.workflows.dmc.rn_block_stationarity_outputs import write_case_table, write_plots
 
-DEFAULT_CASES = "N4_a0.5_omega0.05,N8_a0.5_omega0.05,N8_a0.5_omega0.2"
+DEFAULT_CASES = "N4_A0.1,N8_A0.1,N8_A0.2"
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run a trapped RN-DMC stationarity diagnostic grid."
     )
-    parser.add_argument("--cases", default=DEFAULT_CASES)
+    parser.add_argument(
+        "--cases",
+        default=DEFAULT_CASES,
+        help=(
+            "Comma-separated harmonic-oscillator-unit cases, e.g. N4_A0.1,N8_A0.2."
+        ),
+    )
     parser.add_argument("--seeds", default="301,302,303,304")
     parser.add_argument("--dt", type=float, default=0.00125)
     parser.add_argument("--walkers", type=int, default=512)

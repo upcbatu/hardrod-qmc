@@ -20,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Offline Hellmann-Feynman trap R2/RMS reanalysis from RN-DMC summaries."
     )
     parser.add_argument("summaries", nargs="+", type=Path)
-    parser.add_argument("--base-case", default="N8_a0.5_omega0.05")
+    parser.add_argument("--base-case", default="N8_A0.1")
     parser.add_argument("--polynomial-degree", type=int, default=1)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--no-write", action="store_true")

@@ -125,7 +125,14 @@ def _should_draw_band(
 def _density_title(payload: dict[str, Any]) -> str:
     n_particles = payload.get("n_particles")
     rod_length = payload.get("rod_length")
+    rod_length_ho = payload.get("rod_length_ho")
     omega = payload.get("omega")
+    if (
+        payload.get("case_parameterization") == "harmonic_oscillator_units"
+        and n_particles is not None
+        and rod_length_ho is not None
+    ):
+        return f"Density comparison: N={int(n_particles)}, A={float(rod_length_ho):g}"
     if n_particles is not None and rod_length is not None and omega is not None:
         return (
             f"Density comparison: N={int(n_particles)}, "

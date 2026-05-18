@@ -26,7 +26,12 @@ class ZeroPotential:
 
 @dataclass(frozen=True)
 class HarmonicTrap:
-    """Harmonic trap V(x)=0.5*omega^2*(x-center)^2."""
+    """Harmonic trap V(x)=0.5*omega^2*(x-center)^2.
+
+    The trapped production workflows use harmonic-oscillator length units. In
+    the repository kinetic convention hbar^2/(2m)=1 this corresponds to
+    omega=sqrt(2), so V(x)=x^2.
+    """
 
     omega: float
     center: float = 0.0

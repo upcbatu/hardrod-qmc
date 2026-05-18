@@ -224,6 +224,7 @@ def summarize_stationarity_from_seed_summaries(
         "n_particles": case.n_particles,
         "rod_length": case.rod_length,
         "omega": case.omega,
+        **case.unit_metadata(),
         "initialization_mode": initialization.mode,
         "init_width_log_sigma": initialization.init_width_log_sigma,
         "breathing_preburn_steps": initialization.breathing_preburn_steps,

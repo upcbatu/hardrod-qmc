@@ -32,7 +32,7 @@ from hrdmc.workflows.dmc.rn_block import (
 )
 from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 
-DEFAULT_CASE = "N8_a0.5_omega0.05"
+DEFAULT_CASE = "N8_A0.1"
 DEFAULT_LAGS = "0,10,20,30,40,50,100,200"
 
 
@@ -40,7 +40,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run one RN-DMC benchmark packet with energy gates and transported FW."
     )
-    parser.add_argument("--case", default=DEFAULT_CASE)
+    parser.add_argument(
+        "--case",
+        default=DEFAULT_CASE,
+        help=(
+            "Case in harmonic-oscillator units, e.g. N8_A0.2 where A=a/a_ho."
+        ),
+    )
     parser.add_argument("--seeds", default="1001,1002")
     parser.add_argument("--dt", type=float, default=0.00125)
     parser.add_argument("--walkers", type=int, default=256)

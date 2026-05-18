@@ -32,7 +32,9 @@ class HardRodSystem:
 
     Notes
     -----
-    The prototype works in units hbar^2 / (2m) = 1.
+    The prototype works in units hbar^2 / (2m) = 1. Trapped production
+    workflows choose the harmonic-oscillator length as the length unit on top
+    of this kinetic convention; see `hrdmc.theory.units`.
     Reduced-length geometry lives in `hrdmc.systems.reduced`; EOS formulas live
     in `hrdmc.theory`.
     """

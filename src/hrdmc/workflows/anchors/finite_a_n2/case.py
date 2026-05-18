@@ -84,6 +84,7 @@ def summarize_finite_a_n2_reference_case(
         "n_particles": case.n_particles,
         "rod_length": case.rod_length,
         "omega": case.omega,
+        **case.unit_metadata(),
         "controls": controls_to_dict(controls),
         "seeds": seeds,
         "seed_count": len(seeds),

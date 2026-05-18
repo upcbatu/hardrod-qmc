@@ -7,6 +7,10 @@ These files are intentionally not raw run bundles. Full trace JSON, per-seed
 audits, progress logs, and large reproducibility payloads should be archived as
 separate run artifacts for thesis or paper use.
 
+The trapped rows in the current CSV snapshots predate the harmonic-oscillator
+case-id migration and use legacy `N*_a*_omega*` labels. New trapped production
+runs should use canonical `N*_A*` case ids, where \(A=a/a_{\mathrm{ho}}\).
+
 ## Files
 
 - `rn_validation_summary.csv`: homogeneous hard-rod validation against exact

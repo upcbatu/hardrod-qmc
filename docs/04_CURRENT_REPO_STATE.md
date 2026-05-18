@@ -15,6 +15,11 @@ collective-block DMC candidate.
   files: `src/hrdmc/systems/reduced.py`
 - homogeneous hard-rod EOS, finite ring energy, chemical potential, chemical-potential inversion, and LDA support;
   files: `src/hrdmc/theory/`
+- trapped harmonic-oscillator unit conversion for production cases:
+  canonical trapped case ids use \(A=a/a_{\mathrm{ho}}\), for example
+  `N8_A0.2`; internally this maps to `omega_code = sqrt(2)` in the existing
+  \(\hbar^2/(2m)=1\) kinetic convention;
+  files: `src/hrdmc/theory/units.py`, `src/hrdmc/workflows/dmc/rn_block.py`
 - Jastrow-based trial-wavefunction implementation for the ring scaffold;
   files: `src/hrdmc/wavefunctions/trials/jastrow.py`
 - initial homogeneous VMC workflow;

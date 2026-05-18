@@ -36,6 +36,7 @@ from hrdmc.workflows.dmc.rn_block import (
     rn_progress_bar,
 )
 from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
+from hrdmc.theory.units import HO_TRAP_OMEGA_IN_REPO_UNITS
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -45,8 +46,19 @@ def build_parser() -> argparse.ArgumentParser:
             "relative-coordinate reference."
         )
     )
-    parser.add_argument("--rod-length-values", default="0.5")
-    parser.add_argument("--omega-values", default="0.2,0.1,0.05")
+    parser.add_argument(
+        "--rod-length-values",
+        default="0.2",
+        help="Comma-separated A=a/a_ho values in harmonic-oscillator length units.",
+    )
+    parser.add_argument(
+        "--omega-values",
+        default=f"{HO_TRAP_OMEGA_IN_REPO_UNITS:g}",
+        help=(
+            "Internal trap omega_code. Leave at sqrt(2) for harmonic-oscillator "
+            "units; non-default values are internal solver checks."
+        ),
+    )
     parser.add_argument("--seeds", default="1001,1002")
     parser.add_argument("--dt", type=float, default=0.00125)
     parser.add_argument("--walkers", type=int, default=256)

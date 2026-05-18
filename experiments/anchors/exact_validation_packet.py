@@ -25,6 +25,7 @@ from hrdmc.workflows.dmc.rn_block import (
     resolve_parallel_workers,
     rn_progress_bar,
 )
+from hrdmc.theory.units import HO_TRAP_OMEGA_IN_REPO_UNITS
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,7 +33,14 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run the canonical exact-validation packet for RN-block artifacts."
     )
     parser.add_argument("--trapped-n-values", default="2,4")
-    parser.add_argument("--trapped-omega-values", default="0.1,0.2")
+    parser.add_argument(
+        "--trapped-omega-values",
+        default=f"{HO_TRAP_OMEGA_IN_REPO_UNITS:g}",
+        help=(
+            "Internal trap omega_code values. The default sqrt(2) corresponds "
+            "to harmonic-oscillator units."
+        ),
+    )
     parser.add_argument("--homogeneous-n-values", default="4,8")
     parser.add_argument("--homogeneous-eta-values", default="0.1,0.5")
     parser.add_argument("--rod-length", type=float, default=0.5)
