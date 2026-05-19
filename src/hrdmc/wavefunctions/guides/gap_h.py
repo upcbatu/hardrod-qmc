@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -171,7 +170,7 @@ def _nearest_gap_correction(
         log_correction=np.asarray(log_correction, dtype=float),
         grad_correction=np.asarray(grad_correction, dtype=float),
         lap_correction=np.asarray(lap_correction, dtype=float),
-        n2_total_energy=float(table.relative_energy + omega / math.sqrt(2.0)),
+        n2_total_energy=float(table.relative_energy + 0.5 * omega),
     )
 
 

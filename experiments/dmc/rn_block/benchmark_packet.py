@@ -38,7 +38,10 @@ DEFAULT_LAGS = "0,10,20,30,40,50,100,200"
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run one RN-DMC benchmark packet with energy gates and transported FW."
+        description=(
+            "Run one RN-DMC benchmark packet with energy diagnostics and "
+            "transported FW observables."
+        )
     )
     parser.add_argument(
         "--case",
@@ -56,7 +59,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--production-tau", type=float, default=120.0)
     parser.add_argument("--store-every", type=int, default=40)
     parser.add_argument("--grid-extent", type=float, default=20.0)
-    parser.add_argument("--n-bins", type=int, default=240)
+    parser.add_argument(
+        "--n-bins",
+        type=int,
+        default=800,
+        help=(
+            "Density histogram bins. The default is intentionally high enough "
+            "to resolve finite-N trapped density peaks in report figures."
+        ),
+    )
     parser.add_argument(
         "--initialization-mode",
         choices=("tight-lattice", "lda-rms-lattice", "lda-rms-logspread"),

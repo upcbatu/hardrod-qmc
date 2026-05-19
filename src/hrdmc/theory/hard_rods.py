@@ -19,21 +19,21 @@ def hard_rod_finite_ring_energy_per_particle(
     length: float,
     rod_length: float,
 ) -> float:
-    """Finite-N homogeneous ring benchmark energy in units hbar^2/(2m)=1."""
+    """Finite-N homogeneous ring benchmark energy in units hbar^2/(m)=1."""
     if n_particles < 2:
         raise ValueError("n_particles must be at least 2")
     free_length = excluded_length(n_particles, length, rod_length)
     quantum_numbers = np.arange(n_particles, dtype=float) - (n_particles - 1) / 2.0
     k = 2.0 * np.pi * quantum_numbers / free_length
-    return float(np.sum(k**2) / n_particles)
+    return float(0.5 * np.sum(k**2) / n_particles)
 
 
 def hard_rod_energy_per_particle(density: float, rod_length: float) -> float:
-    """Thermodynamic homogeneous hard-rod EOS in units hbar^2/(2m)=1."""
+    """Thermodynamic homogeneous hard-rod EOS in units hbar^2/(m)=1."""
     _validate_density(density, rod_length)
     if density == 0.0:
         return 0.0
-    return float(np.pi**2 * density**2 / (3.0 * (1.0 - density * rod_length) ** 2))
+    return float(np.pi**2 * density**2 / (6.0 * (1.0 - density * rod_length) ** 2))
 
 
 def hard_rod_energy_density(density: float, rod_length: float) -> float:
@@ -47,7 +47,7 @@ def hard_rod_chemical_potential(density: float, rod_length: float) -> float:
     if density == 0.0:
         return 0.0
     numerator = np.pi**2 * density**2 * (3.0 - rod_length * density)
-    denominator = 3.0 * (1.0 - rod_length * density) ** 3
+    denominator = 6.0 * (1.0 - rod_length * density) ** 3
     return float(numerator / denominator)
 
 
@@ -70,7 +70,7 @@ def invert_hard_rod_chemical_potential(
     if chemical_potential == 0.0:
         return 0.0
     if rod_length == 0.0:
-        return float(np.sqrt(chemical_potential) / np.pi)
+        return float(np.sqrt(2.0 * chemical_potential) / np.pi)
 
     low = 0.0
     high = (1.0 / rod_length) * (1.0 - 1e-14)

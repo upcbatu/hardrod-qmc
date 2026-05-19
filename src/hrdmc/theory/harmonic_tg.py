@@ -7,17 +7,17 @@ FloatArray = NDArray[np.float64]
 
 
 def trapped_tg_energy_total(n_particles: int, omega: float) -> float:
-    """Exact trapped Tonks-Girardeau energy in units hbar^2/(2m)=1."""
+    """Exact trapped Tonks-Girardeau energy in harmonic-oscillator units."""
 
     _validate_trapped_tg_inputs(n_particles, omega)
-    return float(n_particles * n_particles * omega / np.sqrt(2.0))
+    return float(0.5 * n_particles * n_particles * omega)
 
 
 def trapped_tg_r2_radius(n_particles: int, omega: float) -> float:
     """Exact per-particle <x^2> for zero-length hard rods in a harmonic trap."""
 
     _validate_trapped_tg_inputs(n_particles, omega)
-    return float(n_particles / (np.sqrt(2.0) * omega))
+    return float(n_particles / (2.0 * omega))
 
 
 def trapped_tg_rms_radius(n_particles: int, omega: float) -> float:
@@ -41,7 +41,7 @@ def trapped_tg_density_profile(
     if not np.all(np.isfinite(grid)):
         raise ValueError("x must be finite")
 
-    q = omega / np.sqrt(2.0)
+    q = omega
     z = np.sqrt(q) * grid
     phi0 = (q / np.pi) ** 0.25 * np.exp(-0.5 * z * z)
     density = phi0 * phi0
@@ -74,9 +74,9 @@ def trapped_tg_density_profile_semiclassical(
     if not np.all(np.isfinite(grid)):
         raise ValueError("x must be finite")
 
-    q = omega / np.sqrt(2.0)
-    chemical_potential = 2.0 * n_particles * q
-    support = chemical_potential - q * q * grid * grid
+    q = omega
+    chemical_potential = float(n_particles) * q
+    support = 2.0 * (chemical_potential - 0.5 * q * q * grid * grid)
     return np.sqrt(np.maximum(support, 0.0)) / np.pi
 
 

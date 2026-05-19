@@ -156,7 +156,7 @@ def main() -> None:
         "status": "passed" if passed else "failed",
         "benchmark": "homogeneous hard-rod ring exact-wavefunction validation",
         "benchmark_tier": "exact_trial_local_energy",
-        "units": "hbar^2/(2m)=1",
+        "units": "hbar^2/m=1",
         "tolerance_energy_per_particle_abs": args.tolerance,
         "max_energy_per_particle_abs_error": max_error,
         "case_count": len(cases),

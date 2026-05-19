@@ -108,7 +108,7 @@ def run_trapped_tg_anchor(
         "anchor_type": "trapped_tg_rn_dmc_plus_transported_fw",
         "exact_solution": {
             "model": "zero-length hard rods in a harmonic trap",
-            "formula": "TG harmonic mapping: E0 = N^2 * omega / sqrt(2)",
+            "formula": "TG harmonic mapping: E0 = N^2 * omega / 2",
             "n_particles": anchor.n_particles,
             "omega": anchor.omega,
             "energy_total": exact_energy,
@@ -201,7 +201,7 @@ def _run_trapped_tg_seed(
     guide = ReducedTGHardRodGuide(
         system=system,
         trap=trap,
-        alpha=anchor.omega / np.sqrt(2.0),
+        alpha=anchor.omega,
     )
     rng = np.random.default_rng(seed)
     observer = TransportedAuxiliaryForwardWalking(pure_config)

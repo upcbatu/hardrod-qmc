@@ -31,7 +31,7 @@ from hrdmc.theory import (
     trapped_tg_r2_radius,
     trapped_tg_rms_radius,
 )
-from hrdmc.theory.units import HO_TRAP_OMEGA_IN_REPO_UNITS
+from hrdmc.theory.units import HO_TRAP_OMEGA
 from hrdmc.wavefunctions.guides import ReducedTGHardRodGuide
 from hrdmc.workflows.dmc.rn_block import (
     RNRunControls,
@@ -68,8 +68,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--omega",
         type=float,
-        default=HO_TRAP_OMEGA_IN_REPO_UNITS,
-        help="Internal trap omega_code; sqrt(2) corresponds to harmonic-oscillator units.",
+        default=HO_TRAP_OMEGA,
+        help="Trap frequency in harmonic-oscillator units; default is omega=1.",
     )
     parser.add_argument("--seeds", default="301,302,303,304")
     parser.add_argument("--dt", type=float, default=0.00125)
@@ -136,7 +136,7 @@ def main() -> None:
         "claim_boundary": "exact a=0 harmonic TG anchor; not a finite-rod trapped benchmark",
         "exact_solution": {
             "model": "zero-length hard rods in a harmonic trap",
-            "formula": "E0 = N^2 * omega / sqrt(2)",
+            "formula": "E0 = N^2 * omega / 2",
             "n_particles": exact_config.n_particles,
             "omega": exact_config.omega,
             "energy_total": exact_config.exact_energy_total,
@@ -275,7 +275,7 @@ def _run_exact_seed(
     guide = ReducedTGHardRodGuide(
         system=system,
         trap=trap,
-        alpha=exact_config.omega / np.sqrt(2.0),
+        alpha=exact_config.omega,
     )
     rng = np.random.default_rng(seed)
     return run_rn_block_dmc_streaming(

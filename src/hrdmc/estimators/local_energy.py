@@ -72,10 +72,10 @@ def trapped_hard_rod_local_energy(
 
     The kinetic term uses
 
-        -sum_i [d_i^2 log(Psi_T) + (d_i log(Psi_T))^2]
+        -1/2 sum_i [d_i^2 log(Psi_T) + (d_i log(Psi_T))^2]
 
-    in units hbar^2/(2m)=1. Invalid hard-rod configurations raise, because
-    they should not enter a VMC estimator.
+    in harmonic-oscillator units. Invalid hard-rod configurations raise,
+    because they should not enter a VMC estimator.
     """
 
     positions = np.asarray(positions, dtype=float)
@@ -104,7 +104,7 @@ def trapped_hard_rod_local_energy(
         lap_log[:-1] -= power * inv_gaps_sq
         lap_log[1:] -= power * inv_gaps_sq
 
-    kinetic = float(-np.sum(lap_log + grad_log**2))
+    kinetic = float(-0.5 * np.sum(lap_log + grad_log**2))
     trap_energy = trap.total(positions)
     return TrappedLocalEnergyComponents(
         kinetic=kinetic,

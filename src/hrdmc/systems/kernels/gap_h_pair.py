@@ -28,7 +28,7 @@ def _sample_cdf_indices_python(cdf: FloatArray, rows: IntArray, uniforms: FloatA
 
 if NUMBA_AVAILABLE:
 
-    @njit(cache=True)
+    @njit
     def _sample_cdf_indices_numba(
         cdf: FloatArray,
         rows: IntArray,

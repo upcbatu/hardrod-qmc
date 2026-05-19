@@ -52,7 +52,7 @@ def run_homogeneous_ring_anchor(
         "anchor_id": anchor.anchor_id,
         "status": "passed" if max_abs_error <= tolerance else "failed",
         "anchor_type": "homogeneous_finite_a_ring_local_energy",
-        "formula": "E_N/N = pi^2 * (N^2 - 1) / (3 * (L - N*a)^2)",
+        "formula": "E_N/N = pi^2 * (N^2 - 1) / (6 * (L - N*a)^2)",
         "n_particles": system.n_particles,
         "rod_length": system.rod_length,
         "length": system.length,

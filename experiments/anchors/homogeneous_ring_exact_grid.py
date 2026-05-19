@@ -75,8 +75,8 @@ def main() -> None:
             "and not an LDA validation"
         ),
         "source_basis": "Mazzanti2008HardRods finite-N reduced-length mapping",
-        "formula": "E_N/N = pi^2 * (N^2 - 1) / (3 * (L - N*a)^2)",
-        "units": "hbar^2/(2m)=1",
+        "formula": "E_N/N = pi^2 * (N^2 - 1) / (6 * (L - N*a)^2)",
+        "units": "hbar^2/m=1",
         "rod_length": args.rod_length,
         "samples_per_case": args.samples_per_case,
         "tolerance_energy_per_particle_abs": args.tolerance,

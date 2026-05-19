@@ -15,7 +15,7 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> None:
         "case_id",
         "case_parameterization",
         "rod_length_ho",
-        "trap_omega_code",
+        "trap_omega",
         "case_gate",
         "old_case_gate",
         "hygiene_gate",

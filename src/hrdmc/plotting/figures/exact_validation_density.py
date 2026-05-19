@@ -348,7 +348,7 @@ def _draw_tg_density_limit_panel(
     omega: float,
     n_values: tuple[int, ...],
 ) -> None:
-    max_support = float(np.sqrt(2.0 * max(n_values) * np.sqrt(2.0) / omega))
+    max_support = float(np.sqrt(2.0 * max(n_values) / omega))
     x = np.linspace(-1.12 * max_support, 1.12 * max_support, 900)
     colors = ("#0072B2", "#D55E00", "#117733", "#CC79A7")
     for color, n_particles in zip(colors, n_values, strict=True):

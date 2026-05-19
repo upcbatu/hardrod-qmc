@@ -174,10 +174,9 @@ class OpenHardRodTrapGapHProductTargetKernel:
         log_h += table.log_density(gaps_old, gaps_new)
         log_psi_old = self._ground_log_value(q_old, gaps_old, table)
         log_psi_new = self._ground_log_value(q_new, gaps_new, table)
-        product_energy = (
-            self.trap.omega / math.sqrt(2.0)
-            + (self.system.n_particles - 1) * table.relative_energy
-        )
+        product_energy = 0.5 * self.trap.omega + (
+            self.system.n_particles - 1
+        ) * table.relative_energy
         out = log_h - tau * product_energy + log_psi_old - log_psi_new
         invalid = (
             np.any(~np.isfinite(x_old), axis=1)
@@ -291,7 +290,7 @@ class OpenN2HardRodTrapExactKernel:
         log_h += table.log_density(gap_old, gap_new)
         log_psi_old = self._ground_log_value(q_old, gap_old[:, 0], table)
         log_psi_new = self._ground_log_value(q_new, gap_new[:, 0], table)
-        total_energy = table.relative_energy + self.trap.omega / math.sqrt(2.0)
+        total_energy = table.relative_energy + 0.5 * self.trap.omega
         out = log_h - tau * total_energy + log_psi_old - log_psi_new
         invalid = (
             np.any(~np.isfinite(x_old), axis=1)
@@ -329,7 +328,7 @@ class OpenN2HardRodTrapExactKernel:
         gap: FloatArray,
         table: GapHTransformTable,
     ) -> FloatArray:
-        variance = 1.0 / (math.sqrt(2.0) * self.system.n_particles * self.trap.omega)
+        variance = 1.0 / (2.0 * self.system.n_particles * self.trap.omega)
         log_com = -(q * q) / (4.0 * variance)
         psi_floor = max(
             float(np.max(np.abs(table.ground_state))) * 1.0e-14,

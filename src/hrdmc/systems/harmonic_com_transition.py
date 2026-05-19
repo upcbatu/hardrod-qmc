@@ -43,8 +43,8 @@ def harmonic_com_h_transform_moments(
         raise ValueError("omega must be finite and positive")
     if tau <= 0.0:
         raise ValueError("tau must be positive")
-    gamma = math.sqrt(2.0) * omega
-    stationary_variance = 1.0 / (math.sqrt(2.0) * n_particles * omega)
+    gamma = omega
+    stationary_variance = 1.0 / (2.0 * n_particles * omega)
     rho = math.exp(-gamma * tau)
     return rho, stationary_variance * (1.0 - rho * rho)
 
@@ -54,4 +54,4 @@ def harmonic_com_ground_variance(n_particles: int, omega: float) -> float:
         raise ValueError("n_particles must be positive")
     if omega <= 0.0 or not math.isfinite(omega):
         raise ValueError("omega must be finite and positive")
-    return 1.0 / (math.sqrt(2.0) * n_particles * omega)
+    return 1.0 / (2.0 * n_particles * omega)

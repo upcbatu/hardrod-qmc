@@ -166,9 +166,9 @@ def _solve_pair_basis(
 def _relative_pair_hamiltonian(y: FloatArray, omega: float) -> FloatArray:
     dy = float(y[1] - y[0])
     n = y.size
-    diagonal = np.full(n, 4.0 / (dy * dy), dtype=float)
+    diagonal = np.full(n, 2.0 / (dy * dy), dtype=float)
     diagonal += 0.25 * omega * omega * y * y
-    off_diagonal = np.full(n - 1, -2.0 / (dy * dy), dtype=float)
+    off_diagonal = np.full(n - 1, -1.0 / (dy * dy), dtype=float)
     return (
         np.diag(diagonal)
         + np.diag(off_diagonal, k=1)
@@ -195,4 +195,3 @@ def _positive_ground_state(values: FloatArray) -> FloatArray:
     psi = np.asarray(values, dtype=float)
     floor = max(float(np.max(np.abs(psi))) * 1.0e-14, np.finfo(float).tiny)
     return np.maximum(np.abs(psi), floor)
-

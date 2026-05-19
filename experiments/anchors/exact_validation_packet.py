@@ -25,7 +25,7 @@ from hrdmc.workflows.dmc.rn_block import (
     resolve_parallel_workers,
     rn_progress_bar,
 )
-from hrdmc.theory.units import HO_TRAP_OMEGA_IN_REPO_UNITS
+from hrdmc.theory.units import HO_TRAP_OMEGA
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,11 +35,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--trapped-n-values", default="2,4")
     parser.add_argument(
         "--trapped-omega-values",
-        default=f"{HO_TRAP_OMEGA_IN_REPO_UNITS:g}",
-        help=(
-            "Internal trap omega_code values. The default sqrt(2) corresponds "
-            "to harmonic-oscillator units."
-        ),
+        default=f"{HO_TRAP_OMEGA:g}",
+        help="Trap frequencies in harmonic-oscillator units; default is omega=1.",
     )
     parser.add_argument("--homogeneous-n-values", default="4,8")
     parser.add_argument("--homogeneous-eta-values", default="0.1,0.5")
@@ -53,7 +50,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--production-tau", type=float, default=40.0)
     parser.add_argument("--store-every", type=int, default=20)
     parser.add_argument("--grid-extent", type=float, default=12.0)
-    parser.add_argument("--n-bins", type=int, default=200)
+    parser.add_argument(
+        "--n-bins",
+        type=int,
+        default=800,
+        help=(
+            "Density histogram bins. The default is intentionally high enough "
+            "to resolve finite-N trapped density peaks in report figures."
+        ),
+    )
     parser.add_argument("--parallel-workers", type=int, default=0)
     parser.add_argument("--energy-tolerance", type=float, default=1e-8)
     parser.add_argument("--homogeneous-samples", type=int, default=6)

@@ -127,8 +127,8 @@ def trapped_n2_finite_a_reference(
     mass = psi * psi * ground.dy
     mass = mass / float(np.sum(mass))
     gap_mean_square = float(np.sum(ground.y_grid * ground.y_grid * mass))
-    com_energy = float(omega / math.sqrt(2.0))
-    com_variance = float(1.0 / (2.0 * math.sqrt(2.0) * omega))
+    com_energy = float(0.5 * omega)
+    com_variance = float(1.0 / (4.0 * omega))
     total_energy = float(ground.relative_energy + com_energy)
     r2_radius = float(center * center + com_variance + 0.25 * gap_mean_square)
     return TrappedN2FiniteAReference(

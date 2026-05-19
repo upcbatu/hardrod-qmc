@@ -55,11 +55,17 @@ def euler_drift_diffusion_step(
     dt: float,
     local_energies: FloatArray,
 ) -> RNBlockLocalStepResult:
-    """Default local DMC proposal using guide drift and hard fail on invalid trials."""
+    """Default local DMC proposal in harmonic-oscillator units.
+
+    The physical Hamiltonian has kinetic term -1/2 sum_i d_i^2. The associated
+    importance-sampled drift-diffusion move has diffusion coefficient D=1/2,
+    hence drift velocity grad log(Psi_T) and Gaussian variance dt per
+    coordinate.
+    """
 
     grad, _current_energies, _current_valid = guide_grad_energy_valid(guide, positions)
-    drift = 2.0 * grad
-    trial = positions + dt * drift + np.sqrt(2.0 * dt) * rng.normal(size=positions.shape)
+    drift = grad
+    trial = positions + dt * drift + np.sqrt(dt) * rng.normal(size=positions.shape)
     trial_energies, valid = evaluate_guide(guide, trial)
     killed = ~valid
     return RNBlockLocalStepResult(

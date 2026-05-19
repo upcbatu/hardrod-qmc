@@ -28,9 +28,9 @@ class ZeroPotential:
 class HarmonicTrap:
     """Harmonic trap V(x)=0.5*omega^2*(x-center)^2.
 
-    The trapped production workflows use harmonic-oscillator length units. In
-    the repository kinetic convention hbar^2/(2m)=1 this corresponds to
-    omega=sqrt(2), so V(x)=x^2.
+    Trapped workflows use dimensionless harmonic-oscillator coordinates by
+    default. In those code variables the default trap coefficient is one, so
+    V(q)=q^2/2.
     """
 
     omega: float

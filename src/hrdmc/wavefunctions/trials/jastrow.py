@@ -46,7 +46,7 @@ class HardRodJastrowTrial:
         return float(np.exp(logv))
 
     def local_kinetic_energy(self, positions: FloatArray) -> float:
-        """Return -sum_i nabla_i^2 psi / psi for the all-pair reduced trial.
+        """Return -1/2 sum_i nabla_i^2 psi / psi for the all-pair reduced trial.
 
         The all-pair `power=1` form is the controlled homogeneous-ring
         validation wavefunction. For that case this local kinetic energy is
@@ -79,7 +79,7 @@ class HardRodJastrowTrial:
                 lap_log -= self.power * alpha**2 / sin_phase**2
             laplacian_over_value += lap_log + grad_log**2
 
-        return float(-laplacian_over_value)
+        return float(-0.5 * laplacian_over_value)
 
     def _log_nearest_neighbor(self, positions: FloatArray) -> float:
         gaps = self.system.nearest_neighbor_gaps(positions)

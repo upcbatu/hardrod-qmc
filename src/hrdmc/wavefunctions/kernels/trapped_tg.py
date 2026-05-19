@@ -186,7 +186,7 @@ def _reduced_tg_grad_lap_local_batch_python(
             local_sum += lap_i + grad_i * grad_i
             centered = x[walker, i] - center
             trap_sum += centered * centered
-        value = -local_sum + 0.5 * omega2 * trap_sum
+        value = -0.5 * local_sum + 0.5 * omega2 * trap_sum
         local[walker] = value
         finite[walker] = row_finite and np.isfinite(value)
     return grad, lap, local, finite
@@ -194,7 +194,7 @@ def _reduced_tg_grad_lap_local_batch_python(
 
 if NUMBA_AVAILABLE:
 
-    @njit(cache=True, fastmath=False)
+    @njit(fastmath=False)
     def _valid_batch_numba(x: FloatArray, rod_length: float) -> NDArray[np.bool_]:
         walkers, n_particles = x.shape
         valid = np.empty(walkers, dtype=np.bool_)
@@ -213,7 +213,7 @@ if NUMBA_AVAILABLE:
             valid[walker] = ok
         return valid
 
-    @njit(cache=True, fastmath=False)
+    @njit(fastmath=False)
     def _reduced_tg_log_batch_numba(
         x: FloatArray,
         offsets: FloatArray,
@@ -260,7 +260,7 @@ if NUMBA_AVAILABLE:
                 finite[walker] = False
         return log_values, finite
 
-    @njit(cache=True, fastmath=False)
+    @njit(fastmath=False)
     def _reduced_tg_grad_lap_local_batch_numba(
         x: FloatArray,
         offsets: FloatArray,
@@ -313,7 +313,7 @@ if NUMBA_AVAILABLE:
                 local_sum += lap_i + grad_i * grad_i
                 centered = x[walker, i] - center
                 trap_sum += centered * centered
-            value = -local_sum + 0.5 * omega2 * trap_sum
+            value = -0.5 * local_sum + 0.5 * omega2 * trap_sum
             local[walker] = value
             finite[walker] = row_finite and np.isfinite(value)
         return grad, lap, local, finite

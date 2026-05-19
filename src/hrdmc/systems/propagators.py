@@ -43,9 +43,8 @@ def transition_backend(kernel: TargetTransitionKernel) -> str:
 class HarmonicMehlerKernel:
     """Normalized one-body harmonic Mehler proposal kernel.
 
-    Repo units use H=-d^2/dx^2 + 0.5*omega^2*x^2, so the oscillator frequency
-    entering the normalized Mehler transition is sqrt(2)*omega. This is a
-    proposal density, not the raw Hamiltonian heat kernel.
+    Harmonic-oscillator units use H=-1/2*d^2/dx^2+0.5*omega^2*x^2. This is a
+    row-normalized proposal density, not the raw Hamiltonian heat kernel.
     """
 
     trap: HarmonicTrap
@@ -80,7 +79,7 @@ class HarmonicMehlerKernel:
 class HarmonicOscillatorHeatKernel:
     """Unnormalized one-body harmonic imaginary-time heat kernel.
 
-    This is the Hamiltonian kernel for H=-d^2/dx^2+0.5*omega^2*x^2. It is a
+    This is the Hamiltonian kernel for H=-1/2*d^2/dx^2+0.5*omega^2*x^2. It is a
     target kernel for RN/DMC weighting, not a normalized proposal sampler.
     """
 
@@ -200,10 +199,10 @@ def harmonic_oscillator_heat_log_matrix(
         raise ValueError("x_old and x_new must have matching shapes")
     if tau <= 0.0:
         raise ValueError("tau must be positive")
-    q = trap.omega / math.sqrt(2.0)
-    two_q_tau = 2.0 * q * tau
-    sinh = math.sinh(two_q_tau)
-    cosh = math.cosh(two_q_tau)
+    q = trap.omega
+    q_tau = q * tau
+    sinh = math.sinh(q_tau)
+    cosh = math.cosh(q_tau)
     if sinh <= 0.0 or not math.isfinite(sinh):
         raise ValueError("invalid harmonic heat-kernel time")
     old = x_old - trap.center
@@ -224,8 +223,8 @@ def harmonic_transition_moments(
     x_old = np.asarray(x_old, dtype=float)
     if tau <= 0.0:
         raise ValueError("tau must be positive")
-    gamma = math.sqrt(2.0) * trap.omega
-    m_gamma = trap.omega / math.sqrt(2.0)
+    gamma = trap.omega
+    m_gamma = trap.omega
     gamma_tau = gamma * tau
     mean = trap.center + (x_old - trap.center) / math.cosh(gamma_tau)
     variance = math.tanh(gamma_tau) / m_gamma
@@ -287,9 +286,9 @@ def log_free_ordered_hardrod_kernel(
     u_old = _to_reduced(x_old, rod_length)
     u_new = _to_reduced(x_new, rod_length)
     n_walkers, n_particles = u_old.shape
-    log_norm = -0.5 * math.log(4.0 * math.pi * tau)
+    log_norm = -0.5 * math.log(2.0 * math.pi * tau)
     diff = u_new[:, np.newaxis, :] - u_old[:, :, np.newaxis]
-    log_matrix = log_norm - (diff * diff) / (4.0 * tau)
+    log_matrix = log_norm - (diff * diff) / (2.0 * tau)
     max_log = np.max(log_matrix, axis=(1, 2))
     matrix = np.exp(log_matrix - max_log[:, np.newaxis, np.newaxis])
     sign, logdet = np.linalg.slogdet(matrix)

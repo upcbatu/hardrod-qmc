@@ -207,7 +207,7 @@ def _gap_h_grad_lap_local_batch_python(
             local[walker] = n2_total_energy
         elif row_ok:
             trap_sum = np.sum((x[walker] - center) ** 2)
-            local[walker] = -np.sum(lap[walker] + grad[walker] * grad[walker])
+            local[walker] = -0.5 * np.sum(lap[walker] + grad[walker] * grad[walker])
             local[walker] += 0.5 * omega2 * trap_sum
         else:
             local[walker] = np.nan
@@ -217,7 +217,7 @@ def _gap_h_grad_lap_local_batch_python(
 
 if NUMBA_AVAILABLE:
 
-    @njit(cache=True)
+    @njit
     def _interp_uniform_numba(x: float, grid: FloatArray, values: FloatArray) -> float:
         if x <= grid[0]:
             return values[0]
@@ -233,7 +233,7 @@ if NUMBA_AVAILABLE:
         t = position - left
         return (1.0 - t) * values[left] + t * values[left + 1]
 
-    @njit(cache=True, fastmath=False)
+    @njit(fastmath=False)
     def _gap_h_log_batch_numba(
         x: FloatArray,
         offsets: FloatArray,
@@ -290,7 +290,7 @@ if NUMBA_AVAILABLE:
                 finite[walker] = False
         return values, finite
 
-    @njit(cache=True, fastmath=False)
+    @njit(fastmath=False)
     def _gap_h_grad_lap_local_batch_numba(
         x: FloatArray,
         offsets: FloatArray,
@@ -353,7 +353,7 @@ if NUMBA_AVAILABLE:
                         lap[walker, particle]
                         + grad[walker, particle] * grad[walker, particle]
                     )
-                local[walker] = -local_sum + 0.5 * omega2 * trap_sum
+                local[walker] = -0.5 * local_sum + 0.5 * omega2 * trap_sum
             else:
                 local[walker] = np.nan
             finite[walker] = row_ok and np.isfinite(local[walker])

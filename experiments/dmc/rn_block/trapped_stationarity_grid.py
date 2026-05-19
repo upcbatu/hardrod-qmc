@@ -53,7 +53,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--production-tau", type=float, default=480.0)
     parser.add_argument("--store-every", type=int, default=40)
     parser.add_argument("--grid-extent", type=float, default=20.0)
-    parser.add_argument("--n-bins", type=int, default=240)
+    parser.add_argument(
+        "--n-bins",
+        type=int,
+        default=800,
+        help=(
+            "Density histogram bins. The default is intentionally high enough "
+            "to resolve finite-N trapped density peaks in report figures."
+        ),
+    )
     parser.add_argument(
         "--initialization-mode",
         choices=("tight-lattice", "lda-rms-lattice", "lda-rms-logspread"),
@@ -179,7 +187,7 @@ def main() -> None:
         "benchmark_tier": "finite-a trapped RN-DMC statistical-control diagnostic",
         "claim_boundary": (
             "finite-a trapped RN-DMC statistical-control diagnostic; "
-            "not final paper benchmark by itself"
+            "final paper benchmark requires the systematic checks"
         ),
         "controls": controls_to_dict(controls),
         "initialization_mode": args.initialization_mode,

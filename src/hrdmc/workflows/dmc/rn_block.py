@@ -42,10 +42,7 @@ from hrdmc.systems import (
     OpenN2HardRodTrapExactKernel,
 )
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
-from hrdmc.theory.units import (
-    HO_TRAP_OMEGA_IN_REPO_UNITS,
-    harmonic_oscillator_unit_metadata,
-)
+from hrdmc.theory.units import HO_TRAP_OMEGA, harmonic_oscillator_unit_metadata
 from hrdmc.wavefunctions.guides import GapHCorrectedHardRodGuide, ReducedTGHardRodGuide
 from hrdmc.workflows.dmc.rn_block_initial_conditions import (
     RNInitializationControls,
@@ -71,7 +68,7 @@ DEFAULT_COMPONENT_PROBABILITIES = (0.03, 0.10, 0.22, 0.30, 0.22, 0.10, 0.03)
 class RNCase:
     n_particles: int
     rod_length: float
-    omega: float = HO_TRAP_OMEGA_IN_REPO_UNITS
+    omega: float = HO_TRAP_OMEGA
 
     def __post_init__(self) -> None:
         if self.n_particles < 2:
@@ -89,7 +86,7 @@ class RNCase:
 
     @property
     def is_harmonic_oscillator_case(self) -> bool:
-        return math.isclose(self.omega, HO_TRAP_OMEGA_IN_REPO_UNITS, rel_tol=0.0, abs_tol=1e-12)
+        return math.isclose(self.omega, HO_TRAP_OMEGA, rel_tol=0.0, abs_tol=1e-12)
 
     @property
     def rod_length_ho(self) -> float:
@@ -103,10 +100,10 @@ class RNCase:
             "case_parameterization": (
                 "harmonic_oscillator_units"
                 if self.is_harmonic_oscillator_case
-                else "internal_trap_units"
+                else "nondefault_trap_frequency"
             ),
             "rod_length_ho": self.rod_length if self.is_harmonic_oscillator_case else float("nan"),
-            "trap_omega_code": self.omega,
+            "trap_omega": self.omega,
         }
         return metadata
 
@@ -163,7 +160,7 @@ def parse_case(case_id: str) -> RNCase:
         return RNCase(
             n_particles=int(ho_match.group("n")),
             rod_length=float(ho_match.group("A")),
-            omega=HO_TRAP_OMEGA_IN_REPO_UNITS,
+            omega=HO_TRAP_OMEGA,
         )
     raise ValueError(
         f"invalid case id: {case_id}. Use N*_A* harmonic-oscillator units, e.g. N8_A0.2"
@@ -235,13 +232,13 @@ def build_case_objects(
         GapHCorrectedHardRodGuide(
             system=system,
             trap=trap,
-            alpha=case.omega / np.sqrt(2.0),
+            alpha=case.omega,
         )
         if resolved_guide_family == "gap-h-corrected"
         else ReducedTGHardRodGuide(
             system=system,
             trap=trap,
-            alpha=case.omega / np.sqrt(2.0),
+            alpha=case.omega,
         )
     )
     proposal_kernel = (
@@ -744,7 +741,7 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> Path | Non
         "seed_count",
         "case_parameterization",
         "rod_length_ho",
-        "trap_omega_code",
+        "trap_omega",
         "mixed_energy",
         "mixed_energy_seed_stderr",
         "rms_radius",
