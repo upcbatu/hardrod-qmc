@@ -23,9 +23,9 @@ Every entry below has one of these statuses:
 - `Method paper`: formula is a standard QMC/statistical method with a cited
   method source.
 - `Analytic identity`: formula is an elementary analytic identity used by the
-  code; it is not a thesis physics claim by itself.
+  code, separate from thesis physics claims.
 - `Repo convention`: implementation normalization or utility formula. These
-  must not be presented as literature claims unless a source is added.
+  require an added source before presentation as literature claims.
 
 ## Bibliography
 
@@ -126,32 +126,36 @@ Every entry below has one of these statuses:
 
 ## Report-Facing Source Usage Summary
 
-This table is the compact source audit used by the report. It separates what a
-source contributes from what it does not prove.
+This table is the compact source audit used by the report. It records each
+source's role and claim limit.
 
 | source | used for in this repository/report | claim boundary |
 | --- | --- | --- |
-| `[Mazzanti2008HardRods]` | hard-rod potential, reduced length \(L'=L-Na\), homogeneous exact ring reference, homogeneous EOS | homogeneous exactness only; not a trapped finite-\(a\) exact solution |
-| `[AstrakharchikGiorgini2002TrappedCrossover]` | important trapped-QMC precedent for energies/radii and QMC-vs-LDA-style comparisons | not a hard-rod formula source and not direct validation of the present finite-\(a\) RN-DMC construction |
-| `[Astrakharchik2005LDA]` | LDA equation \(\mu=\mu_{\rm hom}(n)+V_{\rm ext}\), normalization, LDA density/energy/radius construction | LDA reference only; not an exact finite-\(N\) trapped benchmark |
-| `[Girardeau1960TG]`, `[GirardeauWrightTriscari2001TrappedTG]` | Tonks-Girardeau mapping and \(a=0\) trapped TG harmonic-trap exact-anchor logic | \(a=0\) impenetrable point-boson limit only; not finite-\(a\) hard rods |
-| `[GirardeauAstrakharchik2010TrappedHardSphere]` | trapped hard-sphere/super-Tonks context and finite-\(a\), \(N=2\) COM-relative reference motivation | supports \(N=2\) anchor and motivation; not an exact \(N>2\) propagator proof |
-| `[Foulkes2001QMC]` | importance-sampled DMC, local energy, mixed estimator conventions | general method source; not gap-\(h\)-product exactness |
-| `[UmrigarNightingaleRunge1993DMC]` | short-time DMC, drift-diffusion, timestep-bias caution | method and timestep source; not target-kernel exactness |
-| `[Billingsley1995Probability]` | Radon-Nikodym/change-of-measure \(K/Q\) weighting | \(K/Q\) corrects proposal to chosen target; it does not make the target exact |
-| `[KarlinMcGregor1959]` | ordered non-crossing determinant kernels | applies where the ordered-kernel assumptions match; not finite-\(a\), trapped \(N>2\) product exactness |
-| `[Doob1957HTransform]` | ground-state \(h\)-transform identity for normalized gap kernels | validates the transform identity; not the many-body product approximation |
-| `[CasullerasBoronat1995Pure]`, `[SarsaBoronatCasulleras2002Pure]` | mixed-vs-pure estimator split and forward-walking descendants | estimator-method basis; implementation still needs lag-zero and plateau gates |
-| `[FlyvbjergPetersen1989Blocking]`, `[Sokal1997MC]`, `[Geyer1992PracticalMCMC]`, `[Andrews1991HAC]`, `[PolitisRomano1995FlatTop]` | correlated-error, autocorrelation, \(N_{\rm eff}\), and error-bar triangulation | statistical precision only; not systematic-bias control |
-| `[Hellmann1937Quantenchemie]`, `[Feynman1939Forces]` | optional energy-response route to pure \(R^2\) | requires a controlled energy derivative; not a density estimator |
-| `[LiebLiniger1963GroundState]`, `[Lieb1963ExcitationSpectrum]`, `[Astrakharchik2005Quasi1DHardRods]` | optional background for future extensions and strongly correlated 1D context | optional only; not active hard-rod benchmark input |
+| `[Mazzanti2008HardRods]` | hard-rod potential, reduced length \(L'=L-Na\), homogeneous exact ring reference, homogeneous EOS | homogeneous exactness and EOS input for the trapped LDA |
+| `[AstrakharchikGiorgini2002TrappedCrossover]` | important trapped-QMC precedent for energies/radii and QMC-vs-LDA-style comparisons | trapped-QMC context for the comparison strategy |
+| `[Astrakharchik2005LDA]` | LDA equation \(\mu=\mu_{\rm hom}(n)+V_{\rm ext}\), normalization, LDA density/energy/radius construction | smooth LDA reference built from the homogeneous EOS |
+| `[Girardeau1960TG]`, `[GirardeauWrightTriscari2001TrappedTG]` | Tonks-Girardeau mapping and \(a=0\) trapped TG harmonic-trap exact-anchor logic | exact \(a=0\) impenetrable point-boson anchor |
+| `[GirardeauAstrakharchik2010TrappedHardSphere]` | trapped hard-sphere/super-Tonks context and finite-\(a\), \(N=2\) COM-relative reference motivation | finite-\(a\), \(N=2\) anchor motivation |
+| `[Foulkes2001QMC]` | importance-sampled DMC, local energy, mixed estimator conventions | general DMC method source |
+| `[UmrigarNightingaleRunge1993DMC]` | short-time DMC, drift-diffusion, timestep-bias caution | DMC timestep and drift-diffusion method source |
+| `[Billingsley1995Probability]` | Radon-Nikodym/change-of-measure \(K/Q\) weighting | proposal-to-target change-of-measure basis |
+| `[KarlinMcGregor1959]` | ordered non-crossing determinant kernels | ordered-kernel basis where the assumptions match |
+| `[Doob1957HTransform]` | ground-state \(h\)-transform identity for normalized gap kernels | one-gap ground-state transform identity |
+| `[CasullerasBoronat1995Pure]`, `[SarsaBoronatCasulleras2002Pure]` | mixed-vs-pure estimator split and forward-walking descendants | estimator-method basis; implementation still needs lag-zero and plateau checks |
+| `[FlyvbjergPetersen1989Blocking]`, `[Sokal1997MC]`, `[Geyer1992PracticalMCMC]`, `[Andrews1991HAC]`, `[PolitisRomano1995FlatTop]` | correlated-error, autocorrelation, \(N_{\rm eff}\), and error-bar triangulation | statistical precision layer |
+| `[Hellmann1937Quantenchemie]`, `[Feynman1939Forces]` | optional energy-response route to pure \(R^2\) | controlled energy-derivative route for \(R^2\) |
+| `[LiebLiniger1963GroundState]`, `[Lieb1963ExcitationSpectrum]`, `[Astrakharchik2005Quasi1DHardRods]` | optional background for future extensions and strongly correlated 1D context | future-extension background |
 
 ## Units
 
-The repository uses:
+The trapped repository convention is harmonic-oscillator units:
 
 $$
-\frac{\hbar^2}{2m}=1.
+q=\frac{x}{a_{\rm ho}},
+\qquad
+\widetilde E=\frac{E}{\hbar\omega_{\rm trap}},
+\qquad
+a_{\rm ho}=\sqrt{\frac{\hbar}{m\omega_{\rm trap}}}.
 $$
 
 Therefore kinetic local-energy terms use:
@@ -159,7 +163,7 @@ Therefore kinetic local-energy terms use:
 $$
 T_{\mathrm{local}}
 =
--\sum_i
+-\frac12\sum_i
 \left[
 \partial_i^2\log\Psi_T
 +
@@ -167,7 +171,8 @@ T_{\mathrm{local}}
 \right].
 $$
 
-Physical-unit formulas must reinsert \(\hbar^2/(2m)\) or \(m\) explicitly.
+Default trapped cases are parameterized by \(N\) and \(A=a/a_{\rm ho}\), with
+no hidden code-frequency conversion.
 
 ## Estimator Response Formulas
 
@@ -211,9 +216,9 @@ Hellmann-Feynman theorem from `[Hellmann1937Quantenchemie]` and
 `[Feynman1939Forces]`.
 
 Claim boundary:
-This only estimates trap \(R_2\)/RMS from RN-DMC energy artifacts. It is not a
-density estimator. Paper-grade use requires every energy point to pass the
-RN-DMC methodology gates; missing gate metadata remains diagnostic only.
+This estimates trap \(R_2\)/RMS from RN-DMC energy artifacts. It does not
+estimate density. Paper-grade use requires every energy point to pass the
+RN-DMC methodology checks; missing diagnostic metadata remains diagnostic only.
 
 ## Systems And Geometry
 
@@ -293,19 +298,16 @@ $$
 Source basis:
 The harmonic trap is a standard trapped-gas model. 
 `[AstrakharchikGiorgini2002TrappedCrossover]` is an important trapped-QMC
-precedent rather than a direct validation source for the present finite-\(a\)
-hard-rod DMC construction. It shows how DMC can be used to compute trapped-gas
-energies and cloud radii and compare them with mean-field/LDA-type
-descriptions in a three- to one-dimensional crossover setting. The present
-thesis differs by focusing on the strictly one-dimensional finite-length
-hard-rod Hamiltonian and on the excluded-volume LDA built from the hard-rod
-equation of state. The zero and cosine potentials are `Repo convention`
-utilities.
+precedent for computing trapped-gas energies and cloud radii and comparing
+them with mean-field/LDA-type descriptions in a three- to one-dimensional
+crossover setting. The present hard-rod scope uses the strictly
+one-dimensional finite-length hard-rod Hamiltonian and the excluded-volume LDA
+built from the hard-rod equation of state. The zero and cosine potentials are
+`Repo convention` utilities.
 
 Claim boundary:
 The thesis trapped hard-rod path uses the harmonic trap. The cosine potential
-must not be cited as a thesis physics formula unless a separate source and use
-case are added.
+has no thesis physics role without a separate source and use case.
 
 ### S4. Reduced Hard-Rod Length
 
@@ -322,8 +324,8 @@ Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
 Claim boundary:
-This is a geometry identity used by ring theory and ring trial states. It is
-not an LDA solver and not a trapped exact solution.
+This geometry identity is used by ring theory and ring trial states. It is
+separate from the LDA solver and from trapped exact solutions.
 
 ### S5. System-Owned Propagator Interfaces
 
@@ -345,8 +347,8 @@ Source basis:
 `[UmrigarNightingaleRunge1993DMC]`.
 
 Claim boundary:
-`systems/` owns the target-kernel interface. RN-block consumes it and must not
-silently rebuild Hamiltonian physics.
+`systems/` owns the target-kernel interface. RN-block consumes it through that
+interface instead of rebuilding Hamiltonian physics.
 
 ### S6. Harmonic Mehler Kernel
 
@@ -356,9 +358,9 @@ Code:
 Formula implemented:
 
 $$
-\gamma = \sqrt{2}\omega,
+\gamma = \omega,
 \qquad
-m_\gamma = \frac{\omega}{\sqrt{2}},
+m_\gamma = \omega,
 $$
 
 $$
@@ -376,8 +378,9 @@ Source basis:
 QMC kernel usage is method-backed by `[Foulkes2001QMC]`.
 
 Claim boundary:
-Exact for the one-body harmonic kernel in repo units. It is not by itself an
-exact many-body trapped hard-rod propagator.
+Exact for the one-body harmonic kernel in harmonic-oscillator units. The
+many-body trapped hard-rod propagator requires the hard-core ordering/domain
+layer as well.
 
 ### S7. Exact Ordered Harmonic Kernel
 
@@ -395,14 +398,14 @@ K_{\mathrm{harm}}(y_j\mid x_i;\tau)
 $$
 
 For the same model, the exact trapped Tonks-Girardeau ground-state energy in
-repo units is:
+harmonic-oscillator units is:
 
 $$
 E_0
 =
-\sum_{n=0}^{N-1}(2n+1)\frac{\omega}{\sqrt{2}}
+\sum_{n=0}^{N-1}\left(n+\frac12\right)\omega
 =
-\frac{N^2\omega}{\sqrt{2}}.
+\frac{N^2\omega}{2}.
 $$
 
 Source basis:
@@ -414,7 +417,7 @@ Karlin-McGregor determinant `[KarlinMcGregor1959]`, TG mapping from
 
 Claim boundary:
 This is an exact validation anchor only for \(a=0\) in a harmonic trap. It
-does not validate finite-rod trapped benchmarks by itself.
+validates the zero-rod-length trapped limit.
 
 ### S8. Free Ordered Hard-Rod Kernel
 
@@ -431,8 +434,8 @@ $$
 $$
 p_\tau(z)
 =
-\frac{1}{\sqrt{4\pi\tau}}
-\exp\left[-\frac{z^2}{4\tau}\right],
+\frac{1}{\sqrt{2\pi\tau}}
+\exp\left[-\frac{z^2}{2\tau}\right],
 $$
 
 $$
@@ -506,9 +509,9 @@ where \(Q_{\mathrm{cm}}\) is the exact harmonic COM h-transform,
 $$
 X_{\mathrm{cm}}'=\rho X_{\mathrm{cm}} + \sqrt{\sigma_Q^2(1-\rho^2)}\,\eta,
 \qquad
-\rho=e^{-\sqrt{2}\omega\tau},
+\rho=e^{-\omega\tau},
 \qquad
-\sigma_Q^2=\frac{1}{\sqrt{2}N\omega},
+\sigma_Q^2=\frac{1}{2N\omega},
 $$
 
 and \(Q_{\mathrm{gap}}\) is the N=2 relative hard-wall harmonic h-transform
@@ -541,7 +544,7 @@ $$
 The implementation reconstructs positions from \(X'_{\mathrm{cm}}\) and the
 sampled gaps. This is the sampleable proposal family \(Q\). The RN target
 density \(K\) is selected separately by the workflow; current report runs use
-the gap-h-product target below rather than the older primitive target.
+the gap-h-product target below.
 
 Source basis:
 `Analytic identity`, harmonic COM separation, Dirichlet relative-coordinate
@@ -549,11 +552,11 @@ h-transform from `[Doob1957HTransform]`, and importance-sampled DMC proposal
 logic from `[Foulkes2001QMC]` and `[UmrigarNightingaleRunge1993DMC]`.
 
 Claim boundary:
-This is a proposal family, not a benchmark result. For \(N=2\) it uses the
-finite-grid relative h-transform. For \(N>2\), the independent nearest-neighbor
-gap product is a sampling approximation. It is paper-eligible only if the
-chosen RN target/weight, stationarity, population, density-accounting, cadence,
-timestep, and precision gates pass.
+This entry maps the proposal family. For \(N=2\) it uses the finite-grid
+relative h-transform. For \(N>2\), the independent nearest-neighbor gap product
+is a sampling approximation. Benchmark rows additionally require the selected
+RN target/weight, stationarity, population, density accounting, cadence,
+timestep, and precision checks.
 
 ### S10b. Gap-H Product RN Target
 
@@ -606,10 +609,9 @@ Source basis:
 `[UmrigarNightingaleRunge1993DMC]`.
 
 Claim boundary:
-Exact target only for the finite-\(a\), \(N=2\) one-gap trapped problem. For
-\(N>2\), this is the product target being tested; it is not an exact many-body
-propagator and requires cadence/timestep/population validation before final
-comparison use.
+The target is exact for the finite-\(a\), \(N=2\) one-gap trapped problem. For
+\(N>2\), this product target is an approximate many-body kernel and requires
+cadence, timestep, and population validation before comparison use.
 
 ### S11. Gap-H-Corrected Trapped Guide
 
@@ -667,11 +669,11 @@ importance-sampled DMC guide logic from `[Foulkes2001QMC]` and
 `[UmrigarNightingaleRunge1993DMC]`.
 
 Claim boundary:
-This is a guide/proposal matching layer, not a final benchmark by itself.
-For all \(N\), benchmark eligibility still requires the selected RN target,
-RN weight, stationarity, population, density-accounting, cadence/timestep, and
-precision gates. Current report runs using `reduced-tg` cite W5 below, while
-this entry maps the optional `gap-h-corrected` guide family.
+This entry maps the guide/proposal matching layer. Benchmark rows also require
+the selected RN target, RN weight, stationarity, population, density accounting,
+cadence/timestep, and precision checks. Current report runs using `reduced-tg`
+cite W5 below, while this entry maps the optional `gap-h-corrected` guide
+family.
 
 ## Theory
 
@@ -700,7 +702,8 @@ Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
 Claim boundary:
-This is the homogeneous validation benchmark. It is not the trapped result.
+This is the homogeneous validation benchmark. Trapped results use the
+open-line harmonic system.
 
 ### T2. Thermodynamic Hard-Rod EOS
 
@@ -712,7 +715,7 @@ Formula:
 $$
 e_{\mathrm{HR}}(\rho)
 =
-\frac{\pi^2\rho^2}{3(1-a\rho)^2},
+\frac{\pi^2\rho^2}{6(1-a\rho)^2},
 $$
 
 $$
@@ -720,15 +723,15 @@ $$
 =
 \rho e_{\mathrm{HR}}(\rho)
 =
-\frac{\pi^2\rho^3}{3(1-a\rho)^2}.
+\frac{\pi^2\rho^3}{6(1-a\rho)^2}.
 $$
 
 Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
 Claim boundary:
-Thermodynamic homogeneous EOS in repo units. It is an LDA input, not a trapped
-exact solution.
+Thermodynamic homogeneous EOS in harmonic-oscillator units. This is the LDA
+input, separate from trapped exact solutions.
 
 ### T3. Hard-Rod Chemical Potential
 
@@ -743,7 +746,7 @@ $$
 \frac{d\epsilon_{\mathrm{HR}}}{d\rho}
 =
 \frac{\pi^2\rho^2(3-a\rho)}
-{3(1-a\rho)^3}.
+{6(1-a\rho)^3}.
 $$
 
 Source basis:
@@ -751,7 +754,7 @@ Source basis:
 
 Claim boundary:
 The inverse chemical potential in code is numerical bisection. The bisection is
-an implementation method, not a separate physics formula.
+an implementation method rather than a separate physics formula.
 
 ### T4. Excluded-Volume LDA
 
@@ -834,7 +837,8 @@ Source basis:
 
 Claim boundary:
 Support edges are rough grid diagnostics. Normalization validates particle
-count on the chosen grid; it does not prove LDA validity.
+count on the chosen grid. LDA validity is assessed by comparison with sampled
+observables.
 
 ## Wavefunctions And Guides
 
@@ -873,10 +877,10 @@ Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
 Claim boundary:
-The all-pair form is controlled for homogeneous validation. It is not a trapped
-exact wavefunction.
+The all-pair form is controlled for homogeneous validation. It is separate from
+trapped exact wavefunctions.
 
-### W2. Nearest-Neighbor Ring Smoke Trial
+### W2. Nearest-Neighbor Ring Diagnostic Trial
 
 Code:
 [src/hrdmc/wavefunctions/trials/jastrow.py](src/hrdmc/wavefunctions/trials/jastrow.py)
@@ -898,7 +902,8 @@ Source basis:
 `Repo convention`.
 
 Claim boundary:
-Smoke-test scaffold only. It must not be cited as a paper hard-rod trial.
+Diagnostic scaffold only; no paper hard-rod trial claim is attached to this
+form.
 
 ### W3. Trapped VMC Diagnostic Trial
 
@@ -920,7 +925,8 @@ Source basis:
 `Repo convention`, motivated by hard-core constraints and harmonic confinement.
 
 Claim boundary:
-VMC diagnostic trial only. It is not a final trapped benchmark wavefunction.
+VMC diagnostic trial only; no trapped hard-rod exactness claim is attached to
+this trial form.
 
 ### W4. DMC Guide Protocol
 
@@ -1036,23 +1042,24 @@ Source basis:
 `[UmrigarNightingaleRunge1993DMC]`.
 
 Claim boundary:
-Contract layer only. It is not a concrete DMC benchmark by itself.
+Contract layer only; concrete DMC benchmark status comes from the workflow
+checks.
 
 ### M3. RN-Corrected Collective-Block DMC
 
 Code:
 [src/hrdmc/monte_carlo/dmc/rn_block/](src/hrdmc/monte_carlo/dmc/rn_block/)
 
-Local DMC proposal in repo units:
+Local DMC proposal in harmonic-oscillator units:
 
 $$
 \mathbf{X}'
 =
 \mathbf{X}
 +
-2\Delta\tau\nabla\log\Psi_T(\mathbf{X})
+\Delta\tau\nabla\log\Psi_T(\mathbf{X})
 +
-\sqrt{2\Delta\tau}\,\boldsymbol{\eta},
+\sqrt{\Delta\tau}\,\boldsymbol{\eta},
 \qquad
 \boldsymbol{\eta}\sim\mathcal{N}(0,I).
 $$
@@ -1123,7 +1130,7 @@ S10b for the gap-h-product target used in the current report.
 
 Claim boundary:
 Candidate engine. It is DMC, but paper-level benchmark status requires
-timestep, population, stationarity, accounting, and archived run-artifact gates.
+timestep, population, stationarity, accounting, and archived run-artifact checks.
 
 ## Estimators
 
@@ -1176,8 +1183,8 @@ Source basis:
 `Repo convention`.
 
 Claim boundary:
-Rough occupied-bin diagnostic only. It is not a physical cloud boundary unless
-the density threshold, grid, and estimator tier are explicitly justified.
+Rough occupied-bin diagnostic only. Physical cloud-boundary use requires an
+explicit density threshold, grid, and estimator tier.
 
 ### E2. Pair Distribution Function
 
@@ -1218,7 +1225,8 @@ Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
 Claim boundary:
-Uses physical wrapped particle positions \(x_j\), not reduced coordinates.
+Uses physical wrapped particle positions \(x_j\). Reduced coordinates are
+reserved for the excluded-volume mapping.
 
 ### E4. Local Energy Estimators
 
@@ -1276,7 +1284,7 @@ Claim boundary:
 For DMC, direct weighted \(R^2\)/RMS from sampled coordinates is a
 mixed-coordinate diagnostic only. Paper \(R^2\)/RMS must come from
 Hellmann-Feynman energy response or a transported auxiliary forward-walking
-estimator that passes its own gate.
+estimator that passes its own check.
 
 ### E6. Weighted DMC Observables
 
@@ -1329,8 +1337,8 @@ Source basis:
 `Method paper`, `[FlyvbjergPetersen1989Blocking]`.
 
 Claim boundary:
-Users must inspect plateau behavior. A single blocking number is not a full
-validation proof.
+Plateau behavior is part of the validation record. A single blocking number
+alone is insufficient validation.
 
 ### A2. Correlated Monte Carlo Error Triangulation
 
@@ -1415,11 +1423,11 @@ HAC long-run variance from `[Andrews1991HAC]`, and the flat-top lag window from
 
 Claim boundary:
 This replaces "blocking plateau missing" as a hard precision veto only when the
-methodology gates are already clean: finite/hard-core hygiene, density
-accounting, RN-weight gate, R-hat, effective-sample, and explicit
+methodology checks are already clean: finite/hard-core validity, density
+accounting, RN-weight check, R-hat, effective-sample, and explicit
 trace-stationarity checks still hard-fail. Missing blocking plateau becomes a
-precision warning with an explicitly inflated error bar; it is not a way to
-manufacture a benchmark GO.
+precision warning with an explicitly inflated error bar; accepted benchmark
+status still requires the methodology checks.
 
 ### A3. Bias And MSE
 
@@ -1504,8 +1512,8 @@ Source basis:
 from `[Foulkes2001QMC]`.
 
 Claim boundary:
-Replicate spread is a diagnostic. It is not a substitute for timestep,
-population, and stationarity controls.
+Replicate spread is a diagnostic, separate from timestep, population, and
+stationarity controls.
 
 ### A6. Time-Series Stationarity Diagnostics
 
@@ -1601,7 +1609,7 @@ z_{\mathrm{spread}}
 }.
 $$
 
-The stationarity gate is:
+The stationarity check is:
 
 $$
 z_{\mathrm{slope}}\le 2,\qquad
@@ -1633,10 +1641,9 @@ $$
 $$
 
 where \(s\) indexes independent seeds and \(M\) is the seed count. Energy-side
-spread warnings, missing blocking plateaus, or correlated-error inflation make
-the energy case a precision warning rather than silently trusting the seed
-standard error. Mixed coordinate traces have a separate diagnostic status and
-do not veto the Hamiltonian energy corridor.
+spread warnings, missing blocking plateaus, or correlated-error inflation mark
+the energy case as a precision warning. Mixed coordinate traces have a
+separate diagnostic status and leave the Hamiltonian energy corridor unchanged.
 
 Source basis:
 `Method paper`, autocorrelation/error-control logic aligned with
@@ -1645,8 +1652,8 @@ Source basis:
 `[Foulkes2001QMC]`.
 
 Claim boundary:
-Gate-support analysis only. It is not a physics source and does not make DMC
-correct without timestep/population/accounting validation.
+Diagnostic-support analysis only. It is separate from physics sources and from
+timestep/population/accounting validation.
 
 ## RN Transport Event Contract And Transported FW
 
@@ -1655,7 +1662,7 @@ Code:
 `src/hrdmc/estimators/pure/forward_walking/`
 
 The RN-block engine can emit one transport event per DMC step. The event is a
-bookkeeping contract, not an estimator formula:
+bookkeeping contract rather than an estimator formula:
 
 $$
 \mathcal E_t =
@@ -1668,8 +1675,8 @@ where \(p_t(j)\) is the post-resampling parent index of final walker \(j\) at
 that DMC step, \(w_t^{\mathrm{pre}}\) are gauge-shifted pre-resampling log
 weights, \(w_t^{\mathrm{post}}\) define the normalized estimator weights for
 the emitted post-step population, and \(I_t\) stores the explicit convention
-fields. Global log-weight gauge shifts cancel under normalized averages and are
-not physical multiplicative factors for transported auxiliary variables.
+fields. Global log-weight gauge shifts cancel under normalized averages and
+therefore act as bookkeeping gauges for transported auxiliary variables.
 
 The optional COM Rao-Blackwell R2 payload is:
 
@@ -1721,13 +1728,13 @@ $$
 so changing no-resample weights inside a collection block cannot break the
 lag-zero mixed-estimator identity.
 
-The paper RMS radius is always:
+The paper RMS radius is defined by:
 
 $$
 R_{\mathrm{rms,paper}} = \sqrt{\widehat{R^2}}.
 $$
 
-It is not the mean of per-configuration square roots.
+Per-configuration square roots are diagnostic quantities.
 
 Source basis:
 Bookkeeping contract for the transported auxiliary-variable forward-walking
@@ -1736,21 +1743,19 @@ approach in `[CasullerasBoronat1995Pure]` /
 weighted-population engine.
 
 Claim boundary:
-The transport stream alone authorizes no paper coordinate claim. The
-transported auxiliary estimator is candidate-tier. It still needs lag-0
-identity, deterministic parent-map, gauge-cancellation, plateau,
-sufficient block count, walker-weight ESS, density-accounting when density is
-requested, and population checks.
+A paper coordinate claim requires the transport stream plus lag-0 identity,
+deterministic parent-map, gauge-cancellation, plateau, sufficient block count,
+walker-weight ESS, density-accounting when density is requested, and population
+checks.
 
 ## Experiment Scripts
 
-Experiment scripts under `experiments/` are orchestration surfaces. They should
-call owners above without owning formulas. If an experiment introduces a new
-formula, it must be added to this source map before being used for a thesis or
-paper claim.
+Experiment scripts under `experiments/` are orchestration surfaces. They call
+the owners above without owning formulas. A new experiment-level formula needs
+a source-map entry before thesis or paper use.
 
 ## Current Missing Source-Map Items
 
-No `src/hrdmc` physics/method formula is intentionally left unmapped. Generated
-run scripts and archived artifacts are not covered here; package formulas must
-be added to this document before they are used for thesis or paper claims.
+All active `src/hrdmc` physics/method formulas have source-map entries.
+Generated run scripts and archived artifacts sit outside this map; package
+formulas enter this document before thesis or paper use.

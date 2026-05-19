@@ -15,10 +15,11 @@ collective-block DMC candidate.
   files: `src/hrdmc/systems/reduced.py`
 - homogeneous hard-rod EOS, finite ring energy, chemical potential, chemical-potential inversion, and LDA support;
   files: `src/hrdmc/theory/`
-- trapped harmonic-oscillator unit conversion for production cases:
+- trapped harmonic-oscillator units for trapped cases:
   canonical trapped case ids use \(A=a/a_{\mathrm{ho}}\), for example
-  `N8_A0.2`; internally this maps to `omega_code = sqrt(2)` in the existing
-  \(\hbar^2/(2m)=1\) kinetic convention;
+  `N8_A0.2`; the default trapped Hamiltonian stores
+  \(q=x/a_{\mathrm{ho}}\) and \(\widetilde E=E/(\hbar\omega)\), so there is
+  no hidden trap-frequency conversion inside a case id;
   files: `src/hrdmc/theory/units.py`, `src/hrdmc/workflows/dmc/rn_block.py`
 - Jastrow-based trial-wavefunction implementation for the ring scaffold;
   files: `src/hrdmc/wavefunctions/trials/jastrow.py`
@@ -47,8 +48,8 @@ collective-block DMC candidate.
   without retaining raw snapshots;
   files: `src/hrdmc/monte_carlo/dmc/rn_block/engine.py`,
   `src/hrdmc/analysis/streaming.py`
-- RN-block development runners for smoke, streaming equivalence, single-case,
-  raw grid, eta planning, and gate-audit sweeps were used during development
+- RN-block development runners for diagnostic, streaming equivalence, single-case,
+  raw grid, eta planning, and diagnostic-audit sweeps were used during development
   but are no longer part of the public experiment surface.
 - generic seed-batch execution, worker-to-parent progress propagation, and
   canonical artifact routing are owned outside experiment scripts;
@@ -57,7 +58,7 @@ collective-block DMC candidate.
   than command-line experiment scripts;
   files: `src/hrdmc/workflows/dmc/`
 - trapped finite-`a` RN-DMC stationarity grid with R-hat, effective-sample,
-  accounting, and warning/NO-GO diagnostics;
+  accounting, and unresolved/warning diagnostics;
   files: `experiments/dmc/rn_block/trapped_stationarity_grid.py`,
   `src/hrdmc/analysis/chain_diagnostics.py`
 - exact trapped Tonks-Girardeau harmonic validation for RN-block DMC in the
@@ -78,8 +79,8 @@ collective-block DMC candidate.
   expected area: repository root plus external archive at release time
 
 The current DMC layer is a contract package plus a candidate RN-block
-implementation. The compact RN-DMC tables should be treated as validation
-summaries, not as final release artifacts.
+implementation. The compact RN-DMC tables are validation summaries rather than
+final release artifacts.
 
 ## Validation Status
 
@@ -97,7 +98,7 @@ can be run with `make validate-ring-grid`.
 files: `experiments/anchors/homogeneous_ring_exact_grid.py`
 
 The RN-DMC exact trapped validation checks the zero-length hard-core
-Tonks-Girardeau harmonic limit against \(E_0=N^2\omega/\sqrt{2}\) and can be
+Tonks-Girardeau harmonic limit against \(E_0=N^2\omega/2\) and can be
 run with `make validate-rn-exact`.
 files: `experiments/anchors/exact_tg_trap.py`
 
@@ -105,11 +106,11 @@ The trapped RN-DMC stationarity grid checks finite-`a` trapped runs for
 R-hat, effective independent samples, stationarity, density accounting, and
 finite/valid sample accounting. It can be run with
 `make validate-rn-trapped-stationarity`. Its output is a statistical-control
-diagnostic, not a final paper benchmark by itself.
+diagnostic for the trapped DMC workflow.
 files: `experiments/dmc/rn_block/trapped_stationarity_grid.py`
 
 Blocking-plateau absence is now classified as a precision warning when the
-hard methodology gates pass and Sokal/Geyer/flat-top-HAC correlated-error
+hard numerical checks pass and Sokal/Geyer/flat-top-HAC correlated-error
 estimates provide a conservative finite error bar. See
 `docs/dmc/method.md`.
 
@@ -121,5 +122,4 @@ Benchmark interpretation and remaining validation checks are maintained in `docs
 RN-DMC method notes are maintained in `docs/dmc/`. Compact
 candidate-result tables are maintained in `docs/tables/`.
 
-This repo state should not be read as a final released DMC package until
-long-run examples and release metadata are in place.
+Final DMC release status still needs long-run examples and release metadata.

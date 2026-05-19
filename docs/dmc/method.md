@@ -1,4 +1,4 @@
-# RN-Block DMC Method And Gate Semantics
+# RN-Block DMC Method And Numerical Checks
 
 This document is the professor-facing description of the trapped hard-rod
 RN-block DMC corridor implemented in `src/hrdmc`. It explains what the method
@@ -13,7 +13,7 @@ trap,
 
 $$
 H =
--\sum_i \partial_{x_i}^2
+-\frac12\sum_i \partial_{x_i}^2
 + \frac12\omega^2\sum_i (x_i-x_0)^2
 + V_{\mathrm{HR}},
 $$
@@ -24,10 +24,22 @@ $$
 x_{i+1}-x_i \ge a.
 $$
 
-The code uses units \(\hbar^2/(2m)=1\). The hard-rod geometry is owned by
-`systems/`; guide and local-energy formulas are owned by `wavefunctions/`;
-DMC propagation is owned by `monte_carlo/dmc/`; statistical interpretation is
-owned by `analysis/`.
+The trapped code stores the dimensionless variables
+\(q=x/a_{\rm ho}\) and \(\widetilde E=E/(\hbar\omega)\), with
+\(a_{\rm ho}=\sqrt{\hbar/(m\omega)}\). Substitution gives
+\(\partial_x=a_{\rm ho}^{-1}\partial_q\) and the prefactors reduce to
+\[
+  \frac{\hbar}{m\omega a_{\rm ho}^2}=1,
+  \qquad
+  \frac{m\omega a_{\rm ho}^2}{\hbar}=1.
+\]
+This gives the dimensionless oscillator
+\(-\frac12\partial_q^2+\frac12 q^2\). The hard-core boundary becomes
+\(q_{i+1}-q_i\ge A=a/a_{\rm ho}\). The scan coordinates are therefore \(N\)
+and \(A\). Changing the physical trap frequency at fixed rod diameter changes
+the dimensionless value \(A\), because \(a_{\rm ho}\) changes. The hard-rod geometry is owned by `systems/`; guide and
+local-energy formulas are owned by `wavefunctions/`; DMC propagation is owned
+by `monte_carlo/dmc/`; statistical interpretation is owned by `analysis/`.
 
 ## Why RN-Block DMC
 
@@ -35,16 +47,17 @@ Pure local drift-diffusion moves equilibrate the trapped cloud width slowly.
 RN-block DMC keeps the standard full-coordinate DMC walker state but separates
 the proposal used to move walkers from the target kernel used in the
 Radon-Nikodym correction. Here "target kernel" means the transition kernel in
-the change-of-measure correction, not a different physical Hamiltonian. For
-finite-\(a\), \(N>2\) trapped runs, the current gap-\(h\)-product target is a
-candidate numerical kernel construction rather than an exact many-body
-propagator, so its reliability is assessed through exact anchors, timestep
-checks, RN-weight diagnostics, stationarity gates, and pure-estimator gates.
+the change-of-measure correction, while the physical Hamiltonian remains the
+trapped hard-rod Hamiltonian above. For finite-\(a\), \(N>2\) trapped runs, the
+current gap-\(h\)-product target is a candidate numerical kernel construction
+rather than an exact many-body propagator; exact anchors, timestep checks,
+RN-weight diagnostics, stationarity checks, and pure-estimator checks quantify
+its reliability.
 
 For a local DMC step,
 
 $$
-x' = x + \Delta t\,F(x) + \sqrt{2\Delta t}\,\eta,
+x' = x + \Delta t\,F(x) + \sqrt{\Delta t}\,\eta,
 \qquad
 F=\nabla \log\Psi_T.
 $$
@@ -75,9 +88,10 @@ $$
 \log\Psi_T(x')-\log\Psi_T(x).
 $$
 
-This is a change-of-measure correction. It is not a new physical approximation.
-The production question is whether the proposal is close enough to the target
-that RN weights remain controlled.
+This is a change-of-measure correction for the sampled move. It changes the
+statistical weight of the proposal path; it does not change the physical
+Hamiltonian. RN-assisted rows are compared against local-DMC baselines and
+cadence checks.
 
 ## Current Candidate Corridor
 
@@ -91,10 +105,11 @@ system   = open-line trapped hard rods
 ```
 
 For \(N=2\), the COM plus one-gap target is checked against a deterministic
-finite-\(a\) reference. For \(N>2\), the same family is treated as the current
-candidate production workflow only for rows passing the documented numerical
-gates. Initialization and preburn reduce transient breathing mismatch before
-production. They are not production estimators and do not change gate logic.
+finite-\(a\) reference. For \(N>2\), the same family is a candidate
+RN-assisted workflow compared against the local-DMC baseline and
+cadence/timestep checks. Initialization and preburn reduce transient breathing
+mismatch before production. They are not production estimators and do not
+change the numerical decision logic.
 
 ## Observables
 
@@ -107,16 +122,16 @@ Coordinate observables are different:
 - `RMS` is reported as \(\sqrt{R2}\).
 - density is a coordinate histogram.
 
-These are mixed-coordinate observables unless a pure-estimator layer closes its
-own gate. Paper-grade coordinate claims require either:
+These are mixed-coordinate observables unless a pure-estimator layer is also
+checked. Paper-grade coordinate claims require either:
 
 - a pure estimator such as transported auxiliary forward walking; or
 - a Hellmann-Feynman energy-response estimator for trap \(R2/RMS\).
 
-Mixed coordinate observables remain diagnostic until that estimator gate is
+Mixed coordinate observables remain diagnostic until that estimator check is
 closed.
 
-## Gate Split
+## Numerical Check Split
 
 The stationarity artifact separates hard methodology failures from precision
 warnings.
@@ -125,16 +140,16 @@ Hard methodology failures are:
 
 - non-finite or invalid retained samples;
 - density accounting failure;
-- `RN_WEIGHT_NO_GO`;
+- RN weight-control failure;
 - R-hat failure;
 - effective independent sample failure;
 - explicit trace-stationarity failure.
 
 No error-estimation method can override these failures.
 
-Precision warnings are different. Blocking plateau detection can fail because
+Precision warnings are separate. Blocking plateau detection can fail because
 the block curve is noisy or the coarsest block levels have too few blocks. If
-the methodology gate is clean, the workflow computes three correlated-trace
+the methodology checks are clean, the workflow computes three correlated-trace
 standard-error estimates:
 
 - Sokal integrated-autocorrelation window;
@@ -156,12 +171,11 @@ $$
 If at least two correlated-error estimators agree within their estimated
 one-sigma uncertainty, the metric reports `TRIANGULATED_2_OF_3`. If they do not
 agree but remain finite, the artifact keeps the larger error and reports a
-precision warning. Missing blocking plateau can therefore become
-`TRIANGULATED_PRECISION_WARNING`, but only after all hard methodology gates
+precision warning. Missing blocking plateau is reported as
+`TRIANGULATED_PRECISION_WARNING`, but only after all hard methodology checks
 pass.
 
-This is not gate softening: the warning remains visible and the error bar is
-inflated.
+The warning remains visible and the error bar is inflated.
 
 ## Interpreting A Run
 
@@ -170,7 +184,7 @@ A clean energy candidate needs:
 ```text
 density_accounting_clean = true
 valid_finite_clean = true
-rn_weight_status != RN_WEIGHT_NO_GO
+RN weight status controlled
 Rhat below threshold
 N_eff above threshold
 trace stationarity clean
@@ -180,22 +194,22 @@ finite conservative energy error
 If those pass but blocking plateau is absent, the run can still be a controlled
 energy candidate with `RN_TRAPPED_STATIONARITY_PRECISION_WARNING`.
 
-If R-hat, N_eff, RN weights, hygiene, density accounting, or explicit
-trace-stationarity fail, the run remains NO-GO.
+If R-hat, N_eff, RN weights, finite/valid sample checks, density accounting, or explicit
+trace-stationarity fail, the run remains unresolved.
 
-For \(R2/RMS/density\), passing the mixed RN-DMC gate is not enough for a paper
-coordinate benchmark. A pure-coordinate estimator or energy-response estimator
-must also pass.
+For \(R2/RMS/density\), a paper coordinate benchmark requires the mixed RN-DMC
+checks plus a completed pure-coordinate estimator or energy-response estimator
+check.
 
 ## Claim Boundary
 
 Current RN-block outputs are candidate/reference-tier artifacts until the
-specific observable and parameter region pass the relevant timestep,
-population, stationarity, RN-weight, density-accounting, and estimator gates.
+specific observable and parameter region passes the relevant timestep,
+population, stationarity, RN-weight, density-accounting, and estimator checks.
 
 Exact homogeneous and trapped limiting tests validate conventions and limiting
-behavior. They do not by themselves prove every finite-rod trapped run is a
-paper-level benchmark.
+behavior. Finite-rod trapped rows still require the observable-specific checks
+above before paper-level use.
 
 ## Core References
 

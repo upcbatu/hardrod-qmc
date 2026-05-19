@@ -7,12 +7,13 @@ emits algorithmic transport events. Estimator formulas consume the events in
 
 ## Scope
 
-The transport stream is for pure-coordinate estimator development. It must not
-change RN dynamics, resampling, gates, local-energy evaluation, or the numba
-guide backend.
+The transport stream is for pure-coordinate estimator development. RN dynamics,
+resampling, diagnostic status, local-energy evaluation, and the numba guide
+backend stay owned by the DMC engine.
 
-Raw descendant-count forward walking is diagnostic only. It can report
-genealogy collapse, but it cannot authorize paper coordinate claims.
+Raw descendant-count forward walking is a genealogy-collapse diagnostic. Paper
+coordinate claims use the transported auxiliary estimator with its own
+checks.
 
 ## Event Fields
 
@@ -42,7 +43,7 @@ for the emitted positions; it is zero after resampling and nonzero during
 weighted no-resample windows.
 
 `r2_rb_per_walker` is the optional engine-side COM Rao-Blackwell R2 payload.
-When the engine is not given the analytic COM variance, this field is `None`.
+When the analytic COM variance is unavailable, this field is `None`.
 When present, the convention is:
 
 ```text
@@ -50,7 +51,7 @@ r_i = x_i - center - mean_j(x_j - center)
 r2_rb = mean_i r_i^2 + Var(COM)
 ```
 
-The estimator chooses raw R2 or RB R2; it does not redefine the COM convention.
+The estimator chooses raw R2 or RB R2 while preserving the COM convention.
 
 ## Branching And Weight Convention
 
@@ -63,21 +64,20 @@ gauge_convention  = log_weights_pre_resample_are_recentered_max_subtracted
 ```
 
 The engine emits one event per DMC step when a transport observer is attached.
-The parent map scope is therefore one DMC step:
+The parent map scope is one DMC step:
 
 ```text
 snapshot_alignment = on_every_dmc_step
 parent_map_scope   = single_dmc_step
 ```
 
-If future artifacts store only fixed-step snapshots, the engine must emit a
-composed parent map from one stored snapshot to the next. Estimators must not
+If future artifacts store only fixed-step snapshots, the engine emits a
+composed parent map from one stored snapshot to the next. Estimators do not
 reconstruct intermediate resampling bookkeeping from hidden engine details.
 
-Global log-weight gauge shifts are not physical factors. They cancel in
-normalized estimator averages and must not be multiplied into transported
-auxiliary variables. At block completion, transported auxiliary values are
-averaged with normalized `log_weights_post_resample`.
+Global log-weight gauge shifts cancel in normalized estimator averages and act
+as bookkeeping gauges. Transported auxiliary variables are averaged with the
+normalized `log_weights_post_resample` values at block completion.
 
 Lag zero is the identity anchor: it is assembled as the block average of each
 DMC step's instantaneous normalized weighted observable. Longer lags use the
@@ -104,8 +104,8 @@ collection_mode = sliding_window
 
 ## Required Invariants
 
-Pure-estimator artifacts must report the transport invariant checks used for
-that run:
+Pure-estimator artifacts report the transport invariant checks used for that
+run:
 
 ```text
 transport_invariant_tests_passed = [
@@ -128,8 +128,9 @@ R2 is the primary transported observable. The paper RMS radius is:
 paper_rms_radius = sqrt(aggregated_pure_r2)
 ```
 
-The mean of per-configuration square roots, if ever emitted, must be named
-`mean_instantaneous_rms` and must not be used as the paper RMS radius.
+The mean of per-configuration square roots, if ever emitted, is named
+`mean_instantaneous_rms`; the paper RMS radius remains
+`sqrt(aggregated_pure_r2)`.
 
 ## Estimator Surface
 

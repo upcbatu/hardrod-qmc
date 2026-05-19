@@ -6,6 +6,20 @@ This repository is a computational-physics thesis codebase for the microscopic d
 
 The homogeneous hard-rod system on a ring is kept as a controlled QMC validation benchmark, because its excluded-volume mapping gives known reference energies and wavefunction structure. The main thesis target is the strictly one-dimensional trapped hard-rod system: compute microscopic benchmark observables with QMC, with DMC as the target production method and VMC as a baseline, then map where an excluded-volume local-density approximation succeeds or fails.
 
+## Units
+
+Trapped-system runs use harmonic-oscillator units directly:
+
+- coordinate stored by the code: \(q=x/a_{\rm ho}\)
+- length unit: \(a_{\rm ho}=\sqrt{\hbar/(m\Omega)}\)
+- energy stored by the code: \(\widetilde E=E/(\hbar\Omega)\)
+- energy unit: \(\hbar\Omega\)
+- time unit: \(1/\Omega\)
+- default dimensionless trap frequency in code variables: \(1\)
+
+After nondimensionalization, trapped hard-rod cases are specified by the
+particle number \(N\) and the dimensionless rod length \(A=a/a_{\rm ho}\).
+
 ## Start here
 
 - [docs/00_PROPOSAL.md](docs/00_PROPOSAL.md)
@@ -21,7 +35,7 @@ The homogeneous hard-rod system on a ring is kept as a controlled QMC validation
 - [docs/05_TIMELINE_AND_NAVIGATION.md](docs/05_TIMELINE_AND_NAVIGATION.md)
   Tentative calendar and navigation note.
 - [docs/dmc/method.md](docs/dmc/method.md)
-  Canonical RN-DMC method, gate, and claim-boundary note.
+  Canonical RN-DMC method, diagnostic-status, and claim-boundary note.
 - [docs/validation/README.md](docs/validation/README.md)
   Validation notes for benchmark status, interpretation, and remaining checks.
 
@@ -69,8 +83,8 @@ Install development tooling with `python3 -m pip install -e ".[dev]"`.
   candidate implementation under `src/hrdmc/monte_carlo/dmc/rn_block/`
 - the active trapped-system progress report uses the RN-block workflow under
   `experiments/dmc/rn_block/` plus transported forward walking under
-  `src/hrdmc/estimators/pure/forward_walking/`; older bootstrap DMC notes
-  should not be read as the active status for that report
-- compact validation tables, gated RN runners, and release-quality
+  `src/hrdmc/estimators/pure/forward_walking/`; this workflow supersedes the
+  older bootstrap DMC notes
+- compact validation tables, RN diagnostic runners, and release-quality
   documentation are now present; release metadata and archived result bundles
   are still pending

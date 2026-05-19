@@ -3,13 +3,13 @@
 This directory contains compact summaries for the RN-corrected
 collective-block DMC candidate.
 
-These files are intentionally not raw run bundles. Full trace JSON, per-seed
-audits, progress logs, and large reproducibility payloads should be archived as
+These files are compact summaries rather than raw run bundles. Full trace JSON,
+per-seed audits, progress logs, and large reproducibility payloads belong in
 separate run artifacts for thesis or paper use.
 
 The trapped rows in the current CSV snapshots predate the harmonic-oscillator
 case-id migration and use legacy `N*_a*_omega*` labels. New trapped production
-runs should use canonical `N*_A*` case ids, where \(A=a/a_{\mathrm{ho}}\).
+runs use canonical `N*_A*` case ids, where \(A=a/a_{\mathrm{ho}}\).
 
 ## Files
 
@@ -28,6 +28,5 @@ The tables support this label:
 RN-corrected collective-block DMC engine, validated candidate.
 ```
 
-They do not by themselves constitute a final paper artifact bundle. A release
-bundle still needs versioned code, raw reproducibility artifacts, citation
-metadata, and an archived dataset.
+Final paper artifact bundles additionally need versioned code, raw
+reproducibility artifacts, citation metadata, and an archived dataset.

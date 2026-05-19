@@ -10,14 +10,14 @@ DMC workflow under `experiments/dmc/rn_block/`, the exact anchor entrypoints
 under `experiments/anchors/`, and the transported forward-walking estimator
 under `src/hrdmc/estimators/pure/forward_walking/`.
 
-That active workflow has promoted candidate rows only when the relevant
-RN-weight, stationarity, density-accounting, and pure-estimator gates pass.
-These rows are still candidate/progress-note results, not final released LDA
-benchmark rows; timestep and closure runs remain part of the validation plan.
+That active workflow marks candidate rows only when the relevant RN-weight,
+stationarity, density-accounting, and pure-estimator numerical checks pass.
+These rows remain progress-note results until timestep and closure runs are
+complete.
 
 ## 1. Purpose
 
-The thesis uses the homogeneous hard-rod gas on a ring as a controlled benchmark before moving to trapped one-dimensional hard rods. This is useful because the homogeneous hard-rod problem has an exact excluded-volume mapping. It therefore provides a clean validation point for the numerical pipeline.
+The thesis uses the homogeneous hard-rod gas on a ring as a controlled benchmark before moving to trapped one-dimensional hard rods. The homogeneous hard-rod problem has an exact excluded-volume mapping, which provides a clean validation point for the numerical pipeline.
 
 The homogeneous validation layer checks the ring pipeline:
 
@@ -45,18 +45,19 @@ L' = L - N a.
 The finite-`N` reference energy per particle is
 
 ```text
-E_N / N = (1 / N) sum_i (2 pi I_i / L')^2,
+E_N / N = (1 / 2N) sum_i (2 pi I_i / L')^2,
 ```
 
-in units where `hbar^2/(2m)=1`. This finite-size expression is the pass/fail reference for the present benchmark.
+with energy measured in the homogeneous scale `hbar^2/(m length^2)`. This finite-size expression is the pass/fail reference for the present benchmark.
 
 The thermodynamic equation of state,
 
 ```text
-e_HR(rho) = pi^2 rho^2 / [3 (1 - a rho)^2],
+e_HR(rho) = pi^2 rho^2 / [6 (1 - a rho)^2],
 ```
 
-is also printed in the run output, but only as contextual information. It is not used as the finite-`N` validation target.
+is printed in the run output as contextual information. The finite-`N`
+validation target is the reduced-length energy formula above.
 
 ### Numerical Test
 
@@ -80,7 +81,7 @@ The benchmark currently runs a small grid:
 | `a rho` | 0.10, 0.30, 0.50 |
 | `a` | 0.5 |
 
-For each point, the code samples configurations with the all-pair hard-rod trial wavefunction and evaluates the local kinetic energy. Since this trial is the exact homogeneous-ring benchmark form, the local energy should be constant and equal to the finite-`N` reference energy.
+For each point, the code samples configurations with the all-pair hard-rod trial wavefunction and evaluates the local kinetic energy. This trial is the exact homogeneous-ring benchmark form, so the local energy is constant and equal to the finite-`N` reference energy.
 
 ### Result
 
@@ -93,38 +94,39 @@ The benchmark passed for all 9 cases.
 | valid snapshot fraction | 1.0 in every case |
 | acceptance-rate range | approximately 0.83 to 0.87 |
 
-The energy error is at floating-point roundoff level. This indicates that the periodic hard-rod geometry, the exact all-pair trial wavefunction, and the local-energy formula are mutually consistent for the homogeneous benchmark. It is not a strong standalone validation of sampler convergence, because the exact all-pair local energy is constant for every valid sampled configuration.
+The energy error is at floating-point roundoff level. This indicates that the periodic hard-rod geometry, the exact all-pair trial wavefunction, and the local-energy formula are mutually consistent for the homogeneous benchmark. Sampler-convergence checks are handled separately, because the exact all-pair local energy is constant for every valid sampled configuration.
 
 ## 3. Interpretation
 
 This validation establishes a controlled starting point for the code. It supports the use of the homogeneous ring as a benchmark for checking basic geometry, exclusion constraints, sampling, and energy-estimator consistency.
 
-It does not by itself establish that the trapped-system calculations are correct. The trapped problem removes translational invariance, introduces an external potential, and requires non-periodic density observables. Those pieces are now validated through the separate exact trapped TG, finite-\(a\) \(N=2\), and RN-DMC stationarity/forward-walking gates listed below.
-
-It also does not validate DMC as a final production reference. RN-DMC should remain labeled as a candidate production method until its propagation, time-step behavior, population behavior, and estimator behavior are checked in the targeted trapped workflow.
+Trapped-system validation is handled by the trapped TG anchor, the finite-\(a\)
+\(N=2\) anchor, and the RN-DMC stationarity/forward-walking checks listed
+below. The trapped workflow also requires propagation, timestep, population,
+and estimator checks before it is used as the production reference.
 
 ## 4. Remaining Validation Steps
 
-Before using the code for thesis-level trapped-system conclusions, the following checks should be completed.
+Before thesis-level trapped-system conclusions, the following checks remain.
 
 ### Homogeneous Observables
 
 - Initial normalization checks now cover the periodic density integral, the `g(r)` finite-`N` unique-pair sum rule, and a lattice reference for `S(k)`.
-- Still useful later: compare homogeneous `g(r)` and `S(k)` shapes against literature curves or trusted reference data where available.
+- Later comparison target: homogeneous `g(r)` and `S(k)` shapes against literature curves or trusted reference data where available.
 
 ### Trapped Geometry and Sampling
 
 - Open-line hard-rod geometry without periodic wrapping has an initial implementation.
 - The harmonic trapping potential has an initial implementation.
 - Trapped initial configurations are checked against the hard-core constraint.
-- Development-only trapped VMC smoke/grid/seed/alpha scans are intentionally not
+- Development-only trapped VMC diagnostic/grid/seed/alpha scans are intentionally not
   part of the public experiment surface.
 
 ### Trapped Density and LDA
 
 - A non-periodic trapped density estimator has an initial implementation.
 - LDA normalization is checked on the same spatial grid used for sampled density profiles.
-- Still needed: systematic density profiles, total energies, edge behavior, and finite-`N` trends between sampled data and excluded-volume LDA.
+- Remaining target: systematic density profiles, total energies, edge behavior, and finite-`N` trends between sampled data and excluded-volume LDA.
 
 ### DMC Readiness
 
@@ -136,11 +138,11 @@ Before using the code for thesis-level trapped-system conclusions, the following
 - Use `experiments/anchors/exact_tg_trap.py` for the zero-rod-length
   trapped TG harmonic validation.
 - Use `experiments/dmc/rn_block/trapped_stationarity_grid.py` for finite-`a`
-  trapped RN-DMC stationarity and gate diagnostics.
+  trapped RN-DMC stationarity diagnostics.
 - Coordinate observables remain claim-limited unless the corresponding
-  estimator gate is explicitly closed.
+  estimator check is explicitly closed.
 
-Only after those checks should the project move to the main thesis comparison:
+Those checks precede the main thesis comparison:
 
 ```text
 trapped QMC/DMC observables versus excluded-volume LDA predictions

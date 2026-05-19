@@ -8,15 +8,15 @@ Working technical scope: microscopic benchmark calculations for strictly one-dim
 
 ## Abstract
 
-This project studies trapped one-dimensional hard-rod bosons as the main thesis problem. The homogeneous hard-rod gas on a periodic ring is used as a controlled validation benchmark for the Quantum Monte Carlo workflow, because its ground-state energy and wavefunction are known through the excluded-volume mapping [1]. Prior trapped-gas QMC work provides the precedent for computing trapped energies and cloud radii and comparing them with mean-field or LDA-type descriptions [2], while trapped hard-sphere/hard-rod wavefunction results provide finite-length hard-core reference context [4]. The central comparison here is narrower: strictly one-dimensional finite-length hard rods against an excluded-volume LDA built from the homogeneous hard-rod equation of state. The thesis asks how far the excluded-volume idea can be pushed from the exactly controlled homogeneous hard-rod system into a spatially varying trapped hard-rod gas.
+This project studies trapped one-dimensional hard-rod bosons as the main thesis problem. The homogeneous hard-rod gas on a periodic ring is used as a controlled validation benchmark for the Quantum Monte Carlo workflow, because its ground-state energy and wavefunction are known through the excluded-volume mapping [1]. Prior trapped-gas QMC work provides the precedent for computing trapped energies and cloud radii and comparing them with mean-field or LDA-type descriptions [2], while trapped hard-sphere/hard-rod wavefunction results provide finite-length hard-core reference context [4]. The central comparison is strictly one-dimensional finite-length hard rods against an excluded-volume LDA built from the homogeneous hard-rod equation of state. The thesis asks how far the excluded-volume idea can be pushed from the exactly controlled homogeneous hard-rod system into a spatially varying trapped hard-rod gas.
 
 ## 1. Motivation
 
 One-dimensional hard rods are a useful model for strongly correlated bosons because the hard core introduces a finite excluded length while preserving an analytically controlled homogeneous reference. On a ring, the problem maps to point-like particles living on the reduced length `L' = L - N a`, where `a` is the rod length. This gives an exact benchmark for the homogeneous energy and a physically transparent equation of state [1].
 
-The trapped problem is more relevant as a many-body target because real quasi-one-dimensional gases are normally inhomogeneous. In a trap, translation invariance is lost and the density profile becomes a primary observable. LDA methods for trapped systems are already established, including work that derives density profiles, Thomas-Fermi sizes, and energy relations from perturbative equations of state [3]. Trapped-gas DMC versus LDA-style comparisons also already exist in broader crossover settings [2]. The contribution here is therefore not a new general trapped-gas QMC framework, but a controlled test of the excluded-volume LDA in the strictly one-dimensional hard-rod setting.
+The trapped problem is more relevant as a many-body target because real quasi-one-dimensional gases are normally inhomogeneous. In a trap, translation invariance is lost and the density profile becomes a primary observable. LDA methods for trapped systems are already established, including work that derives density profiles, Thomas-Fermi sizes, and energy relations from perturbative equations of state [3]. Trapped-gas DMC versus LDA-style comparisons also already exist in broader crossover settings [2]. The contribution here is a controlled test of the excluded-volume LDA in the strictly one-dimensional hard-rod setting.
 
-The scope also should not claim that trapped hard rods are being solved for the first time. There are already strong trapped hard-sphere/hard-rod wavefunction results in the literature [4]. The thesis contribution is a controlled QMC and benchmark-data failure map for excluded-volume LDA, especially where finite particle number, trap-edge behavior, density profiles, and correlation observables can expose the limits of a local approximation.
+Existing trapped hard-sphere/hard-rod wavefunction results provide important reference context [4]. The thesis contribution is a controlled QMC and benchmark-data failure map for excluded-volume LDA, especially where finite particle number, trap-edge behavior, density profiles, and correlation observables can expose the limits of a local approximation.
 
 The main scientific comparison is microscopic trapped hard-rod benchmark data versus excluded-volume LDA, with DMC as the target production method and VMC as a baseline and diagnostic stage.
 
@@ -30,17 +30,17 @@ More specifically, the project will:
 2. include available trapped hard-sphere/hard-rod wavefunction and QMC results as reference context;
 3. implement a trapped one-dimensional hard-rod system with open-line geometry and a harmonic external potential;
 4. compute trapped hard-rod benchmark observables with QMC, with DMC as the target production method and VMC as a baseline and diagnostic stage;
-5. quantify LDA accuracy and failure regimes across particle number, rod length, trap strength, trap edge, and correlation observables.
+5. quantify LDA accuracy and failure regimes across particle number, dimensionless rod length \(A=a/a_{\rm ho}\), trap edge, and correlation observables.
 
 ## 3. Physical Scope
 
 The validation system is the homogeneous one-dimensional hard-rod Bose gas on a periodic ring of length `L`, rod length `a`, particle number `N`, and density `rho = N/L`.
 
-In the thermodynamic limit, the hard-rod energy per particle in repository units \(\hbar^2/(2m)=1\) is
+In the thermodynamic limit, the hard-rod energy per particle in harmonic-oscillator energy units is
 
 $$
 e_{\mathrm{HR}}(\rho)=\frac{E}{N}
-=\frac{\pi^2 \rho^2}{3(1-a\rho)^2}.
+=\frac{\pi^2 \rho^2}{6(1-a\rho)^2}.
 $$
 
 The corresponding homogeneous energy density is
@@ -48,7 +48,7 @@ The corresponding homogeneous energy density is
 $$
 \epsilon_{\mathrm{HR}}(\rho)
 =\rho e_{\mathrm{HR}}(\rho)
-=\frac{\pi^2\rho^3}{3(1-a\rho)^2}.
+=\frac{\pi^2\rho^3}{6(1-a\rho)^2}.
 $$
 
 The local chemical potential used by the LDA is
@@ -56,7 +56,7 @@ The local chemical potential used by the LDA is
 $$
 \mu_{\mathrm{HR}}(\rho)
 =\frac{d\epsilon_{\mathrm{HR}}}{d\rho}
-=\frac{\pi^2\rho^2(3-a\rho)}{3(1-a\rho)^3}.
+=\frac{\pi^2\rho^2(3-a\rho)}{6(1-a\rho)^3}.
 $$
 
 For a trapped system with external potential `V_trap(x)`, the LDA density satisfies
@@ -104,7 +104,7 @@ choose N, a, trap strength
 -> compare benchmark observables with LDA predictions
 ```
 
-The DMC implementation remains the target production method because the final trapped comparison should target ground-state observables. VMC provides smoke tests, trial-state diagnostics, and baseline data; it should not be presented as final trapped-system validation unless DMC or other benchmark data are unavailable.
+The DMC implementation remains the target production method for ground-state observables. VMC provides trial-state diagnostics and baseline data; final trapped-system validation comes from DMC or another benchmark-quality reference.
 
 ## 5. Comparison Criteria
 
@@ -129,15 +129,15 @@ $$
 \Delta R = R_{\mathrm{benchmark}} - R_{\mathrm{LDA}}.
 $$
 
-The comparison should explicitly separate bulk agreement from trap-edge failure. Finite-`N` dependence is part of the target result, because LDA is expected to improve in larger, smoother systems but can fail for small or moderately sized trapped gases. Correlation observables are also important because an LDA may describe density and energy more reliably than nonlocal quantities.
+The comparison separates bulk agreement from trap-edge failure. Finite-`N` dependence is part of the target result, because LDA is expected to improve in larger, smoother systems but can fail for small or moderately sized trapped gases. Correlation observables are also important because an LDA may describe density and energy more reliably than nonlocal quantities.
 
-Uncertainty will be estimated with blocking or repeated seeds where appropriate. Runtime may be reported as run metadata, but it is not the main thesis endpoint.
+Uncertainty will be estimated with blocking or repeated seeds where appropriate. Runtime may be reported as run metadata; the scientific endpoints are the benchmark observables and their comparison with excluded-volume LDA.
 
 ## 6. Expected Contribution
 
-The contribution is not the hard-rod model, the LDA formalism, DMC itself, or the first use of QMC in a trapped Bose gas. The contribution is the construction and validation of microscopic finite-`N` benchmarks for the strictly one-dimensional finite-length hard-rod model, and the comparison of energy, cloud size, and density profiles with the excluded-volume LDA built from the hard-rod EOS.
+The contribution is the construction and validation of microscopic finite-`N` benchmarks for the strictly one-dimensional finite-length hard-rod model, together with a quantitative comparison of energy, cloud size, and density profiles against the excluded-volume LDA built from the hard-rod EOS.
 
-If time permits, the same excluded-volume intuition may be tested beyond hard rods, for example as an approximate route to selected Lieb-Liniger excited-state or correlation-function quantities. This extension is optional and should remain secondary to the trapped hard-rod study.
+If time permits, the same excluded-volume intuition can be tested beyond hard rods, for example as an approximate route to selected Lieb-Liniger excited-state or correlation-function quantities. This extension remains secondary to the trapped hard-rod study.
 
 ## 7. Work Plan
 
@@ -155,7 +155,7 @@ Implement the hard-rod equation of state, chemical-potential inversion, trap nor
 
 ### Stage IV. Trapped hard-rod benchmarks versus LDA comparison
 
-Run trapped hard-rod simulations, compute density profiles and energies, and benchmark them against the LDA across the selected parameter grid. The output should be an accuracy and failure map, not a claim that LDA or trapped-gas QMC is new.
+Run trapped hard-rod simulations, compute density profiles and energies, and benchmark them against the LDA across the selected parameter grid. The output is an accuracy and failure map for the excluded-volume approximation.
 
 ### Stage V. Optional extension
 

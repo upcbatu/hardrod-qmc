@@ -26,9 +26,9 @@ This module owns only:
 - system-side hot array kernels under `systems/kernels/`.
 
 It does not own the homogeneous equation of state, chemical potential,
-excluded-volume LDA, trial/guide amplitudes, estimator reducers, or benchmark
-error logic. `systems/` may own Green-kernel and coordinate-map mathematics;
-it must not own wavefunction log-amplitude mathematics.
+excluded-volume LDA, trial/guide amplitudes, estimator reducers, benchmark
+error logic, or wavefunction log-amplitude mathematics. `systems/` owns
+Green-kernel and coordinate-map mathematics tied to the physical system.
 
 ### `wavefunctions/`
 
@@ -47,16 +47,16 @@ This module owns:
 - trial forms used directly in VMC and as DMC input.
 
 `wavefunctions/api.py` defines the guide interface consumed by DMC engines.
-Engines should depend on the protocol, not on concrete guide classes or kernel
+Engines depend on the protocol, not on concrete guide classes or kernel
 modules.
 
-`wavefunctions/` does not own proposal densities, RN log weights, population
-control, coordinate observable reducers, or gate logic.
+Proposal densities, RN log weights, population control, coordinate observable
+reducers, and numerical-check logic are owned by their respective DMC,
+estimator, and analysis layers.
 
-For production DMC, a "wavefunction" is not just an initializer. It controls
-the importance-sampling drift, local-energy variance, and practical projection
-quality. The RN-DMC release path should therefore expose a guide protocol
-with:
+For production DMC, a guide controls the importance-sampling drift,
+local-energy variance, and practical projection quality. The RN-DMC release
+path exposes a guide protocol with:
 
 ```text
 log_value
@@ -78,28 +78,28 @@ This module owns:
 - walker/result contracts;
 - population-control support;
 
-DMC is the target production method, but the architecture must not assume DMC is already a trusted reference. Until it is validated, trapped results should be labeled by benchmark tier: VMC diagnostic, DMC candidate, or external/group reference if available.
+DMC is the target production method, but the architecture separates generated
+results from benchmark-tier interpretation. Trapped results carry an explicit
+tier: VMC diagnostic, DMC candidate, or external/group reference if available.
 
-The generic DMC contract should remain a shared support layer inside the
-`dmc/` package. Specific DMC engines should live in subpackages. The
-RN-corrected collective-block engine candidate is therefore promoted as:
+The generic DMC contract remains a shared support layer inside the `dmc/`
+package. Specific DMC engines live in subpackages, including the RN-corrected
+collective-block engine candidate:
 
 ```text
 src/hrdmc/monte_carlo/dmc/rn_block/
 ```
 
-and not by turning the DMC contract layer into a monolith.
-
-The RN-block subpackage must not own the physical system. Its config should own
-algorithmic proposal parameters only. The system/Hamiltonian layer should own
-the target short-time transition density:
+The RN-block subpackage owns algorithmic proposal parameters. The
+system/Hamiltonian layer owns the physical system and target short-time
+transition density:
 
 ```text
 K_sys(x_new | x_old, tau)
 ```
 
-The guide should own trial-wavefunction derivatives and local energy. RN-block
-should own only the collective proposal:
+The guide owns trial-wavefunction derivatives and local energy. RN-block owns
+only the collective proposal:
 
 ```text
 Q_theta(x_new | x_old)
@@ -114,9 +114,8 @@ log K_sys - log Q_theta
 This prevents the collective block code from silently duplicating system
 physics and playing a separate dynamics game.
 
-Monte Carlo engines should call guide and transition interfaces only. They must
-not branch on optional numba availability and must not own guide/proposal
-formulas.
+Monte Carlo engines call guide and transition interfaces only. Optional numba
+availability and guide/proposal formulas remain outside the engine logic.
 
 ### `numerics/`
 
@@ -129,7 +128,8 @@ This module owns:
 - `njit` fallback helpers;
 - backend label helpers for artifacts.
 
-It does not own physics formulas, kernels, sampling, estimators, or gates.
+It does not own physics formulas, kernels, sampling, estimators, or diagnostic
+status rules.
 Formula owners keep hot array kernels under their own packages, such as
 `systems/kernels/` or `wavefunctions/kernels/`, and import backend helpers from
 `numerics/`.
@@ -146,7 +146,8 @@ This module owns:
 - density profile `n(x)`;
 - future trapped observables that are direct functions of sampled coordinates.
 
-It should not know how LDA is solved. Trapped density estimation must also avoid periodic wrapping.
+LDA solving belongs to `theory/`. Trapped density estimation consumes sampled
+coordinates on an open-line grid without periodic wrapping.
 
 ### `theory/`
 
@@ -163,7 +164,8 @@ This module owns:
 - LDA normalization;
 - LDA density and energy predictions.
 
-The theory layer produces reference predictions. It does not compare them against sampled data.
+The theory layer produces reference predictions. Comparisons against sampled
+data belong to `analysis/`.
 
 ### `analysis/`
 
@@ -179,7 +181,7 @@ This module owns:
 - failure maps;
 - compact run summaries.
 
-It should not solve the LDA normalization or own EOS formulas.
+LDA normalization and EOS formulas remain in `theory/`.
 
 ### `io/`
 
@@ -193,7 +195,8 @@ This module owns:
 - result metadata serialization;
 - file-format boundaries between experiments, analysis, and plotting.
 
-It should not own physics formulas, sampling behavior, comparison metrics, or figure layout.
+It does not own physics formulas, sampling behavior, comparison metrics, or
+figure layout.
 
 ### `runners/`
 
@@ -204,7 +207,7 @@ This module owns seed-batch dispatch, bounded parallel-worker integration,
 worker-to-parent progress propagation, and serial fallback when multiprocessing
 is unavailable.
 
-It should not own physics systems, DMC algorithms, observables, or paper
+It does not own physics systems, DMC algorithms, observables, or paper
 classification rules.
 
 ### `workflows/`
@@ -216,15 +219,15 @@ Workflow modules sit above engines and below command-line experiments. They own
 case parsing, default controls, system-guide-kernel composition, and
 method-specific summaries.
 
-They should not own primitive DMC transition kernels, low-level estimators, or
-CLI argument parsing.
+They do not own primitive DMC transition kernels, low-level estimators, or CLI
+argument parsing.
 
 ### `artifacts/`
 
 Purpose:
 define canonical result routes.
 
-Artifact layout belongs here so scripts do not invent ad hoc result folders.
+Artifact layout belongs here so scripts use canonical result folders.
 The tracked convention is:
 
 ```text
@@ -247,43 +250,48 @@ Only release-facing anchor and RN-block DMC entrypoints belong here. Private
 diagnostic probes, tuning scans, and abandoned signal scripts are intentionally
 kept out of the public experiment surface.
 
-They should not contain reusable runner engines, method workflows, statistics
-logic, or scientific equations.
+Reusable runner engines, method workflows, statistics logic, and scientific
+equations belong to the package owners above.
 
 ### `plotting/`
 
 Purpose:
 generate figures only.
 
-Plotting should render outputs from experiments and analysis without owning physics or comparison logic.
+Plotting renders outputs from experiments and analysis without owning physics
+or comparison logic.
 
 ### `tests/`
 
 Purpose:
 verify implemented behavior.
 
-Tests should cover owner contracts, numerical formulas, shape conventions, and regression behavior. Tests should not become hidden experiments.
+Tests cover owner contracts, numerical formulas, shape conventions, and
+regression behavior.
 
 ### `data/`
 
 Purpose:
 hold external or generated input data.
 
-Raw/reference data should stay separate from generated results. Large data should remain out of git unless it is tiny and required for tests.
+Raw/reference data stay separate from generated results. Large data stays out
+of git unless it is tiny and required for tests.
 
 ### `results/`
 
 Purpose:
 hold generated experiment outputs.
 
-Experiment outputs should include metadata with parameters, seeds, sample counts, and runtime. Results are artifacts, not source ownership.
+Experiment outputs include metadata with parameters, seeds, sample counts, and
+runtime. Source ownership remains in the package layers above.
 
 ### `notebooks/`
 
 Purpose:
 support inspection and figure drafting.
 
-Notebook logic should be promoted into `src/` or `experiments/` before it becomes part of the thesis workflow.
+Notebook logic moves into `src/` or `experiments/` before it becomes part of
+the thesis workflow.
 
 ## 2. Main Thesis Flow
 
@@ -301,7 +309,7 @@ QMC/DMC vs LDA
   -> analysis-layer benchmark and failure map
 
 Lieb-Liniger probe
-  -> optional isolated extension, not part of the main trapped-hard-rod path
+  -> optional isolated extension outside the main trapped-hard-rod path
 ```
 
 The operational flow is:
@@ -319,23 +327,24 @@ At present, the repository contains:
 - a Jastrow-like VMC implementation;
 - observable estimators for `g(r)`, `S(k)`, and ring-based `n(x)`;
 - blocking and support metric utilities;
-- an initial homogeneous VMC smoke experiment;
+- an initial homogeneous VMC diagnostic experiment;
 - a DMC contract package plus an RN-block candidate implementation.
 
 The trapped system now has an initial VMC diagnostic path. Benchmark-tier
 expansion, systematic failure-map workflows, and release-grade RN-DMC examples
-are not yet complete.
+remain pending.
 
-Release material should include compact examples, validation fixtures, archived
-run artifacts, and one canonical method document. Exploratory notebooks,
-progress logs, and full raw run bundles should not be part of the package API.
+Release material includes compact examples, validation fixtures, archived run
+artifacts, and one canonical method document. Exploratory notebooks, progress
+logs, and full raw run bundles remain outside the package API.
 
 ## 4. Summary
 
-The repository should evolve toward this progression:
+The repository evolves toward this progression:
 
 ```text
 systems geometry -> theory predictions -> sampled observables -> analysis failure map
 ```
 
-This keeps the excluded-volume LDA as a scientific approximation layer, not an analysis helper, and prevents `systems/` from accumulating EOS ownership.
+This keeps the excluded-volume LDA as a scientific approximation layer,
+separate from analysis helpers, and keeps EOS ownership out of `systems/`.

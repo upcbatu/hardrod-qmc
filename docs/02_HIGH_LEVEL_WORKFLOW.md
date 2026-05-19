@@ -13,7 +13,7 @@ validate homogeneous hard rods -> build trapped QMC workflow -> evaluate exclude
 ```mermaid
 flowchart TD
     A["Homogeneous hard-rod ring<br/>N, L, a, rho"] --> B["Validate known references<br/>energy, exclusion, trial structure"]
-    B --> C["Trapped hard-rod setup<br/>N, a, harmonic trap"]
+    B --> C["Trapped hard-rod setup<br/>N, A=a/a_ho"]
     C --> D["Generate QMC data<br/>DMC target, VMC baseline"]
     D --> E["Estimate trapped observables<br/>n(x), radius, energy"]
     B --> F["theory/<br/>homogeneous EOS and excluded-volume LDA"]
@@ -24,7 +24,10 @@ flowchart TD
 
 ## 3. Phase 1: Homogeneous Validation
 
-The homogeneous system is the one-dimensional hard-rod Bose gas on a periodic ring. It is not the final physics target; it is the calibration problem used to confirm that the implementation respects the known excluded-volume reference.
+The homogeneous system is the one-dimensional hard-rod Bose gas on a periodic
+ring. It is the calibration problem used to confirm that the implementation
+respects the known excluded-volume reference before moving to the trapped
+hard-rod target.
 
 The validation choices are:
 
@@ -52,9 +55,11 @@ The trapped model requires:
 - nearest-neighbor exclusion on the line;
 - a harmonic external potential;
 - valid trapped initial configurations;
-- observables that do not assume periodic boundary conditions.
+- observables defined for open-line boundary conditions.
 
-The repository now has initial implementations for these items sufficient for a VMC diagnostic smoke run. They still need systematic benchmark-tier expansion before thesis-level conclusions.
+The repository has initial implementations for these items and an RN-DMC
+candidate workflow. Systematic benchmark-tier expansion remains before
+thesis-level conclusions.
 
 The primary trapped observables are:
 
@@ -66,9 +71,10 @@ The primary trapped observables are:
 
 ## 5. Phase 3: QMC Data Production
 
-VMC remains useful for smoke tests, trial-state diagnostics, and fast end-to-end runs. DMC is the intended ground-state production method.
+VMC remains useful for trial-state diagnostics and fast end-to-end runs. DMC is
+the intended ground-state production method.
 
-The sampling layer should emit:
+The sampling layer emits:
 
 - coordinate snapshots;
 - local energies when available;
@@ -81,7 +87,7 @@ The `theory/` layer evaluates the LDA reference from the homogeneous hard-rod eq
 
 $$
 e_{\mathrm{HR}}(\rho)
-=\frac{\pi^2\rho^2}{3(1-a\rho)^2}.
+=\frac{\pi^2\rho^2}{6(1-a\rho)^2}.
 $$
 
 with energy density
@@ -89,7 +95,7 @@ with energy density
 $$
 \epsilon_{\mathrm{HR}}(\rho)
 =\rho e_{\mathrm{HR}}(\rho)
-=\frac{\pi^2\rho^3}{3(1-a\rho)^2}.
+=\frac{\pi^2\rho^3}{6(1-a\rho)^2}.
 $$
 
 and chemical potential
@@ -97,7 +103,7 @@ and chemical potential
 $$
 \mu_{\mathrm{HR}}(\rho)
 =\frac{d\epsilon_{\mathrm{HR}}}{d\rho}
-=\frac{\pi^2\rho^2(3-a\rho)}{3(1-a\rho)^3}.
+=\frac{\pi^2\rho^2(3-a\rho)}{6(1-a\rho)^3}.
 $$
 
 For a trap, the local density satisfies
@@ -122,13 +128,14 @@ R_benchmark    versus R_LDA
 E_benchmark    versus E_LDA
 ```
 
-The parameter sweep should vary only the quantities needed to answer the thesis question:
+The parameter sweep varies the quantities needed to answer the thesis question:
 
 - particle number;
-- rod length or packing scale;
-- trap strength;
-- DMC time step and walker count as numerical controls once DMC exists.
+- dimensionless rod length \(A=a/a_{\rm ho}\);
+- DMC time step and walker count as numerical controls.
 
 ## 8. Optional Extension
 
-Only after the trapped hard-rod comparison is complete, the excluded-volume idea may be tested against selected Lieb-Liniger excited-state or correlation-function quantities. This should remain a narrow optional extension, not a second thesis.
+After the trapped hard-rod comparison, the excluded-volume idea can be tested
+against selected Lieb-Liniger excited-state or correlation-function quantities
+as a narrow optional extension.
