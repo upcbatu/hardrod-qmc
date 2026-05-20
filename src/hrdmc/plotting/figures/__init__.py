@@ -8,6 +8,12 @@ def __getattr__(name: str) -> Any:  # noqa: ANN401
         from hrdmc.plotting.figures.benchmark_packet import write_benchmark_packet_plots
 
         return write_benchmark_packet_plots
+    if name == "write_benchmark_packet_comparison_plots":
+        from hrdmc.plotting.figures.benchmark_packet_compare import (
+            write_benchmark_packet_comparison_plots,
+        )
+
+        return write_benchmark_packet_comparison_plots
     if name == "write_claim_matrix_plot":
         from hrdmc.plotting.figures.claim_matrix import write_claim_matrix_plot
 

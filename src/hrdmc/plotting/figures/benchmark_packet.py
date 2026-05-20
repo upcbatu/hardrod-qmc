@@ -7,6 +7,7 @@ from hrdmc.plotting.components import (
     draw_case_header,
     draw_chain_panel,
     draw_density_panel,
+    draw_energy_stationarity_panel,
     draw_fw_lag_panel,
     draw_scalar_panel,
 )
@@ -29,6 +30,7 @@ def write_benchmark_packet_plots(
     paths.extend(_write_scalar_comparison(plt, plot_dir, payload, formats=formats))
     paths.extend(_write_density_comparison(plt, plot_dir, payload, formats=formats))
     paths.extend(_write_gate_diagnostics(plt, plot_dir, payload, formats=formats))
+    paths.extend(_write_energy_stationarity_diagnostics(plt, plot_dir, payload, formats=formats))
     paths.extend(_write_fw_lag_diagnostics(plt, plot_dir, payload, formats=formats))
     paths.extend(_write_optional_vector_observables(plt, plot_dir, payload, formats=formats))
     paths.extend(_write_one_page_packet(plt, plot_dir, payload, formats=formats))
@@ -98,6 +100,27 @@ def _write_gate_diagnostics(
     draw_case_header(fig, payload)
     draw_chain_panel(axes[0], axes[1], payload)
     paths = save_figure(fig, plot_dir / "gate_diagnostics", formats)
+    plt.close(fig)
+    return paths
+
+
+def _write_energy_stationarity_diagnostics(
+    plt: Any,  # noqa: ANN401
+    plot_dir: Path,
+    payload: dict[str, Any],
+    *,
+    formats: tuple[str, ...],
+) -> list[Path]:
+    fig, axes = plt.subplots(
+        2,
+        1,
+        figsize=(8.2, 5.8),
+        sharex=False,
+        gridspec_kw={"height_ratios": (1.15, 1.0)},
+    )
+    draw_case_header(fig, payload)
+    draw_energy_stationarity_panel(axes[0], axes[1], payload)
+    paths = save_figure(fig, plot_dir / "energy_stationarity_diagnostics", formats)
     plt.close(fig)
     return paths
 

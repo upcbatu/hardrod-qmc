@@ -15,6 +15,9 @@ from hrdmc.io.schema import to_jsonable
 from hrdmc.plotting import write_benchmark_packet_plots
 from hrdmc.workflows.dmc.benchmark_packet import (
     summarize_benchmark_packet_case,
+    write_benchmark_packet_density_fw_table,
+    write_benchmark_packet_energy_stationarity_table,
+    write_benchmark_packet_fw_plateau_table,
     write_benchmark_packet_seed_table,
     write_benchmark_packet_table,
 )
@@ -217,7 +220,20 @@ def main() -> None:
         write_json(summary_path, payload)
         seed_table = write_benchmark_packet_seed_table(output_dir, payload["seed_results"])
         packet_table = write_benchmark_packet_table(output_dir, payload)
-        artifacts = [summary_path, seed_table, packet_table]
+        fw_plateau_table = write_benchmark_packet_fw_plateau_table(output_dir, payload)
+        energy_stationarity_table = write_benchmark_packet_energy_stationarity_table(
+            output_dir,
+            payload,
+        )
+        density_fw_table = write_benchmark_packet_density_fw_table(output_dir, payload)
+        artifacts = [
+            summary_path,
+            seed_table,
+            packet_table,
+            fw_plateau_table,
+            energy_stationarity_table,
+            density_fw_table,
+        ]
         artifacts.extend(output_dir / path for path in plot_paths)
         write_run_manifest(
             output_dir,

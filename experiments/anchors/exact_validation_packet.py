@@ -9,6 +9,7 @@ from typing import Any
 from hrdmc.artifacts import ArtifactRoute, artifact_dir, repo_root_from
 from hrdmc.io import progress_requested
 from hrdmc.io.schema import to_jsonable
+from hrdmc.theory.units import HO_TRAP_OMEGA
 from hrdmc.workflows.anchors.exact_validation import (
     HomogeneousRingAnchor,
     TrappedTGAnchor,
@@ -25,7 +26,6 @@ from hrdmc.workflows.dmc.rn_block import (
     resolve_parallel_workers,
     rn_progress_bar,
 )
-from hrdmc.theory.units import HO_TRAP_OMEGA
 
 
 def build_parser() -> argparse.ArgumentParser:

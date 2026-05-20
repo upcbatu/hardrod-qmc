@@ -379,7 +379,10 @@ def _plot_cubic_equivalence(
     ax_top.plot(x, profile.n_x, linewidth=1.8, label="bisection profile")
     ax_top.plot(x, cubic, linestyle="--", linewidth=1.3, label="explicit cubic")
     ax_top.set_ylabel(r"$n(x)a_{\rm ho}$")
-    ax_top.set_title(f"Equivalent hard-rod LDA inversions, N={config.n_particles}, A={rod_length:g}")
+    ax_top.set_title(
+        f"Equivalent hard-rod LDA inversions, N={config.n_particles}, "
+        f"A={rod_length:g}"
+    )
     ax_top.legend(frameon=False, fontsize=8)
     ax_bottom.plot(x, cubic - profile.n_x, linewidth=1.1, color="black")
     ax_bottom.axhline(0.0, color="0.5", linewidth=0.8)

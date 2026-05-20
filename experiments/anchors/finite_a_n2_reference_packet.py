@@ -13,6 +13,7 @@ from hrdmc.io.schema import to_jsonable
 from hrdmc.plotting.figures.finite_a_n2_reference import (
     write_finite_a_n2_reference_plots,
 )
+from hrdmc.theory.units import HO_TRAP_OMEGA
 from hrdmc.workflows.anchors.finite_a_n2 import (
     FiniteAN2ReferenceTolerances,
     summarize_finite_a_n2_reference_case,
@@ -36,7 +37,6 @@ from hrdmc.workflows.dmc.rn_block import (
     rn_progress_bar,
 )
 from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
-from hrdmc.theory.units import HO_TRAP_OMEGA
 
 
 def build_parser() -> argparse.ArgumentParser:

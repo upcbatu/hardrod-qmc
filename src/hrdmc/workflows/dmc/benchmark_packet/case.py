@@ -5,6 +5,8 @@ from typing import Any
 import numpy as np
 
 from hrdmc.estimators.pure.forward_walking import PureWalkingConfig
+from hrdmc.estimators.pure.forward_walking.diagnostics import plateau_summary
+from hrdmc.estimators.pure.forward_walking.results import LagValue
 from hrdmc.io.artifacts import ensure_dir, write_json_atomic
 from hrdmc.io.progress import ProgressBar, QueuedProgress
 from hrdmc.runners import run_seed_batch
@@ -16,7 +18,6 @@ from hrdmc.workflows.dmc.benchmark_packet.selection import (
     scalar_seed_stderr,
 )
 from hrdmc.workflows.dmc.pure_walking.case import (
-    case_status,
     pure_config_metadata,
     pure_config_with_density_edges_if_needed,
 )
@@ -118,7 +119,7 @@ def summarize_benchmark_packet_case(
         guide_family=guide_family,
         target_family=target_family,
     )
-    pure_summary = summarize_pure_seed_payloads(seed_payloads)
+    pure_summary = summarize_pure_seed_payloads(seed_payloads, config=config)
     energy_status = energy_claim_status(stationarity)
     pure_status = pure_fw_claim_status(pure_summary)
     status = benchmark_packet_status(energy_status=energy_status, pure_status=pure_status)
@@ -159,8 +160,11 @@ def summarize_benchmark_packet_case(
     }
 
 
-def summarize_pure_seed_payloads(seed_payloads: list[dict[str, Any]]) -> dict[str, Any]:
-    status = case_status(seed_payloads)
+def summarize_pure_seed_payloads(
+    seed_payloads: list[dict[str, Any]],
+    *,
+    config: PureWalkingConfig | None = None,
+) -> dict[str, Any]:
     observables = {
         name: summarize_pure_observable(seed_payloads, name)
         for name in seed_payloads[0]["pure_walking"]["observable_results"]
@@ -177,28 +181,210 @@ def summarize_pure_seed_payloads(seed_payloads: list[dict[str, Any]]) -> dict[st
         r2_values.append(float(r2.get("plateau_value", float("nan"))))
         r2_stderr_values.append(float(r2.get("plateau_stderr", float("nan"))))
         rms_values.append(float(r2.get("paper_rms_radius", float("nan"))))
-    pure_r2 = scalar_seed_mean(r2_values)
-    pure_r2_stderr = scalar_seed_stderr(r2_values)
+    aggregate = aggregate_r2_plateau_summary(seed_payloads, config=config)
+    aggregate_value = float(aggregate.get("plateau_value", float("nan")))
+    aggregate_stderr = float(aggregate.get("plateau_stderr", float("nan")))
+    seed_r2_stderr = scalar_seed_stderr(r2_values)
+    pure_r2 = (
+        aggregate_value if np.isfinite(aggregate_value) else scalar_seed_mean(r2_values)
+    )
+    pure_r2_stderr = _max_finite(aggregate_stderr, seed_r2_stderr)
     paper_rms = float(np.sqrt(pure_r2)) if np.isfinite(pure_r2) and pure_r2 >= 0.0 else float("nan")
     paper_rms_stderr = (
         float(0.5 * pure_r2_stderr / paper_rms)
         if np.isfinite(pure_r2_stderr) and np.isfinite(paper_rms) and paper_rms > 0.0
         else float("nan")
     )
+    status = pure_case_status_from_aggregate(
+        schema_statuses=schema_statuses,
+        aggregate_status=str(aggregate.get("plateau_status", "")),
+    )
+    if "r2" in observables:
+        observables["r2"] = {
+            **observables["r2"],
+            "status": "PURE_FW_GO"
+            if status == "PURE_WALKING_GO"
+            else "PURE_FW_NO_GO",
+            "decision_level": "seed_aggregated",
+            "aggregate_plateau_status": aggregate.get("plateau_status"),
+            "aggregate_plateau_value": aggregate.get("plateau_value"),
+            "aggregate_plateau_stderr": aggregate.get("plateau_stderr"),
+            "aggregate_plateau_diagnostics": aggregate.get("plateau_diagnostics"),
+        }
     return {
         "status": status,
         "seed_count": len(seed_payloads),
         "observables": observables,
         "r2_schema_statuses": schema_statuses,
         "r2_plateau_statuses": plateau_statuses,
+        "r2_seed_plateau_pass_count": plateau_statuses.count("PLATEAU_FOUND"),
+        "r2_seed_plateau_warning_count": sum(
+            status == "NO_LAG_PLATEAU" for status in plateau_statuses
+        ),
+        "r2_aggregate_plateau_status": aggregate.get("plateau_status"),
+        "r2_aggregate_plateau_value": aggregate.get("plateau_value"),
+        "r2_aggregate_plateau_stderr": aggregate.get("plateau_stderr"),
+        "r2_aggregate_plateau_diagnostics": aggregate.get("plateau_diagnostics"),
         "pure_r2": pure_r2,
-        "pure_r2_seed_stderr": pure_r2_stderr,
+        "pure_r2_stderr": pure_r2_stderr,
+        "pure_r2_seed_stderr": seed_r2_stderr,
+        "pure_r2_aggregate_plateau_stderr": aggregate_stderr,
         "pure_r2_mean_internal_stderr": scalar_seed_mean(r2_stderr_values),
         "paper_rms_radius": paper_rms,
-        "paper_rms_radius_seed_stderr": paper_rms_stderr,
+        "paper_rms_radius_stderr": paper_rms_stderr,
+        "paper_rms_radius_seed_stderr": (
+            float(0.5 * seed_r2_stderr / paper_rms)
+            if np.isfinite(seed_r2_stderr)
+            and np.isfinite(paper_rms)
+            and paper_rms > 0.0
+            else float("nan")
+        ),
         "mean_seed_rms_diagnostic": scalar_seed_mean(rms_values),
         "rms_semantics": "paper_rms_radius=sqrt(seed-aggregated pure_r2)",
     }
+
+
+def aggregate_r2_plateau_summary(
+    seed_payloads: list[dict[str, Any]],
+    *,
+    config: PureWalkingConfig | None = None,
+) -> dict[str, Any]:
+    if not seed_payloads:
+        return {
+            "plateau_status": "NO_BLOCKS",
+            "plateau_value": float("nan"),
+            "plateau_stderr": float("nan"),
+            "plateau_diagnostics": {"reason": "no_seed_payloads"},
+        }
+    first_r2 = seed_payloads[0]["pure_walking"]["observable_results"].get("r2", {})
+    if config is None:
+        config = _r2_plateau_config_from_seed_result(first_r2)
+    lag_steps = tuple(int(lag) for lag in config.lag_steps)
+    values_by_lag: dict[int, LagValue] = {}
+    stderr_by_lag: dict[int, LagValue] = {}
+    block_count_by_lag: dict[int, int] = {}
+    weight_ess_min_by_lag: dict[int, float] = {}
+    for lag in lag_steps:
+        seed_values: list[float] = []
+        seed_stderrs: list[float] = []
+        block_counts: list[int] = []
+        weight_ess: list[float] = []
+        for payload in seed_payloads:
+            r2 = payload["pure_walking"]["observable_results"].get("r2", {})
+            value = _lag_dict_float(r2.get("values_by_lag", {}), lag)
+            stderr = _lag_dict_float(r2.get("stderr_by_lag", {}), lag)
+            if np.isfinite(value):
+                seed_values.append(value)
+            if np.isfinite(stderr):
+                seed_stderrs.append(stderr)
+            block_count = _lag_dict_int(r2.get("block_count_by_lag", {}), lag)
+            if block_count is not None:
+                block_counts.append(block_count)
+            ess = _lag_dict_float(r2.get("block_weight_ess_min_by_lag", {}), lag)
+            if np.isfinite(ess):
+                weight_ess.append(ess)
+        values = np.asarray(seed_values, dtype=float)
+        stderrs = np.asarray(seed_stderrs, dtype=float)
+        values_by_lag[lag] = float(np.mean(values)) if values.size else float("nan")
+        seed_stderr = (
+            float(np.std(values, ddof=1) / np.sqrt(values.size))
+            if values.size >= 2
+            else float("nan")
+        )
+        internal_stderr = (
+            float(np.sqrt(np.sum(stderrs * stderrs)) / stderrs.size)
+            if stderrs.size
+            else float("nan")
+        )
+        stderr_by_lag[lag] = _max_finite(seed_stderr, internal_stderr)
+        block_count_by_lag[lag] = min(block_counts) if block_counts else 0
+        weight_ess_min_by_lag[lag] = min(weight_ess) if weight_ess else 0.0
+    value, stderr, bracket, plateau_status, diagnostics = plateau_summary(
+        config=config,
+        observable="r2",
+        values_by_lag=values_by_lag,
+        stderr_by_lag=stderr_by_lag,
+        block_count_by_lag=block_count_by_lag,
+        weight_ess_min_by_lag=weight_ess_min_by_lag,
+    )
+    diagnostics = {
+        **diagnostics,
+        "decision_level": "seed_aggregated",
+        "seed_count": len(seed_payloads),
+        "seed_plateau_statuses": [
+            payload["pure_walking"]["observable_results"]
+            .get("r2", {})
+            .get("plateau_status", "")
+            for payload in seed_payloads
+        ],
+        "values_by_lag": values_by_lag,
+        "stderr_by_lag": stderr_by_lag,
+    }
+    return {
+        "plateau_status": plateau_status,
+        "plateau_value": float(value) if value is not None else float("nan"),
+        "plateau_stderr": float(stderr) if stderr is not None else float("nan"),
+        "bias_bracket": None
+        if bracket is None
+        else [float(bracket[0]), float(bracket[1])],
+        "plateau_diagnostics": diagnostics,
+    }
+
+
+def pure_case_status_from_aggregate(
+    *,
+    schema_statuses: list[str],
+    aggregate_status: str,
+) -> str:
+    if any(status != "SCHEMA_GO" for status in schema_statuses):
+        return "PURE_WALKING_SCHEMA_NO_GO"
+    if aggregate_status == "PLATEAU_FOUND":
+        return "PURE_WALKING_GO"
+    if aggregate_status == "NO_BLOCKS":
+        return "PURE_WALKING_NO_BLOCKS_NO_GO"
+    if aggregate_status in {"INSUFFICIENT_BLOCKS", "INSUFFICIENT_WEIGHT_ESS"}:
+        return "PURE_WALKING_INSUFFICIENT_SAMPLES_NO_GO"
+    return "PURE_WALKING_PLATEAU_NO_GO"
+
+
+def _r2_plateau_config_from_seed_result(r2: dict[str, Any]) -> PureWalkingConfig:
+    metadata = r2.get("metadata", {})
+    return PureWalkingConfig(
+        lag_steps=tuple(int(lag) for lag in r2.get("lag_steps", (0,))),
+        observables=("r2",),
+        min_block_count=int(metadata.get("min_block_count", 30)),
+        min_walker_weight_ess=float(metadata.get("min_walker_weight_ess", 30.0)),
+        plateau_sigma_threshold=float(metadata.get("plateau_sigma_threshold", 1.0)),
+        plateau_abs_tolerance=float(metadata.get("plateau_abs_tolerance", 0.0)),
+        plateau_window_lag_count=int(metadata.get("plateau_window_lag_count", 4)),
+    )
+
+
+def _lag_dict_float(values: Any, lag: int) -> float:
+    if not isinstance(values, dict):
+        return float("nan")
+    value = values.get(lag, values.get(str(lag), float("nan")))
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+def _lag_dict_int(values: Any, lag: int) -> int | None:
+    if not isinstance(values, dict):
+        return None
+    value = values.get(lag, values.get(str(lag)))
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _max_finite(*values: float) -> float:
+    finite = [float(value) for value in values if np.isfinite(value)]
+    return max(finite) if finite else float("nan")
 
 
 def summarize_pure_observable(
@@ -267,7 +453,7 @@ def paper_values(stationarity: dict[str, Any], pure_summary: dict[str, Any]) -> 
         },
         "r2": {
             "value": pure_r2,
-            "stderr": pure_summary.get("pure_r2_seed_stderr"),
+            "stderr": pure_summary.get("pure_r2_stderr"),
             "estimator": "transported auxiliary forward walking",
             "status": pure_fw_claim_status(pure_summary),
             "mixed_diagnostic": stationarity.get("r2_radius"),
@@ -276,7 +462,7 @@ def paper_values(stationarity: dict[str, Any], pure_summary: dict[str, Any]) -> 
         },
         "rms": {
             "value": pure_rms,
-            "stderr": pure_summary.get("paper_rms_radius_seed_stderr"),
+            "stderr": pure_summary.get("paper_rms_radius_stderr"),
             "estimator": "transported auxiliary forward walking",
             "status": pure_fw_claim_status(pure_summary),
             "mixed_diagnostic": stationarity.get("rms_radius"),

@@ -22,7 +22,15 @@ def draw_fw_lag_panel(ax: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
         return
     lags, values = lag_values
     stderr = stderr_values[1] if stderr_values is not None else None
-    ax.plot(lags, values, marker="o", color=tokens.DMC_PRIMARY, label=r"pure FW $R^2$")
+    _draw_seed_lag_traces(ax, payload)
+    ax.plot(
+        lags,
+        values,
+        marker="o",
+        color=tokens.DMC_PRIMARY,
+        linewidth=2.0,
+        label=r"aggregate FW $R^2$",
+    )
     if stderr is not None and stderr.shape == values.shape:
         ax.fill_between(lags, values - stderr, values + stderr, color=tokens.SEED_BAND, alpha=0.3)
     plateau = finite_float(r2.get("plateau_value"))
@@ -51,6 +59,9 @@ def draw_fw_lag_panel(ax: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
 
 
 def _r2_lag_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    aggregate = _aggregate_r2_lag_payload(payload)
+    if aggregate:
+        return aggregate
     seeds = payload.get("seed_results", [])
     if isinstance(seeds, list) and seeds:
         first = seeds[0].get("pure_walking", {}).get("observable_results", {})
@@ -58,6 +69,50 @@ def _r2_lag_payload(payload: dict[str, Any]) -> dict[str, Any]:
             return first["r2"]
     pure = payload.get("pure_walking", {}).get("observables", {})
     return pure.get("r2", {}) if isinstance(pure, dict) else {}
+
+
+def _aggregate_r2_lag_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    pure = payload.get("pure_walking", {})
+    if not isinstance(pure, dict):
+        return {}
+    diagnostics = pure.get("r2_aggregate_plateau_diagnostics", {})
+    if not isinstance(diagnostics, dict):
+        return {}
+    values = diagnostics.get("values_by_lag")
+    stderr = diagnostics.get("stderr_by_lag")
+    if not isinstance(values, dict) or not values:
+        return {}
+    return {
+        "values_by_lag": values,
+        "stderr_by_lag": stderr,
+        "plateau_value": pure.get("r2_aggregate_plateau_value"),
+        "plateau_status": pure.get("r2_aggregate_plateau_status", ""),
+    }
+
+
+def _draw_seed_lag_traces(ax: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
+    seeds = payload.get("seed_results", [])
+    if not isinstance(seeds, list):
+        return
+    label_used = False
+    for seed_payload in seeds:
+        r2 = seed_payload.get("pure_walking", {}).get("observable_results", {}).get("r2", {})
+        seed_lag_values = _lag_dict_to_arrays(r2.get("values_by_lag", {}))
+        if seed_lag_values is None:
+            continue
+        seed_lags, seed_values = seed_lag_values
+        ax.plot(
+            seed_lags,
+            seed_values,
+            marker=".",
+            linewidth=0.9,
+            markersize=3.0,
+            alpha=0.22,
+            color=tokens.INK_SOFT,
+            label="seed traces" if not label_used else None,
+            zorder=1,
+        )
+        label_used = True
 
 
 def _lag_dict_to_arrays(value: object) -> tuple[np.ndarray, np.ndarray] | None:
