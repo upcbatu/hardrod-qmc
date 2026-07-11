@@ -49,15 +49,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--case",
         default=DEFAULT_CASE,
-        help=(
-            "Case in harmonic-oscillator units, e.g. N8_A0.2 where A=a/a_ho."
-        ),
+        help=("Case in harmonic-oscillator units, e.g. N8_A0.2 where A=a/a_ho."),
     )
     parser.add_argument("--seeds", default="1001,1002")
     parser.add_argument("--dt", type=float, default=0.00125)
     parser.add_argument("--walkers", type=int, default=256)
     parser.add_argument("--tau", type=float, default=0.01)
     parser.add_argument("--rn-cadence", type=float, default=0.01)
+    parser.add_argument(
+        "--disable-rn",
+        action="store_true",
+        help=(
+            "Run only drift-diffusion DMC steps by scheduling the first "
+            "collective RN event after the requested trajectory."
+        ),
+    )
     parser.add_argument("--burn-tau", type=float, default=60.0)
     parser.add_argument("--production-tau", type=float, default=120.0)
     parser.add_argument("--store-every", type=int, default=40)
@@ -142,11 +148,14 @@ def main() -> None:
     repo_root = repo_root_from(Path(__file__))
     case = parse_case(args.case)
     seeds = parse_seeds(args.seeds)
+    rn_cadence_tau = (
+        args.burn_tau + args.production_tau + args.dt if args.disable_rn else args.rn_cadence
+    )
     controls = RNRunControls(
         dt=args.dt,
         walkers=args.walkers,
         tau_block=args.tau,
-        rn_cadence_tau=args.rn_cadence,
+        rn_cadence_tau=rn_cadence_tau,
         burn_tau=args.burn_tau,
         production_tau=args.production_tau,
         store_every=args.store_every,
@@ -243,6 +252,7 @@ def main() -> None:
                 "seeds": seeds,
                 "controls": controls_to_dict(controls),
                 "parallel_workers": args.parallel_workers,
+                "disable_rn": args.disable_rn,
                 "initialization_mode": args.initialization_mode,
                 "init_width_log_sigma": args.init_width_log_sigma,
                 "breathing_preburn_steps": args.breathing_preburn_steps,
@@ -292,9 +302,7 @@ def _pair_edges(args: argparse.Namespace) -> np.ndarray | None:
     if "pair_distance_density" not in observables:
         return None
     pair_max = float(
-        2.0 * args.grid_extent
-        if args.pure_fw_pair_max is None
-        else args.pure_fw_pair_max
+        2.0 * args.grid_extent if args.pure_fw_pair_max is None else args.pure_fw_pair_max
     )
     if pair_max <= 0.0:
         raise ValueError("pure-fw-pair-max must be positive")
