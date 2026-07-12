@@ -102,7 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path("results/dmc/final_matrix/local_dmc_dt0025_fw50"),
+        default=Path("results/dmc/final_matrix/local_dmc_dt0025_split_fw50"),
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
