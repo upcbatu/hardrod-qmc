@@ -151,6 +151,9 @@ def case_status(seed_payloads: list[dict[str, Any]]) -> str:
 def pure_config_metadata(config: PureWalkingConfig) -> dict[str, Any]:
     return {
         "lag_steps": list(config.lag_steps),
+        "density_lag_steps": (
+            None if config.density_lag_steps is None else list(config.density_lag_steps)
+        ),
         "lag_unit": config.lag_unit,
         "observables": list(config.observables),
         "observable_source": config.observable_source,
@@ -158,12 +161,14 @@ def pure_config_metadata(config: PureWalkingConfig) -> dict[str, Any]:
         "min_walker_weight_ess": config.min_walker_weight_ess,
         "block_size_steps": config.block_size_steps,
         "collection_stride_steps": config.collection_stride_steps,
+        "density_collection_stride_steps": config.density_collection_stride_steps,
         "transport_mode": config.transport_mode,
         "collection_mode": config.collection_mode,
         "center": config.center,
         "plateau_sigma_threshold": config.plateau_sigma_threshold,
         "plateau_abs_tolerance": config.plateau_abs_tolerance,
         "plateau_window_lag_count": config.plateau_window_lag_count,
+        "density_plateau_window_lag_count": config.density_plateau_window_lag_count,
         "density_plateau_relative_l2_tolerance": (
             config.density_plateau_relative_l2_tolerance
         ),
@@ -201,6 +206,9 @@ def pure_config_with_density_edges_if_needed(
         plateau_sigma_threshold=config.plateau_sigma_threshold,
         plateau_abs_tolerance=config.plateau_abs_tolerance,
         plateau_window_lag_count=config.plateau_window_lag_count,
+        density_lag_steps=config.density_lag_steps,
+        density_collection_stride_steps=config.density_collection_stride_steps,
+        density_plateau_window_lag_count=config.density_plateau_window_lag_count,
         density_plateau_relative_l2_tolerance=config.density_plateau_relative_l2_tolerance,
         schema_atol=config.schema_atol,
         schema_rtol=config.schema_rtol,

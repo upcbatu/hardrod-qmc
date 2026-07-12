@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 from numpy.typing import NDArray
@@ -29,6 +29,9 @@ class PureWalkingConfig:
     plateau_sigma_threshold: float = 1.0
     plateau_abs_tolerance: float = 0.0
     plateau_window_lag_count: int = 4
+    density_lag_steps: tuple[int, ...] | None = None
+    density_collection_stride_steps: int | None = None
+    density_plateau_window_lag_count: int | None = None
     density_plateau_relative_l2_tolerance: float = 0.03
     schema_atol: float = 1.0e-12
     schema_rtol: float = 1.0e-12
@@ -73,6 +76,23 @@ class PureWalkingConfig:
             raise ValueError("density_plateau_relative_l2_tolerance must be non-negative")
         if self.plateau_window_lag_count < 2:
             raise ValueError("plateau_window_lag_count must be at least 2")
+        if self.density_lag_steps is not None:
+            if tuple(sorted(set(self.density_lag_steps))) != self.density_lag_steps:
+                raise ValueError("density_lag_steps must be sorted and unique")
+            if any(lag < 0 for lag in self.density_lag_steps):
+                raise ValueError("density_lag_steps must be non-negative")
+            if 0 not in self.density_lag_steps:
+                raise ValueError("density_lag_steps must include 0")
+        if (
+            self.density_collection_stride_steps is not None
+            and self.density_collection_stride_steps <= 0
+        ):
+            raise ValueError("density_collection_stride_steps must be positive")
+        if (
+            self.density_plateau_window_lag_count is not None
+            and self.density_plateau_window_lag_count < 2
+        ):
+            raise ValueError("density_plateau_window_lag_count must be at least 2")
         if self.transport_mode != "post_resample_auxiliary":
             raise ValueError("unsupported transport_mode")
         if self.collection_mode not in {"single_point", "sliding_window"}:
@@ -92,6 +112,34 @@ class PureWalkingConfig:
                 "single_point lagged FW requires block_size_steps=1; "
                 "use sliding_window before collecting multi-step blocks"
             )
+
+    def for_observable(self, observable: str) -> PureWalkingConfig:
+        """Return the transport settings used by one observable stream.
+
+        Density snapshots are much larger than scalar R2 payloads.  A separate
+        density ladder can therefore retain the same parent-map transport while
+        using a coarser snapshot cadence.
+        """
+
+        if observable != "density" or self.density_lag_steps is None:
+            return self
+        return replace(
+            self,
+            lag_steps=self.density_lag_steps,
+            collection_stride_steps=(
+                self.collection_stride_steps
+                if self.density_collection_stride_steps is None
+                else self.density_collection_stride_steps
+            ),
+            plateau_window_lag_count=(
+                self.plateau_window_lag_count
+                if self.density_plateau_window_lag_count is None
+                else self.density_plateau_window_lag_count
+            ),
+            density_lag_steps=None,
+            density_collection_stride_steps=None,
+            density_plateau_window_lag_count=None,
+        )
 
 
 def _validate_edges(edges: FloatArray | None, name: str) -> None:

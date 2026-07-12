@@ -30,6 +30,8 @@ DEFAULT_SEEDS = "7001,7002,7003"
 # time well beyond the earlier 7/omega ladder.  At dt=0.0025 this reaches
 # 50/omega while retaining ample production support for tau_prod=480.
 DEFAULT_LAGS = "0,2000,4000,8000,12000,16000,20000"
+DEFAULT_DENSITY_LAGS = "0,8000,12000,20000"
+DEFAULT_DENSITY_COLLECTION_STRIDE_STEPS = 4000
 DEFAULT_RN_CADENCE = 0.01
 
 
@@ -84,10 +86,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--breathing-preburn-steps", type=int, default=1000)
     parser.add_argument("--breathing-preburn-log-step", type=float, default=0.04)
     parser.add_argument("--pure-fw-lags", default=DEFAULT_LAGS)
+    parser.add_argument("--pure-fw-density-lags", default=DEFAULT_DENSITY_LAGS)
     parser.add_argument("--pure-fw-block-size-steps", type=int, default=1)
     parser.add_argument("--pure-fw-collection-stride-steps", type=int, default=20)
+    parser.add_argument(
+        "--pure-fw-density-collection-stride-steps",
+        type=int,
+        default=DEFAULT_DENSITY_COLLECTION_STRIDE_STEPS,
+    )
     parser.add_argument("--pure-fw-min-block-count", type=int, default=20)
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
+    parser.add_argument("--pure-fw-density-plateau-window-lag-count", type=int, default=3)
     parser.add_argument("--parallel-workers", type=int, default=3)
     parser.add_argument("--plot-formats", default="png,pdf")
     parser.add_argument(
@@ -277,14 +286,20 @@ def _benchmark_command(
         "1.0",
         "--pure-fw-lags",
         args.pure_fw_lags,
+        "--pure-fw-density-lags",
+        args.pure_fw_density_lags,
         "--pure-fw-block-size-steps",
         str(args.pure_fw_block_size_steps),
         "--pure-fw-collection-stride-steps",
         str(args.pure_fw_collection_stride_steps),
+        "--pure-fw-density-collection-stride-steps",
+        str(args.pure_fw_density_collection_stride_steps),
         "--pure-fw-min-block-count",
         str(args.pure_fw_min_block_count),
         "--pure-fw-min-walker-weight-ess",
         _format_number(args.pure_fw_min_walker_weight_ess),
+        "--pure-fw-density-plateau-window-lag-count",
+        str(args.pure_fw_density_plateau_window_lag_count),
         "--parallel-workers",
         str(args.parallel_workers),
         "--plot-formats",
@@ -342,10 +357,17 @@ def _write_matrix_manifest(
                 "breathing_preburn_steps": args.breathing_preburn_steps,
                 "breathing_preburn_log_step": args.breathing_preburn_log_step,
                 "pure_fw_lags": args.pure_fw_lags,
+                "pure_fw_density_lags": args.pure_fw_density_lags,
                 "pure_fw_block_size_steps": args.pure_fw_block_size_steps,
                 "pure_fw_collection_stride_steps": args.pure_fw_collection_stride_steps,
+                "pure_fw_density_collection_stride_steps": (
+                    args.pure_fw_density_collection_stride_steps
+                ),
                 "pure_fw_min_block_count": args.pure_fw_min_block_count,
                 "pure_fw_min_walker_weight_ess": args.pure_fw_min_walker_weight_ess,
+                "pure_fw_density_plateau_window_lag_count": (
+                    args.pure_fw_density_plateau_window_lag_count
+                ),
                 "parallel_workers": args.parallel_workers,
                 "plot_formats": args.plot_formats,
                 "calculation": "metropolis_corrected_drift_diffusion_dmc",
@@ -485,13 +507,22 @@ def _expected_manifest_fields(
         "guide_family": "reduced-tg",
         "target_family": "primitive",
         "pure_config.lag_steps": [int(value) for value in args.pure_fw_lags.split(",")],
+        "pure_config.density_lag_steps": [
+            int(value) for value in args.pure_fw_density_lags.split(",")
+        ],
         "pure_config.observables": ["r2", "density"],
         "pure_config.observable_source": "raw_r2",
         "pure_config.block_size_steps": args.pure_fw_block_size_steps,
         "pure_config.collection_stride_steps": args.pure_fw_collection_stride_steps,
+        "pure_config.density_collection_stride_steps": (
+            args.pure_fw_density_collection_stride_steps
+        ),
         "pure_config.min_block_count": args.pure_fw_min_block_count,
         "pure_config.min_walker_weight_ess": args.pure_fw_min_walker_weight_ess,
         "pure_config.plateau_window_lag_count": 4,
+        "pure_config.density_plateau_window_lag_count": (
+            args.pure_fw_density_plateau_window_lag_count
+        ),
         "plot_formats": [value.strip() for value in args.plot_formats.split(",")],
     }
 

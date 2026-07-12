@@ -34,6 +34,7 @@ class TransportedAuxiliaryForwardWalking:
         self.config = config
         self._n_walkers: int | None = None
         self._lag_states: dict[str, dict[int, LagState]] = {}
+        self._observable_configs: dict[str, PureWalkingConfig] = {}
         self._observable_dimensions: dict[str, int] = {}
         self._direct_reference_sum: dict[str, FloatArray] = {}
         self._event_count = 0
@@ -58,14 +59,19 @@ class TransportedAuxiliaryForwardWalking:
                 observable: self._observable_dimension(observable)
                 for observable in self.config.observables
             }
+            self._observable_configs = {
+                observable: self.config.for_observable(observable)
+                for observable in self.config.observables
+            }
             self._lag_states = {
                 observable: {
                     lag: self._new_lag_state(
                         lag=lag,
                         n_walkers=n_walkers,
                         dimension=self._observable_dimensions[observable],
+                        config=self._observable_configs[observable],
                     )
-                    for lag in self.config.lag_steps
+                    for lag in self._observable_configs[observable].lag_steps
                 }
                 for observable in self.config.observables
             }
@@ -135,13 +141,14 @@ class TransportedAuxiliaryForwardWalking:
         if mixed_r2_reference is not None:
             direct_references["r2"] = float(mixed_r2_reference)
         for observable in self.config.observables:
+            observable_config = self._observable_configs[observable]
             stats = {
                 lag: state.block_stats()
                 for lag, state in self._lag_states[observable].items()
             }
             if observable == "r2":
                 observable_results[observable] = assemble_observable_result_from_stats(
-                    config=self.config,
+                    config=observable_config,
                     observable=observable,
                     block_mean_by_lag={lag: stat.mean for lag, stat in stats.items()},
                     block_stderr_by_lag={lag: stat.stderr for lag, stat in stats.items()},
@@ -161,7 +168,7 @@ class TransportedAuxiliaryForwardWalking:
                 )
             else:
                 observable_results[observable] = assemble_observable_result_from_stats(
-                    config=self.config,
+                    config=observable_config,
                     observable=observable,
                     block_mean_by_lag={lag: stat.mean for lag, stat in stats.items()},
                     block_stderr_by_lag={lag: stat.stderr for lag, stat in stats.items()},
@@ -191,9 +198,15 @@ class TransportedAuxiliaryForwardWalking:
             "pure_estimator_tier": "transported_auxiliary_fw",
             "raw_descendant_count_role": "diagnostic_only",
             "lag_steps": list(self.config.lag_steps),
+            "density_lag_steps": (
+                None
+                if self.config.density_lag_steps is None
+                else list(self.config.density_lag_steps)
+            ),
             "lag_unit": self.config.lag_unit,
             "block_size_steps": self.config.block_size_steps,
             "collection_stride_steps": self.config.collection_stride_steps,
+            "density_collection_stride_steps": self.config.density_collection_stride_steps,
             "observable_source": self.config.observable_source,
             "observables": list(self.config.observables),
             "transport_mode": self.config.transport_mode,
@@ -202,6 +215,9 @@ class TransportedAuxiliaryForwardWalking:
             "plateau_sigma_threshold": self.config.plateau_sigma_threshold,
             "plateau_abs_tolerance": self.config.plateau_abs_tolerance,
             "plateau_window_lag_count": self.config.plateau_window_lag_count,
+            "density_plateau_window_lag_count": (
+                self.config.density_plateau_window_lag_count
+            ),
             "density_plateau_relative_l2_tolerance": (
                 self.config.density_plateau_relative_l2_tolerance
             ),
@@ -242,18 +258,19 @@ class TransportedAuxiliaryForwardWalking:
         lag: int,
         n_walkers: int,
         dimension: int,
+        config: PureWalkingConfig,
     ) -> LagState:
         state_cls = (
             SlidingLagState
-            if self.config.collection_mode == "sliding_window" and lag > 0
+            if config.collection_mode == "sliding_window" and lag > 0
             else LagState
         )
         return state_cls(
             lag_steps=lag,
-            block_size_steps=self.config.block_size_steps,
+            block_size_steps=config.block_size_steps,
             n_walkers=n_walkers,
             dimension=dimension,
-            collection_stride_steps=self.config.collection_stride_steps,
+            collection_stride_steps=config.collection_stride_steps,
         )
 
     def _observable_dimension(self, observable: str) -> int:

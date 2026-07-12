@@ -115,6 +115,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--log-weight-span-warning", type=float, default=50.0)
     parser.add_argument("--pure-fw-lags", default=DEFAULT_LAGS)
     parser.add_argument(
+        "--pure-fw-density-lags",
+        default=None,
+        help=(
+            "Optional density-only FW lag ladder. Use this with a coarser "
+            "density collection stride when long density transport would be large."
+        ),
+    )
+    parser.add_argument(
         "--pure-fw-observables",
         default="r2,density",
     )
@@ -125,9 +133,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--pure-fw-block-size-steps", type=int, default=1)
     parser.add_argument("--pure-fw-collection-stride-steps", type=int, default=1)
+    parser.add_argument("--pure-fw-density-collection-stride-steps", type=int, default=None)
     parser.add_argument("--pure-fw-min-block-count", type=int, default=30)
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
     parser.add_argument("--pure-fw-plateau-window-lag-count", type=int, default=4)
+    parser.add_argument("--pure-fw-density-plateau-window-lag-count", type=int, default=None)
     parser.add_argument(
         "--pure-fw-pair-max",
         type=float,
@@ -186,6 +196,13 @@ def main() -> None:
         min_block_count=args.pure_fw_min_block_count,
         min_walker_weight_ess=args.pure_fw_min_walker_weight_ess,
         plateau_window_lag_count=args.pure_fw_plateau_window_lag_count,
+        density_lag_steps=(
+            None
+            if args.pure_fw_density_lags is None
+            else _parse_int_tuple(args.pure_fw_density_lags)
+        ),
+        density_collection_stride_steps=args.pure_fw_density_collection_stride_steps,
+        density_plateau_window_lag_count=args.pure_fw_density_plateau_window_lag_count,
         block_size_steps=args.pure_fw_block_size_steps,
         collection_stride_steps=args.pure_fw_collection_stride_steps,
         transport_invariant_tests_passed=(
