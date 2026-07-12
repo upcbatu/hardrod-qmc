@@ -43,7 +43,11 @@ from hrdmc.systems import (
 )
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
 from hrdmc.theory.units import HO_TRAP_OMEGA, harmonic_oscillator_unit_metadata
-from hrdmc.wavefunctions.guides import GapHCorrectedHardRodGuide, ReducedTGHardRodGuide
+from hrdmc.wavefunctions.guides import (
+    GapHCorrectedHardRodGuide,
+    ReducedTGHardRodGuide,
+    TrapMatchedReducedTGHardRodGuide,
+)
 from hrdmc.workflows.dmc.rn_block_initial_conditions import (
     RNInitializationControls,
     initial_walkers,
@@ -55,7 +59,7 @@ MAX_AUTO_WORKERS = 6
 RN_GRID_SCHEMA_VERSION = "rn_block_grid_v1"
 RN_SINGLE_CASE_SCHEMA_VERSION = "rn_block_single_case_v1"
 RN_PROPOSAL_FAMILIES = ("harmonic-mehler", "gap-h-transform")
-RN_GUIDE_FAMILIES = ("auto", "reduced-tg", "gap-h-corrected")
+RN_GUIDE_FAMILIES = ("auto", "reduced-tg", "trap-matched-reduced-tg", "gap-h-corrected")
 RN_TARGET_FAMILIES = ("primitive", "gap-h-product", "n2-exact-relative")
 DEFAULT_RN_PROPOSAL_FAMILY = "gap-h-transform"
 DEFAULT_RN_GUIDE_FAMILY = "auto"
@@ -212,7 +216,7 @@ def build_case_objects(
 ) -> tuple[
     OpenLineHardRodSystem,
     HarmonicTrap,
-    ReducedTGHardRodGuide | GapHCorrectedHardRodGuide,
+    ReducedTGHardRodGuide | TrapMatchedReducedTGHardRodGuide | GapHCorrectedHardRodGuide,
     OpenHardRodTrapPrimitiveKernel
     | OpenHardRodTrapGapHProductTargetKernel
     | OpenN2HardRodTrapExactKernel,
@@ -237,6 +241,12 @@ def build_case_objects(
             alpha=case.omega,
         )
         if resolved_guide_family == "gap-h-corrected"
+        else TrapMatchedReducedTGHardRodGuide(
+            system=system,
+            trap=trap,
+            alpha=case.omega,
+        )
+        if resolved_guide_family == "trap-matched-reduced-tg"
         else ReducedTGHardRodGuide(
             system=system,
             trap=trap,
@@ -701,6 +711,8 @@ def controls_to_dict(controls: RNRunControls) -> dict[str, float | int | str | b
 def _guide_family_name(guide: object) -> str:
     if isinstance(guide, GapHCorrectedHardRodGuide):
         return "gap-h-corrected"
+    if isinstance(guide, TrapMatchedReducedTGHardRodGuide):
+        return "trap-matched-reduced-tg"
     if isinstance(guide, ReducedTGHardRodGuide):
         return "reduced-tg"
     return type(guide).__name__

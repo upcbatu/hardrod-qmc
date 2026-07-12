@@ -27,6 +27,7 @@ def reduced_tg_log_batch(
     alpha: float,
     center: float,
     pair_power: float,
+    gaussian_uses_reduced_coordinates: bool = True,
 ) -> tuple[FloatArray, NDArray[np.bool_]]:
     x = np.asarray(x, dtype=float)
     offsets = np.asarray(offsets, dtype=float)
@@ -38,6 +39,7 @@ def reduced_tg_log_batch(
             float(alpha),
             float(center),
             float(pair_power),
+            bool(gaussian_uses_reduced_coordinates),
         )
     return _reduced_tg_log_batch_python(
         x,
@@ -46,6 +48,7 @@ def reduced_tg_log_batch(
         alpha=float(alpha),
         center=float(center),
         pair_power=float(pair_power),
+        gaussian_uses_reduced_coordinates=bool(gaussian_uses_reduced_coordinates),
     )
 
 
@@ -58,6 +61,7 @@ def reduced_tg_grad_lap_local_batch(
     center: float,
     omega2: float,
     pair_power: float,
+    gaussian_uses_reduced_coordinates: bool = True,
 ) -> tuple[FloatArray, FloatArray, FloatArray, NDArray[np.bool_]]:
     x = np.asarray(x, dtype=float)
     offsets = np.asarray(offsets, dtype=float)
@@ -70,6 +74,7 @@ def reduced_tg_grad_lap_local_batch(
             float(center),
             float(omega2),
             float(pair_power),
+            bool(gaussian_uses_reduced_coordinates),
         )
     return _reduced_tg_grad_lap_local_batch_python(
         x,
@@ -79,6 +84,7 @@ def reduced_tg_grad_lap_local_batch(
         center=float(center),
         omega2=float(omega2),
         pair_power=float(pair_power),
+        gaussian_uses_reduced_coordinates=bool(gaussian_uses_reduced_coordinates),
     )
 
 
@@ -109,6 +115,7 @@ def _reduced_tg_log_batch_python(
     alpha: float,
     center: float,
     pair_power: float,
+    gaussian_uses_reduced_coordinates: bool,
 ) -> tuple[FloatArray, NDArray[np.bool_]]:
     walkers, n_particles = x.shape
     log_values = np.empty(walkers, dtype=float)
@@ -124,7 +131,8 @@ def _reduced_tg_log_batch_python(
         row_valid = True
         for i in range(n_particles):
             y_i = x[walker, i] - offsets[i]
-            gaussian_sum += (y_i - center) ** 2
+            gaussian_coordinate = y_i if gaussian_uses_reduced_coordinates else x[walker, i]
+            gaussian_sum += (gaussian_coordinate - center) ** 2
             for j in range(i + 1, n_particles):
                 gap = (x[walker, j] - offsets[j]) - y_i
                 if gap <= 0.0 or not np.isfinite(gap):
@@ -152,6 +160,7 @@ def _reduced_tg_grad_lap_local_batch_python(
     center: float,
     omega2: float,
     pair_power: float,
+    gaussian_uses_reduced_coordinates: bool,
 ) -> tuple[FloatArray, FloatArray, FloatArray, NDArray[np.bool_]]:
     walkers, n_particles = x.shape
     grad = np.empty((walkers, n_particles), dtype=float)
@@ -165,7 +174,8 @@ def _reduced_tg_grad_lap_local_batch_python(
         row_finite = bool(valid[walker])
         for i in range(n_particles):
             y_i = x[walker, i] - offsets[i]
-            grad_i = -alpha * (y_i - center)
+            gaussian_coordinate = y_i if gaussian_uses_reduced_coordinates else x[walker, i]
+            grad_i = -alpha * (gaussian_coordinate - center)
             lap_i = -alpha
             for j in range(n_particles):
                 if i == j:
@@ -221,6 +231,7 @@ if NUMBA_AVAILABLE:
         alpha: float,
         center: float,
         pair_power: float,
+        gaussian_uses_reduced_coordinates: bool,
     ) -> tuple[FloatArray, NDArray[np.bool_]]:
         walkers, n_particles = x.shape
         log_values = np.empty(walkers, dtype=np.float64)
@@ -242,7 +253,8 @@ if NUMBA_AVAILABLE:
             if valid:
                 for i in range(n_particles):
                     y_i = x[walker, i] - offsets[i]
-                    gaussian_sum += (y_i - center) * (y_i - center)
+                    gaussian_coordinate = y_i if gaussian_uses_reduced_coordinates else x[walker, i]
+                    gaussian_sum += (gaussian_coordinate - center) * (gaussian_coordinate - center)
                     for j in range(i + 1, n_particles):
                         gap = (x[walker, j] - offsets[j]) - y_i
                         if gap <= 0.0 or not np.isfinite(gap):
@@ -269,6 +281,7 @@ if NUMBA_AVAILABLE:
         center: float,
         omega2: float,
         pair_power: float,
+        gaussian_uses_reduced_coordinates: bool,
     ) -> tuple[FloatArray, FloatArray, FloatArray, NDArray[np.bool_]]:
         walkers, n_particles = x.shape
         grad = np.empty((walkers, n_particles), dtype=np.float64)
@@ -292,7 +305,8 @@ if NUMBA_AVAILABLE:
             row_finite = valid
             for i in range(n_particles):
                 y_i = x[walker, i] - offsets[i]
-                grad_i = -alpha * (y_i - center)
+                gaussian_coordinate = y_i if gaussian_uses_reduced_coordinates else x[walker, i]
+                grad_i = -alpha * (gaussian_coordinate - center)
                 lap_i = -alpha
                 for j in range(n_particles):
                     if i == j:

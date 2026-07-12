@@ -145,6 +145,46 @@ class ReducedTGHardRodGuide:
         return positions
 
 
+@dataclass(frozen=True)
+class TrapMatchedReducedTGHardRodGuide(ReducedTGHardRodGuide):
+    """Reduced-coordinate Vandermonde guide with the physical trap Gaussian.
+
+    The hard-core boundary is still represented by reduced coordinates
+    ``y_i=x_i-a(i-(N-1)/2)``.  Unlike :class:`ReducedTGHardRodGuide`, the
+    Gaussian is evaluated at the physical coordinates ``x_i``.  This retains
+    the finite-rod linear confinement of the reduced cloud induced by the
+    harmonic trap.  At zero rod length the two guides are identical.
+    """
+
+    def batch_log_value(self, positions: FloatArray) -> tuple[FloatArray, NDArray[np.bool_]]:
+        positions = self._as_position_batch(positions)
+        return reduced_tg_log_batch(
+            positions,
+            self._offsets(),
+            rod_length=self.system.rod_length,
+            alpha=self.alpha,
+            center=self.system.center,
+            pair_power=self.pair_power,
+            gaussian_uses_reduced_coordinates=False,
+        )
+
+    def batch_grad_lap_local(
+        self,
+        positions: FloatArray,
+    ) -> tuple[FloatArray, FloatArray, FloatArray, NDArray[np.bool_]]:
+        positions = self._as_position_batch(positions)
+        return reduced_tg_grad_lap_local_batch(
+            positions,
+            self._offsets(),
+            rod_length=self.system.rod_length,
+            alpha=self.alpha,
+            center=self.system.center,
+            omega2=self.trap.omega**2,
+            pair_power=self.pair_power,
+            gaussian_uses_reduced_coordinates=False,
+        )
+
+
 def _upper_pair_gaps(y: FloatArray) -> FloatArray:
     i, j = np.triu_indices(y.size, k=1)
     return y[j] - y[i]
