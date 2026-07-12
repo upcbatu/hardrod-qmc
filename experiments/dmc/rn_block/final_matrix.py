@@ -6,6 +6,7 @@ import math
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,26 @@ DEFAULT_LAGS = "0,2000,4000,8000,12000,16000,20000"
 DEFAULT_DENSITY_LAGS = "0,8000,12000,20000"
 DEFAULT_DENSITY_COLLECTION_STRIDE_STEPS = 4000
 DEFAULT_RN_CADENCE = 0.01
+FW_LAG_TIMES = (0.0, 5.0, 10.0, 20.0, 30.0, 40.0, 50.0)
+DENSITY_FW_LAG_TIMES = (0.0, 20.0, 30.0, 50.0)
+STORE_INTERVAL_TAU = 0.025
+FW_COLLECTION_INTERVAL_TAU = 0.05
+DENSITY_FW_COLLECTION_INTERVAL_TAU = 10.0
+
+
+@dataclass(frozen=True)
+class RowMethod:
+    dt: float
+    relative_alpha: float | None
+    initialization_mode: str
+    init_width_log_sigma: float
+    breathing_preburn_steps: int
+    breathing_preburn_log_step: float
+    store_every: int
+    pure_fw_lags: tuple[int, ...]
+    pure_fw_density_lags: tuple[int, ...]
+    pure_fw_collection_stride_steps: int
+    pure_fw_density_collection_stride_steps: int
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -121,12 +142,14 @@ def main() -> None:
     records: list[dict[str, Any]] = []
     for case_id in cases:
         case_output_dir = output_root / case_id
+        method = _row_method(args, case_id)
         grid_plan = _case_grid_plan(args, case_id)
         record: dict[str, Any] = {
             "case": case_id,
             "output_dir": str(case_output_dir),
             "summary": str(case_output_dir / "summary.json"),
             "grid_plan": grid_plan,
+            "method": _row_method_metadata(method),
         }
         summary_path = case_output_dir / "summary.json"
         completed, completion_errors = _verified_completed_row(
@@ -134,6 +157,7 @@ def main() -> None:
             case_id,
             case_output_dir,
             grid_plan,
+            method,
         )
         if completed and not args.force:
             record["status"] = "skipped_verified_complete"
@@ -144,12 +168,13 @@ def main() -> None:
                 case_id,
                 case_output_dir,
                 grid_plan,
+                method,
             )
             records.append(record)
             continue
         if completion_errors:
             record["existing_artifact_errors"] = completion_errors
-        command = _benchmark_command(args, case_id, case_output_dir, grid_plan)
+        command = _benchmark_command(args, case_id, case_output_dir, grid_plan, method)
         record["command"] = command
         if args.dry_run:
             record["status"] = "planned"
@@ -187,7 +212,12 @@ def _case_grid_plan(args: argparse.Namespace, case_id: str) -> dict[str, float |
     case = parse_case(case_id)
     minimum_extent = 0.5 * case.n_particles * case.rod_length
     requested_extent = max(args.grid_extent, minimum_extent + args.excluded_volume_margin)
-    controls = _disabled_rn_controls(args, grid_extent=requested_extent, n_bins=args.n_bins)
+    controls = _disabled_rn_controls(
+        args,
+        _row_method(args, case_id),
+        grid_extent=requested_extent,
+        n_bins=args.n_bins,
+    )
     grid = make_grid(controls, case)
     planned_extent = _command_float(float(max(abs(grid[0]), abs(grid[-1]))))
     planned_bins = max(
@@ -238,6 +268,7 @@ def _benchmark_command(
     case_id: str,
     output_dir: Path,
     grid_plan: dict[str, float | int],
+    method: RowMethod,
 ) -> list[str]:
     command = [
         sys.executable,
@@ -247,7 +278,7 @@ def _benchmark_command(
         "--seeds",
         args.seeds,
         "--dt",
-        _format_number(args.dt),
+        _format_number(method.dt),
         "--walkers",
         str(args.walkers),
         "--local-step-method",
@@ -261,19 +292,19 @@ def _benchmark_command(
         "--production-tau",
         _format_number(args.production_tau),
         "--store-every",
-        str(args.store_every),
+        str(method.store_every),
         "--grid-extent",
         _format_number(float(grid_plan["grid_extent"])),
         "--n-bins",
         str(grid_plan["n_bins"]),
         "--initialization-mode",
-        args.initialization_mode,
+        method.initialization_mode,
         "--init-width-log-sigma",
-        _format_number(args.init_width_log_sigma),
+        _format_number(method.init_width_log_sigma),
         "--breathing-preburn-steps",
-        str(args.breathing_preburn_steps),
+        str(method.breathing_preburn_steps),
         "--breathing-preburn-log-step",
-        _format_number(args.breathing_preburn_log_step),
+        _format_number(method.breathing_preburn_log_step),
         "--proposal-family",
         "harmonic-mehler",
         "--guide-family",
@@ -285,15 +316,15 @@ def _benchmark_command(
         "--component-probabilities",
         "1.0",
         "--pure-fw-lags",
-        args.pure_fw_lags,
+        _format_int_tuple(method.pure_fw_lags),
         "--pure-fw-density-lags",
-        args.pure_fw_density_lags,
+        _format_int_tuple(method.pure_fw_density_lags),
         "--pure-fw-block-size-steps",
         str(args.pure_fw_block_size_steps),
         "--pure-fw-collection-stride-steps",
-        str(args.pure_fw_collection_stride_steps),
+        str(method.pure_fw_collection_stride_steps),
         "--pure-fw-density-collection-stride-steps",
-        str(args.pure_fw_density_collection_stride_steps),
+        str(method.pure_fw_density_collection_stride_steps),
         "--pure-fw-min-block-count",
         str(args.pure_fw_min_block_count),
         "--pure-fw-min-walker-weight-ess",
@@ -308,6 +339,8 @@ def _benchmark_command(
         str(output_dir),
         "--disable-rn",
     ]
+    if method.relative_alpha is not None:
+        command.extend(("--relative-alpha", _format_number(method.relative_alpha)))
     if args.progress:
         command.append("--progress")
     return command
@@ -371,6 +404,11 @@ def _write_matrix_manifest(
                 "parallel_workers": args.parallel_workers,
                 "plot_formats": args.plot_formats,
                 "calculation": "metropolis_corrected_drift_diffusion_dmc",
+                "row_method_policy": {
+                    "a_over_aho_0p1_or_smaller": "dt=0.0025, reduced-TG default guide",
+                    "a_over_aho_1": "dt=0.00125, relative-alpha=1.5",
+                    "a_over_aho_10": "dt=0.00025, reduced-TG default guide",
+                },
             },
             "rows": [merged_records[case_id] for case_id in sorted(merged_records)],
         },
@@ -399,11 +437,13 @@ def _discover_completed_rows(output_root: Path, args: argparse.Namespace) -> lis
         except ValueError:
             continue
         grid_plan = _case_grid_plan(args, case_id)
+        method = _row_method(args, case_id)
         completed, _errors = _verified_completed_row(
             args,
             case_id,
             summary_path.parent,
             grid_plan,
+            method,
         )
         if not completed:
             continue
@@ -422,22 +462,24 @@ def _discover_completed_rows(output_root: Path, args: argparse.Namespace) -> lis
 
 def _disabled_rn_controls(
     args: argparse.Namespace,
+    method: RowMethod,
     *,
     grid_extent: float,
     n_bins: int,
 ) -> RNRunControls:
     return RNRunControls(
-        dt=args.dt,
+        dt=method.dt,
         walkers=args.walkers,
         tau_block=args.tau,
         rn_cadence_tau=DEFAULT_RN_CADENCE,
         collective_rn_enabled=False,
         burn_tau=args.burn_tau,
         production_tau=args.production_tau,
-        store_every=args.store_every,
+        store_every=method.store_every,
         grid_extent=grid_extent,
         n_bins=n_bins,
         local_step_method=args.local_step_method,
+        relative_alpha=method.relative_alpha,
     )
 
 
@@ -446,6 +488,7 @@ def _verified_completed_row(
     case_id: str,
     output_dir: Path,
     grid_plan: dict[str, float | int],
+    method: RowMethod,
 ) -> tuple[bool, list[str]]:
     summary_path = output_dir / "summary.json"
     manifest_path = output_dir / "run_manifest.json"
@@ -460,7 +503,7 @@ def _verified_completed_row(
         return False, ["run manifest has no configuration payload"]
     if manifest.get("config_fingerprint") != config_fingerprint(config):
         return False, ["run manifest configuration fingerprint mismatch"]
-    expected = _expected_manifest_fields(args, case_id, grid_plan)
+    expected = _expected_manifest_fields(args, case_id, grid_plan, method)
     mismatches = [key for key, value in expected.items() if _nested_value(config, key) != value]
     if mismatches:
         return False, [f"configuration mismatch: {', '.join(mismatches)}"]
@@ -485,9 +528,11 @@ def _expected_manifest_fields(
     args: argparse.Namespace,
     case_id: str,
     grid_plan: dict[str, float | int],
+    method: RowMethod,
 ) -> dict[str, Any]:
     controls = _disabled_rn_controls(
         args,
+        method,
         grid_extent=float(grid_plan["grid_extent"]),
         n_bins=int(grid_plan["n_bins"]),
     )
@@ -497,25 +542,23 @@ def _expected_manifest_fields(
         "controls": controls_to_dict(controls),
         "parallel_workers": args.parallel_workers,
         "disable_rn": True,
-        "initialization_mode": args.initialization_mode,
-        "init_width_log_sigma": args.init_width_log_sigma,
-        "breathing_preburn_steps": args.breathing_preburn_steps,
-        "breathing_preburn_log_step": args.breathing_preburn_log_step,
+        "initialization_mode": method.initialization_mode,
+        "init_width_log_sigma": method.init_width_log_sigma,
+        "breathing_preburn_steps": method.breathing_preburn_steps,
+        "breathing_preburn_log_step": method.breathing_preburn_log_step,
         "component_log_scales": [0.0],
         "component_probabilities": [1.0],
         "proposal_family": "harmonic-mehler",
         "guide_family": "reduced-tg",
         "target_family": "primitive",
-        "pure_config.lag_steps": [int(value) for value in args.pure_fw_lags.split(",")],
-        "pure_config.density_lag_steps": [
-            int(value) for value in args.pure_fw_density_lags.split(",")
-        ],
+        "pure_config.lag_steps": list(method.pure_fw_lags),
+        "pure_config.density_lag_steps": list(method.pure_fw_density_lags),
         "pure_config.observables": ["r2", "density"],
         "pure_config.observable_source": "raw_r2",
         "pure_config.block_size_steps": args.pure_fw_block_size_steps,
-        "pure_config.collection_stride_steps": args.pure_fw_collection_stride_steps,
+        "pure_config.collection_stride_steps": method.pure_fw_collection_stride_steps,
         "pure_config.density_collection_stride_steps": (
-            args.pure_fw_density_collection_stride_steps
+            method.pure_fw_density_collection_stride_steps
         ),
         "pure_config.min_block_count": args.pure_fw_min_block_count,
         "pure_config.min_walker_weight_ess": args.pure_fw_min_walker_weight_ess,
@@ -538,6 +581,67 @@ def _nested_value(payload: dict[str, Any], dotted_key: str) -> Any:
 
 def _format_number(value: float) -> str:
     return f"{value:g}"
+
+
+def _format_int_tuple(values: tuple[int, ...]) -> str:
+    return ",".join(str(value) for value in values)
+
+
+def _steps_for_tau(tau: float, dt: float) -> int:
+    if tau == 0.0:
+        return 0
+    steps = int(round(tau / dt))
+    if steps <= 0 or not math.isclose(steps * dt, tau, rel_tol=0.0, abs_tol=1e-12):
+        raise ValueError(f"{tau=} is not representable at {dt=}")
+    return steps
+
+
+def _row_method(args: argparse.Namespace, case_id: str) -> RowMethod:
+    case = parse_case(case_id)
+    if math.isclose(case.rod_length, 10.0, rel_tol=0.0, abs_tol=1e-12):
+        dt = 0.00025
+        relative_alpha = 1.0
+        initialization_mode = "lda-rms-lattice"
+        preburn_steps = 0
+    elif math.isclose(case.rod_length, 1.0, rel_tol=0.0, abs_tol=1e-12):
+        dt = 0.00125
+        relative_alpha = 1.5
+        initialization_mode = "lda-rms-lattice"
+        preburn_steps = 0
+    else:
+        dt = args.dt
+        relative_alpha = None
+        initialization_mode = args.initialization_mode
+        preburn_steps = args.breathing_preburn_steps
+    return RowMethod(
+        dt=dt,
+        relative_alpha=relative_alpha,
+        initialization_mode=initialization_mode,
+        init_width_log_sigma=args.init_width_log_sigma,
+        breathing_preburn_steps=preburn_steps,
+        breathing_preburn_log_step=args.breathing_preburn_log_step,
+        store_every=_steps_for_tau(STORE_INTERVAL_TAU, dt),
+        pure_fw_lags=tuple(_steps_for_tau(tau, dt) for tau in FW_LAG_TIMES),
+        pure_fw_density_lags=tuple(_steps_for_tau(tau, dt) for tau in DENSITY_FW_LAG_TIMES),
+        pure_fw_collection_stride_steps=_steps_for_tau(FW_COLLECTION_INTERVAL_TAU, dt),
+        pure_fw_density_collection_stride_steps=_steps_for_tau(
+            DENSITY_FW_COLLECTION_INTERVAL_TAU,
+            dt,
+        ),
+    )
+
+
+def _row_method_metadata(method: RowMethod) -> dict[str, float | int | list[int] | None | str]:
+    return {
+        "dt": method.dt,
+        "relative_alpha": method.relative_alpha,
+        "initialization_mode": method.initialization_mode,
+        "store_every": method.store_every,
+        "pure_fw_lags": list(method.pure_fw_lags),
+        "pure_fw_density_lags": list(method.pure_fw_density_lags),
+        "pure_fw_collection_stride_steps": method.pure_fw_collection_stride_steps,
+        "pure_fw_density_collection_stride_steps": method.pure_fw_density_collection_stride_steps,
+    }
 
 
 def _command_float(value: float) -> float:

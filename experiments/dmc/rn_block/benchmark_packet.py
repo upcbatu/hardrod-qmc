@@ -89,6 +89,15 @@ def build_parser() -> argparse.ArgumentParser:
         default="lda-rms-logspread",
     )
     parser.add_argument("--init-width-log-sigma", type=float, default=0.10)
+    parser.add_argument(
+        "--relative-alpha",
+        type=float,
+        default=None,
+        help=(
+            "Optional reduced-coordinate internal Gaussian width for the "
+            "reduced-TG guide. The center-of-mass width remains harmonic."
+        ),
+    )
     parser.add_argument("--breathing-preburn-steps", type=int, default=1000)
     parser.add_argument("--breathing-preburn-log-step", type=float, default=0.04)
     parser.add_argument(
@@ -176,6 +185,7 @@ def main() -> None:
         grid_extent=args.grid_extent,
         n_bins=args.n_bins,
         local_step_method=args.local_step_method,
+        relative_alpha=args.relative_alpha,
     )
     initialization = RNInitializationControls(
         mode=args.initialization_mode,
@@ -278,6 +288,7 @@ def main() -> None:
                 "disable_rn": args.disable_rn,
                 "initialization_mode": args.initialization_mode,
                 "init_width_log_sigma": args.init_width_log_sigma,
+                "relative_alpha": args.relative_alpha,
                 "breathing_preburn_steps": args.breathing_preburn_steps,
                 "breathing_preburn_log_step": args.breathing_preburn_log_step,
                 "component_log_scales": list(proposal.component_log_scales),

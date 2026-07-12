@@ -9,9 +9,9 @@ from hrdmc.systems.external_potential import HarmonicTrap
 from hrdmc.systems.open_line import OpenLineHardRodSystem
 from hrdmc.wavefunctions.kernels.trapped_tg import (
     backend_name,
-    reduced_tg_closed_form_local_energy_batch,
     reduced_tg_grad_lap_local_batch,
     reduced_tg_log_batch,
+    reduced_tg_relative_width_local_energy_batch,
     valid_batch,
 )
 
@@ -31,6 +31,10 @@ class ReducedTGHardRodGuide:
         Psi_T = exp[-alpha/2 * sum_i (y_i-x0)^2]
                 * prod_{i<j} (y_j-y_i)^pair_power.
 
+    ``relative_alpha`` optionally changes only the Gaussian width of the
+    internal reduced coordinates.  The center-of-mass factor remains matched
+    to ``alpha``.
+
     This class is a DMC guide, not only a VMC trial: it owns log amplitude,
     first and second log derivatives, local energy, and ordered-sector validity.
     """
@@ -38,6 +42,7 @@ class ReducedTGHardRodGuide:
     system: OpenLineHardRodSystem
     trap: HarmonicTrap
     alpha: float
+    relative_alpha: float | None = None
     pair_power: float = 1.0
 
     def __post_init__(self) -> None:
@@ -45,6 +50,8 @@ class ReducedTGHardRodGuide:
             raise ValueError("system and trap centers must match")
         if self.alpha <= 0.0:
             raise ValueError("alpha must be positive")
+        if self.relative_alpha is not None and self.relative_alpha <= 0.0:
+            raise ValueError("relative_alpha must be positive when provided")
         if self.pair_power <= 0.0:
             raise ValueError("pair_power must be positive")
 
@@ -103,6 +110,7 @@ class ReducedTGHardRodGuide:
             self._offsets(),
             rod_length=self.system.rod_length,
             alpha=self.alpha,
+            relative_alpha=self._relative_alpha(),
             center=self.system.center,
             pair_power=self.pair_power,
         )
@@ -117,15 +125,17 @@ class ReducedTGHardRodGuide:
             self._offsets(),
             rod_length=self.system.rod_length,
             alpha=self.alpha,
+            relative_alpha=self._relative_alpha(),
             center=self.system.center,
             omega2=self.trap.omega**2,
             pair_power=self.pair_power,
         )
         if self.pair_power == 1.0 and np.isclose(self.alpha, self.trap.omega):
-            closed_local = reduced_tg_closed_form_local_energy_batch(
+            closed_local = reduced_tg_relative_width_local_energy_batch(
                 positions,
                 rod_length=self.system.rod_length,
                 omega=self.trap.omega,
+                relative_alpha=self._relative_alpha(),
             )
             local = np.where(finite, closed_local, local)
         return grad, lap, local, finite
@@ -146,6 +156,9 @@ class ReducedTGHardRodGuide:
         return self.system.rod_length * (
             np.arange(self.system.n_particles, dtype=float) - 0.5 * (self.system.n_particles - 1)
         )
+
+    def _relative_alpha(self) -> float:
+        return self.alpha if self.relative_alpha is None else self.relative_alpha
 
     def _as_position_batch(self, positions: FloatArray) -> FloatArray:
         positions = np.asarray(positions, dtype=float)

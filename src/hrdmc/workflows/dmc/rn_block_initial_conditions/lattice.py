@@ -59,11 +59,15 @@ def initial_walkers_with_metadata(
         if target_initial_rms is None:
             raise ValueError("target_initial_rms is required for LDA-RMS initialization")
         spacing = lattice_spacing_for_target_rms(system.n_particles, target_initial_rms)
-        spacing = max(spacing, system.rod_length * 1.05)
+        minimum_free_gap = 0.05
+        spacing = max(spacing, system.rod_length + minimum_free_gap)
         target = float(target_initial_rms)
         if initialization_mode == "lda-rms-logspread":
-            spacings = spacing * np.exp(rng.normal(0.0, init_width_log_sigma, size=walkers))
-            spacings = np.maximum(spacings, system.rod_length * 1.05)
+            free_spacing = spacing - system.rod_length
+            free_spacings = free_spacing * np.exp(
+                rng.normal(0.0, init_width_log_sigma, size=walkers)
+            )
+            spacings = system.rod_length + np.maximum(free_spacings, minimum_free_gap)
         else:
             spacings = np.full(walkers, spacing, dtype=float)
     positions = np.vstack(
@@ -85,6 +89,10 @@ def initial_walkers_with_metadata(
             "target_initial_rms": target,
             "initial_spacing_mean": float(np.mean(spacings)),
             "initial_spacing_std": float(np.std(spacings, ddof=1)) if walkers > 1 else 0.0,
+            "initial_free_spacing_mean": float(np.mean(spacings - system.rod_length)),
+            "initial_free_spacing_std": float(np.std(spacings - system.rod_length, ddof=1))
+            if walkers > 1
+            else 0.0,
             "initial_rms_mean": float(np.mean(rms)),
             "initial_rms_std": float(np.std(rms, ddof=1)) if walkers > 1 else 0.0,
             "initial_gap_min": array_min_or_none(gaps),

@@ -124,6 +124,7 @@ class RNRunControls:
     n_bins: int
     local_step_method: str = "metropolis"
     collective_rn_enabled: bool = True
+    relative_alpha: float | None = None
 
     @property
     def burn_in_steps(self) -> int:
@@ -212,6 +213,7 @@ def build_case_objects(
     proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
     guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
     target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    relative_alpha: float | None = None,
 ) -> tuple[
     OpenLineHardRodSystem,
     HarmonicTrap,
@@ -244,6 +246,7 @@ def build_case_objects(
             system=system,
             trap=trap,
             alpha=case.omega,
+            relative_alpha=relative_alpha,
         )
     )
     proposal_kernel = (
@@ -340,6 +343,7 @@ def run_streaming_seed(
         proposal_family=proposal_family,
         guide_family=guide_family,
         target_family=target_family,
+        relative_alpha=controls.relative_alpha,
     )
     grid = make_grid(controls, case) if density_grid is None else density_grid
     initialization = RNInitializationControls() if initialization is None else initialization
@@ -420,6 +424,7 @@ def validate_streaming_against_raw(
         proposal_family=proposal_family,
         guide_family=guide_family,
         target_family=target_family,
+        relative_alpha=controls.relative_alpha,
     )
     grid = make_grid(controls, case)
     raw_rng = np.random.default_rng(seed)
@@ -537,6 +542,7 @@ def summarize_case(
         proposal_family=proposal_family,
         guide_family=guide_family,
         target_family=target_family,
+        relative_alpha=controls.relative_alpha,
     )
     lda = lda_density_profile(
         grid,
@@ -690,7 +696,7 @@ def _run_seed_worker(
 
 
 def controls_to_dict(controls: RNRunControls) -> dict[str, float | int | str | bool]:
-    return {
+    values: dict[str, float | int | str | bool] = {
         "dt": controls.dt,
         "walkers": controls.walkers,
         "tau_block": controls.tau_block,
@@ -705,6 +711,9 @@ def controls_to_dict(controls: RNRunControls) -> dict[str, float | int | str | b
         "n_bins": controls.n_bins,
         "local_step_method": controls.local_step_method,
     }
+    if controls.relative_alpha is not None:
+        values["relative_alpha"] = controls.relative_alpha
+    return values
 
 
 def _guide_family_name(guide: object) -> str:
