@@ -410,8 +410,14 @@ def _write_matrix_manifest(
                 "calculation": "metropolis_corrected_drift_diffusion_dmc",
                 "row_method_policy": {
                     "a_over_aho_0_and_0p1": "dt=0.0025, reduced-TG default guide",
-                    "N10_a_over_aho_1": "dt=0.00125, relative-alpha=1.5",
-                    "N20_a_over_aho_1": "dt=0.00125, reduced-TG default guide",
+                    "N10_a_over_aho_1": (
+                        "dt=0.00125, relative-alpha=1.5, log-spread initialization "
+                        "with breathing preburn"
+                    ),
+                    "N20_a_over_aho_1": (
+                        "dt=0.00125, reduced-TG default guide, log-spread initialization "
+                        "with breathing preburn"
+                    ),
                     "a_over_aho_10": "dt=0.00025, reduced-TG default guide",
                     "density_fw": (
                         "physical lags=(0,2,4,7); snapshot interval=0.1 "
@@ -618,8 +624,8 @@ def _row_method(args: argparse.Namespace, case_id: str) -> RowMethod:
         # separated N=20 seed energies in the longer trace, so N=20 retains
         # the parameter-free oscillator-width reduced-TG guide.
         relative_alpha = 1.5 if case.n_particles == 10 else None
-        initialization_mode = "lda-rms-lattice"
-        preburn_steps = 0
+        initialization_mode = "lda-rms-logspread"
+        preburn_steps = args.breathing_preburn_steps
     else:
         dt = args.dt
         relative_alpha = None
