@@ -25,20 +25,24 @@ from hrdmc.workflows.dmc.rn_block import (
     parse_seeds,
 )
 
-DEFAULT_CASES = "N10_A0.1,N10_A1,N10_A10,N20_A0.1,N20_A1,N20_A10"
-DEFAULT_SEEDS = "7001,7002,7003"
+DEFAULT_CASES = "N10_A0,N10_A0.1,N10_A1,N10_A10,N20_A0,N20_A0.1,N20_A1,N20_A10"
+DEFAULT_SEEDS = "7001,7002,7003,7004,7005"
 # The finite-rod N=2 anchor requires a physical forward-walking projection
 # time well beyond the earlier 7/omega ladder.  At dt=0.0025 this reaches
 # 50/omega while retaining ample production support for tau_prod=480.
 DEFAULT_LAGS = "0,2000,4000,8000,12000,16000,20000"
-DEFAULT_DENSITY_LAGS = "0,8000,12000,20000"
-DEFAULT_DENSITY_COLLECTION_STRIDE_STEPS = 4000
+DEFAULT_DENSITY_LAGS = "0,800,1600,2800"
+DEFAULT_DENSITY_COLLECTION_STRIDE_STEPS = 40
 DEFAULT_RN_CADENCE = 0.01
 FW_LAG_TIMES = (0.0, 5.0, 10.0, 20.0, 30.0, 40.0, 50.0)
-DENSITY_FW_LAG_TIMES = (0.0, 20.0, 30.0, 50.0)
+# Density needs enough independent transported snapshots to resolve the finite-N
+# shell structure.  Its shorter ladder is separate from the longer scalar-R2
+# ladder so that large density histograms remain bounded in memory.
+DENSITY_FW_LAG_TIMES = (0.0, 2.0, 4.0, 7.0)
 STORE_INTERVAL_TAU = 0.025
 FW_COLLECTION_INTERVAL_TAU = 0.05
-DENSITY_FW_COLLECTION_INTERVAL_TAU = 10.0
+DENSITY_FW_COLLECTION_INTERVAL_TAU = 0.1
+LARGE_GRID_DENSITY_FW_COLLECTION_INTERVAL_TAU = 0.5
 
 
 @dataclass(frozen=True)
@@ -118,12 +122,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pure-fw-min-block-count", type=int, default=20)
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
     parser.add_argument("--pure-fw-density-plateau-window-lag-count", type=int, default=3)
-    parser.add_argument("--parallel-workers", type=int, default=3)
+    parser.add_argument("--parallel-workers", type=int, default=5)
     parser.add_argument("--plot-formats", default="png,pdf")
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path("results/dmc/final_matrix/local_dmc_dt0025_split_fw50"),
+        default=Path("results/dmc/final_matrix/thesis_5seed"),
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
@@ -405,9 +409,14 @@ def _write_matrix_manifest(
                 "plot_formats": args.plot_formats,
                 "calculation": "metropolis_corrected_drift_diffusion_dmc",
                 "row_method_policy": {
-                    "a_over_aho_0p1_or_smaller": "dt=0.0025, reduced-TG default guide",
-                    "a_over_aho_1": "dt=0.00125, relative-alpha=1.5",
+                    "a_over_aho_0_and_0p1": "dt=0.0025, reduced-TG default guide",
+                    "N10_a_over_aho_1": "dt=0.00125, relative-alpha=1.5",
+                    "N20_a_over_aho_1": "dt=0.00125, reduced-TG default guide",
                     "a_over_aho_10": "dt=0.00025, reduced-TG default guide",
+                    "density_fw": (
+                        "physical lags=(0,2,4,7); snapshot interval=0.1 "
+                        "except 0.5 for the large a/a_ho=10 grids"
+                    ),
                 },
             },
             "rows": [merged_records[case_id] for case_id in sorted(merged_records)],
@@ -600,12 +609,15 @@ def _row_method(args: argparse.Namespace, case_id: str) -> RowMethod:
     case = parse_case(case_id)
     if math.isclose(case.rod_length, 10.0, rel_tol=0.0, abs_tol=1e-12):
         dt = 0.00025
-        relative_alpha = 1.0
+        relative_alpha = None
         initialization_mode = "lda-rms-lattice"
         preburn_steps = 0
     elif math.isclose(case.rod_length, 1.0, rel_tol=0.0, abs_tol=1e-12):
         dt = 0.00125
-        relative_alpha = 1.5
+        # The N=10 screen selected a narrower internal guide.  The same width
+        # separated N=20 seed energies in the longer trace, so N=20 retains
+        # the parameter-free oscillator-width reduced-TG guide.
+        relative_alpha = 1.5 if case.n_particles == 10 else None
         initialization_mode = "lda-rms-lattice"
         preburn_steps = 0
     else:
@@ -625,7 +637,11 @@ def _row_method(args: argparse.Namespace, case_id: str) -> RowMethod:
         pure_fw_density_lags=tuple(_steps_for_tau(tau, dt) for tau in DENSITY_FW_LAG_TIMES),
         pure_fw_collection_stride_steps=_steps_for_tau(FW_COLLECTION_INTERVAL_TAU, dt),
         pure_fw_density_collection_stride_steps=_steps_for_tau(
-            DENSITY_FW_COLLECTION_INTERVAL_TAU,
+            (
+                LARGE_GRID_DENSITY_FW_COLLECTION_INTERVAL_TAU
+                if math.isclose(case.rod_length, 10.0, rel_tol=0.0, abs_tol=1e-12)
+                else DENSITY_FW_COLLECTION_INTERVAL_TAU
+            ),
             dt,
         ),
     )
