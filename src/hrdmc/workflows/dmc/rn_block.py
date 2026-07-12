@@ -295,7 +295,13 @@ def make_grid(controls: RNRunControls, case: RNCase | None = None) -> np.ndarray
                 rod_length=system.rod_length,
             )
         except ValueError as exc:
-            if "density cloud" not in str(exc):
+            if not any(
+                message in str(exc)
+                for message in (
+                    "density cloud",
+                    "grid is too small for the requested hard-rod excluded volume",
+                )
+            ):
                 raise
             extent *= 1.5
         else:
