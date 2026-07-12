@@ -177,7 +177,7 @@ def _case_grid_plan(args: argparse.Namespace, case_id: str) -> dict[str, float |
     requested_extent = max(args.grid_extent, minimum_extent + args.excluded_volume_margin)
     controls = _disabled_rn_controls(args, grid_extent=requested_extent, n_bins=args.n_bins)
     grid = make_grid(controls, case)
-    planned_extent = float(max(abs(grid[0]), abs(grid[-1])))
+    planned_extent = _command_float(float(max(abs(grid[0]), abs(grid[-1]))))
     planned_bins = max(
         args.n_bins,
         math.ceil((2.0 * planned_extent) / args.max_density_bin_width) + 1,
@@ -504,6 +504,12 @@ def _nested_value(payload: dict[str, Any], dotted_key: str) -> Any:
 
 def _format_number(value: float) -> str:
     return f"{value:g}"
+
+
+def _command_float(value: float) -> float:
+    """Return the float reconstructed from the command-line representation."""
+
+    return float(_format_number(value))
 
 
 if __name__ == "__main__":

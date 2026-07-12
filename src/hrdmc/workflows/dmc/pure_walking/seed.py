@@ -138,6 +138,16 @@ def compact_rn_seed_summary(summary: RNBlockStreamingSummary) -> dict[str, Any]:
             "resample_count": summary.metadata.get("resample_count"),
             "ess_fraction_min": summary.metadata.get("ess_fraction_min"),
             "log_weight_span_max": summary.metadata.get("log_weight_span_max"),
+            "local_step_method": summary.metadata.get("local_step_method"),
+            "local_acceptance_fraction_mean": summary.metadata.get(
+                "local_acceptance_fraction_mean"
+            ),
+            "invalid_proposal_fraction_max": summary.metadata.get(
+                "invalid_proposal_fraction_max"
+            ),
+            "metropolis_rejection_fraction_max": summary.metadata.get(
+                "metropolis_rejection_fraction_max"
+            ),
             "guide_batch_backend": summary.metadata.get("guide_batch_backend"),
             "target_backend": summary.metadata.get("target_backend"),
             "proposal_backend": summary.metadata.get("proposal_backend"),
