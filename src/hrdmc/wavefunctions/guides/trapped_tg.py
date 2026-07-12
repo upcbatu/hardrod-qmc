@@ -9,6 +9,7 @@ from hrdmc.systems.external_potential import HarmonicTrap
 from hrdmc.systems.open_line import OpenLineHardRodSystem
 from hrdmc.wavefunctions.kernels.trapped_tg import (
     backend_name,
+    reduced_tg_closed_form_local_energy_batch,
     reduced_tg_grad_lap_local_batch,
     reduced_tg_log_batch,
     valid_batch,
@@ -111,7 +112,7 @@ class ReducedTGHardRodGuide:
         positions: FloatArray,
     ) -> tuple[FloatArray, FloatArray, FloatArray, NDArray[np.bool_]]:
         positions = self._as_position_batch(positions)
-        return reduced_tg_grad_lap_local_batch(
+        grad, lap, local, finite = reduced_tg_grad_lap_local_batch(
             positions,
             self._offsets(),
             rod_length=self.system.rod_length,
@@ -120,6 +121,14 @@ class ReducedTGHardRodGuide:
             omega2=self.trap.omega**2,
             pair_power=self.pair_power,
         )
+        if self.pair_power == 1.0 and np.isclose(self.alpha, self.trap.omega):
+            closed_local = reduced_tg_closed_form_local_energy_batch(
+                positions,
+                rod_length=self.system.rod_length,
+                omega=self.trap.omega,
+            )
+            local = np.where(finite, closed_local, local)
+        return grad, lap, local, finite
 
     @property
     def batch_backend(self) -> str:

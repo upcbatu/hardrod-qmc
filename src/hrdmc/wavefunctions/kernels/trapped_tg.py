@@ -19,6 +19,40 @@ def valid_batch(x: FloatArray, rod_length: float) -> NDArray[np.bool_]:
     return _valid_batch_python(x, float(rod_length))
 
 
+def reduced_tg_closed_form_local_energy_batch(
+    x: FloatArray,
+    *,
+    rod_length: float,
+    omega: float,
+) -> FloatArray:
+    """Return the exact local energy of the harmonic reduced-TG guide.
+
+    For ``alpha=omega`` and unit Vandermonde power, the derivative terms of the
+    reduced-coordinate guide cancel analytically.  Evaluating the resulting
+    free-gap expression avoids subtracting large near-contact terms in the
+    generic log-derivative formula.
+    """
+
+    x = np.asarray(x, dtype=float)
+    walkers, n_particles = x.shape
+    if n_particles < 2:
+        raise ValueError("reduced-TG guide requires at least two particles")
+    free_gaps = np.diff(x, axis=1) - float(rod_length)
+    gap_index = np.arange(1, n_particles, dtype=float)
+    weights = gap_index * (n_particles - gap_index)
+    constant = (
+        0.5 * float(omega) * n_particles**2
+        + float(omega) ** 2
+        * float(rod_length) ** 2
+        * n_particles
+        * (n_particles**2 - 1)
+        / 24.0
+    )
+    return np.full(walkers, constant, dtype=float) + 0.5 * float(omega) ** 2 * float(
+        rod_length
+    ) * (free_gaps @ weights)
+
+
 def reduced_tg_log_batch(
     x: FloatArray,
     offsets: FloatArray,

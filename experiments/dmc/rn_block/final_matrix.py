@@ -25,8 +25,11 @@ from hrdmc.workflows.dmc.rn_block import (
 )
 
 DEFAULT_CASES = "N10_A0.1,N10_A1,N10_A10,N20_A0.1,N20_A1,N20_A10"
-DEFAULT_SEEDS = "7001,7002"
-DEFAULT_LAGS = "0,400,800,1200,1600,2000,2800"
+DEFAULT_SEEDS = "7001,7002,7003"
+# The finite-rod N=2 anchor requires a physical forward-walking projection
+# time well beyond the earlier 7/omega ladder.  At dt=0.0025 this reaches
+# 50/omega while retaining ample production support for tau_prod=480.
+DEFAULT_LAGS = "0,2000,4000,8000,12000,16000,20000"
 DEFAULT_RN_CADENCE = 0.01
 
 
@@ -85,12 +88,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pure-fw-collection-stride-steps", type=int, default=20)
     parser.add_argument("--pure-fw-min-block-count", type=int, default=20)
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
-    parser.add_argument("--parallel-workers", type=int, default=2)
+    parser.add_argument("--parallel-workers", type=int, default=3)
     parser.add_argument("--plot-formats", default="png,pdf")
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path("results/dmc/final_matrix/local_mala_dt0025"),
+        default=Path("results/dmc/final_matrix/local_dmc_dt0025_fw50"),
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
