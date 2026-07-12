@@ -41,6 +41,8 @@ class RNBlockStreamingSummary:
     ess_fraction_trace: FloatArray | None = None
     invalid_proposal_fraction_trace: FloatArray | None = None
     hard_wall_kill_fraction_trace: FloatArray | None = None
+    local_acceptance_fraction_trace: FloatArray | None = None
+    metropolis_rejection_fraction_trace: FloatArray | None = None
     zero_weight_excluded_fraction_trace: FloatArray | None = None
     rn_logk_mean_trace: FloatArray | None = None
     rn_logq_mean_trace: FloatArray | None = None
@@ -77,20 +79,18 @@ class RNBlockStreamingSummary:
             "local_energy_variance_trace": _array_or_none(self.local_energy_variance_trace),
             "log_weight_span_trace": _array_or_none(self.log_weight_span_trace),
             "ess_fraction_trace": _array_or_none(self.ess_fraction_trace),
-            "invalid_proposal_fraction_trace": _array_or_none(
-                self.invalid_proposal_fraction_trace
-            ),
-            "hard_wall_kill_fraction_trace": _array_or_none(
-                self.hard_wall_kill_fraction_trace
+            "invalid_proposal_fraction_trace": _array_or_none(self.invalid_proposal_fraction_trace),
+            "hard_wall_kill_fraction_trace": _array_or_none(self.hard_wall_kill_fraction_trace),
+            "local_acceptance_fraction_trace": _array_or_none(self.local_acceptance_fraction_trace),
+            "metropolis_rejection_fraction_trace": _array_or_none(
+                self.metropolis_rejection_fraction_trace
             ),
             "zero_weight_excluded_fraction_trace": _array_or_none(
                 self.zero_weight_excluded_fraction_trace
             ),
             "rn_logk_mean_trace": _array_or_none(self.rn_logk_mean_trace),
             "rn_logq_mean_trace": _array_or_none(self.rn_logq_mean_trace),
-            "rn_logw_increment_mean_trace": _array_or_none(
-                self.rn_logw_increment_mean_trace
-            ),
+            "rn_logw_increment_mean_trace": _array_or_none(self.rn_logw_increment_mean_trace),
             "rn_logw_increment_variance_trace": _array_or_none(
                 self.rn_logw_increment_variance_trace
             ),

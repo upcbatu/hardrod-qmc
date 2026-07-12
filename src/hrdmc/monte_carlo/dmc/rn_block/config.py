@@ -17,6 +17,7 @@ class RNBlockDMCConfig:
     component_log_scales: tuple[float, ...] = (-0.05, 0.0, 0.05)
     component_probabilities: tuple[float, ...] = (0.25, 0.50, 0.25)
     rn_cadence_tau: float = 0.005
+    collective_rn_enabled: bool = True
     ess_resample_fraction: float = 0.35
     local_step_method: str = "metropolis"
 

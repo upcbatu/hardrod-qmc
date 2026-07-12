@@ -10,12 +10,24 @@ from pathlib import Path
 from typing import Any
 
 from hrdmc.artifacts import repo_root_from
-from hrdmc.io.artifacts import ensure_dir, write_json
-from hrdmc.workflows.dmc.rn_block import RNRunControls, make_grid, parse_case, parse_seeds
+from hrdmc.io.artifacts import (
+    config_fingerprint,
+    ensure_dir,
+    verify_run_manifest,
+    write_json,
+)
+from hrdmc.workflows.dmc.rn_block import (
+    RNRunControls,
+    controls_to_dict,
+    make_grid,
+    parse_case,
+    parse_seeds,
+)
 
 DEFAULT_CASES = "N10_A0.1,N10_A1,N10_A10,N20_A0.1,N20_A1,N20_A10"
 DEFAULT_SEEDS = "7001,7002"
 DEFAULT_LAGS = "0,400,800,1200,1600,2000,2800"
+DEFAULT_RN_CADENCE = 0.01
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -105,8 +117,14 @@ def main() -> None:
             "grid_plan": grid_plan,
         }
         summary_path = case_output_dir / "summary.json"
-        if summary_path.exists() and not args.force:
-            record["status"] = "skipped_existing_summary"
+        completed, completion_errors = _verified_completed_row(
+            args,
+            case_id,
+            case_output_dir,
+            grid_plan,
+        )
+        if completed and not args.force:
+            record["status"] = "skipped_verified_complete"
             record["grid_plan"] = _existing_grid_plan(summary_path, grid_plan)
             record["run_manifest"] = str(case_output_dir / "run_manifest.json")
             record["rerun_command"] = _benchmark_command(
@@ -117,6 +135,8 @@ def main() -> None:
             )
             records.append(record)
             continue
+        if completion_errors:
+            record["existing_artifact_errors"] = completion_errors
         command = _benchmark_command(args, case_id, case_output_dir, grid_plan)
         record["command"] = command
         if args.dry_run:
@@ -155,30 +175,19 @@ def _case_grid_plan(args: argparse.Namespace, case_id: str) -> dict[str, float |
     case = parse_case(case_id)
     minimum_extent = 0.5 * case.n_particles * case.rod_length
     requested_extent = max(args.grid_extent, minimum_extent + args.excluded_volume_margin)
-    controls = RNRunControls(
-        dt=args.dt,
-        walkers=args.walkers,
-        tau_block=args.tau,
-        rn_cadence_tau=args.burn_tau + args.production_tau + args.dt,
-        burn_tau=args.burn_tau,
-        production_tau=args.production_tau,
-        store_every=args.store_every,
-        grid_extent=requested_extent,
-        n_bins=args.n_bins,
-        local_step_method=args.local_step_method,
-    )
+    controls = _disabled_rn_controls(args, grid_extent=requested_extent, n_bins=args.n_bins)
     grid = make_grid(controls, case)
     planned_extent = float(max(abs(grid[0]), abs(grid[-1])))
     planned_bins = max(
         args.n_bins,
-        math.ceil((2.0 * planned_extent) / args.max_density_bin_width),
+        math.ceil((2.0 * planned_extent) / args.max_density_bin_width) + 1,
     )
     return {
         "minimum_excluded_volume_extent": minimum_extent,
         "requested_grid_extent": requested_extent,
         "grid_extent": planned_extent,
         "n_bins": planned_bins,
-        "density_bin_width": (2.0 * planned_extent) / planned_bins,
+        "density_bin_width": (2.0 * planned_extent) / (planned_bins - 1),
     }
 
 
@@ -202,13 +211,13 @@ def _existing_grid_plan(
             "configured_grid_extent": float(grid_extent),
             "grid_extent": actual_extent,
             "n_bins": actual_bins,
-            "density_bin_width": (2.0 * actual_extent) / actual_bins,
+            "density_bin_width": float(density_x[1] - density_x[0]),
         }
     return {
         **planned_grid,
         "grid_extent": float(grid_extent),
         "n_bins": n_bins,
-        "density_bin_width": (2.0 * float(grid_extent)) / n_bins,
+        "density_bin_width": (2.0 * float(grid_extent)) / (n_bins - 1),
     }
 
 
@@ -233,6 +242,8 @@ def _benchmark_command(
         args.local_step_method,
         "--tau",
         _format_number(args.tau),
+        "--rn-cadence",
+        _format_number(DEFAULT_RN_CADENCE),
         "--burn-tau",
         _format_number(args.burn_tau),
         "--production-tau",
@@ -301,7 +312,7 @@ def _write_matrix_manifest(
 ) -> Path:
     path = output_root / "final_matrix_manifest.json"
     existing_records = _existing_matrix_records(path)
-    discovered_records = _discover_completed_rows(output_root)
+    discovered_records = _discover_completed_rows(output_root, args)
     merged_records = {
         record["case"]: record for record in [*existing_records, *discovered_records, *records]
     }
@@ -313,6 +324,7 @@ def _write_matrix_manifest(
             "seeds": seeds,
             "invocation_settings": {
                 "dt": args.dt,
+                "local_step_method": args.local_step_method,
                 "walkers": args.walkers,
                 "tau": args.tau,
                 "burn_tau": args.burn_tau,
@@ -346,10 +358,14 @@ def _existing_matrix_records(path: Path) -> list[dict[str, Any]]:
         return []
     payload = json.loads(path.read_text(encoding="utf-8"))
     records = payload.get("rows", payload.get("records", []))
-    return [record for record in records if isinstance(record, dict) and "case" in record]
+    return [
+        record
+        for record in records
+        if isinstance(record, dict) and record.get("status") == "planned" and "case" in record
+    ]
 
 
-def _discover_completed_rows(output_root: Path) -> list[dict[str, Any]]:
+def _discover_completed_rows(output_root: Path, args: argparse.Namespace) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for summary_path in sorted(output_root.glob("N*_A*/summary.json")):
         case_id = summary_path.parent.name
@@ -357,17 +373,133 @@ def _discover_completed_rows(output_root: Path) -> list[dict[str, Any]]:
             parse_case(case_id)
         except ValueError:
             continue
+        grid_plan = _case_grid_plan(args, case_id)
+        completed, _errors = _verified_completed_row(
+            args,
+            case_id,
+            summary_path.parent,
+            grid_plan,
+        )
+        if not completed:
+            continue
         records.append(
             {
                 "case": case_id,
                 "output_dir": str(summary_path.parent),
                 "summary": str(summary_path),
                 "run_manifest": str(summary_path.parent / "run_manifest.json"),
-                "status": "completed_existing",
-                "grid_plan": _existing_grid_plan(summary_path, {}),
+                "status": "verified_existing",
+                "grid_plan": _existing_grid_plan(summary_path, grid_plan),
             }
         )
     return records
+
+
+def _disabled_rn_controls(
+    args: argparse.Namespace,
+    *,
+    grid_extent: float,
+    n_bins: int,
+) -> RNRunControls:
+    return RNRunControls(
+        dt=args.dt,
+        walkers=args.walkers,
+        tau_block=args.tau,
+        rn_cadence_tau=DEFAULT_RN_CADENCE,
+        collective_rn_enabled=False,
+        burn_tau=args.burn_tau,
+        production_tau=args.production_tau,
+        store_every=args.store_every,
+        grid_extent=grid_extent,
+        n_bins=n_bins,
+        local_step_method=args.local_step_method,
+    )
+
+
+def _verified_completed_row(
+    args: argparse.Namespace,
+    case_id: str,
+    output_dir: Path,
+    grid_plan: dict[str, float | int],
+) -> tuple[bool, list[str]]:
+    summary_path = output_dir / "summary.json"
+    manifest_path = output_dir / "run_manifest.json"
+    if not summary_path.exists() or not manifest_path.exists():
+        return False, ["missing summary.json or run_manifest.json"]
+    verified, errors = verify_run_manifest(manifest_path)
+    if not verified:
+        return False, errors
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    config = manifest.get("config")
+    if not isinstance(config, dict):
+        return False, ["run manifest has no configuration payload"]
+    if manifest.get("config_fingerprint") != config_fingerprint(config):
+        return False, ["run manifest configuration fingerprint mismatch"]
+    expected = _expected_manifest_fields(args, case_id, grid_plan)
+    mismatches = [key for key, value in expected.items() if _nested_value(config, key) != value]
+    if mismatches:
+        return False, [f"configuration mismatch: {', '.join(mismatches)}"]
+    required = {
+        "summary.json",
+        "seed_table.csv",
+        "packet_table.csv",
+        "fw_plateau_table.csv",
+        "energy_stationarity_table.csv",
+        "density_fw_table.csv",
+    }
+    artifact_paths = {
+        str(entry.get("path")) for entry in manifest.get("artifacts", []) if isinstance(entry, dict)
+    }
+    missing = sorted(required - artifact_paths)
+    if missing:
+        return False, [f"manifest missing required artifacts: {', '.join(missing)}"]
+    return True, []
+
+
+def _expected_manifest_fields(
+    args: argparse.Namespace,
+    case_id: str,
+    grid_plan: dict[str, float | int],
+) -> dict[str, Any]:
+    controls = _disabled_rn_controls(
+        args,
+        grid_extent=float(grid_plan["grid_extent"]),
+        n_bins=int(grid_plan["n_bins"]),
+    )
+    return {
+        "case": case_id,
+        "seeds": parse_seeds(args.seeds),
+        "controls": controls_to_dict(controls),
+        "parallel_workers": args.parallel_workers,
+        "disable_rn": True,
+        "initialization_mode": args.initialization_mode,
+        "init_width_log_sigma": args.init_width_log_sigma,
+        "breathing_preburn_steps": args.breathing_preburn_steps,
+        "breathing_preburn_log_step": args.breathing_preburn_log_step,
+        "component_log_scales": [0.0],
+        "component_probabilities": [1.0],
+        "proposal_family": "harmonic-mehler",
+        "guide_family": "reduced-tg",
+        "target_family": "primitive",
+        "pure_config.lag_steps": [int(value) for value in args.pure_fw_lags.split(",")],
+        "pure_config.observables": ["r2", "density"],
+        "pure_config.observable_source": "raw_r2",
+        "pure_config.block_size_steps": args.pure_fw_block_size_steps,
+        "pure_config.collection_stride_steps": args.pure_fw_collection_stride_steps,
+        "pure_config.min_block_count": args.pure_fw_min_block_count,
+        "pure_config.min_walker_weight_ess": args.pure_fw_min_walker_weight_ess,
+        "pure_config.plateau_window_lag_count": 4,
+        "plot_formats": [value.strip() for value in args.plot_formats.split(",")],
+    }
+
+
+def _nested_value(payload: dict[str, Any], dotted_key: str) -> Any:
+    value: Any = payload
+    for key in dotted_key.split("."):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(key)
+    return value
 
 
 def _format_number(value: float) -> str:

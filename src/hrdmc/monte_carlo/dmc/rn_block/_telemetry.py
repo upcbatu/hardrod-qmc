@@ -17,6 +17,8 @@ class StepTelemetry:
     rn_logw_increment_mean: float = float("nan")
     rn_logw_increment_variance: float = float("nan")
     local_acceptance_fraction: float = float("nan")
+    invalid_proposal_fraction: float = float("nan")
+    metropolis_rejection_fraction: float = float("nan")
 
 
 @dataclass(frozen=True)
@@ -39,6 +41,8 @@ class TraceAccumulator:
     rn_logw_increment_values: list[float] = field(default_factory=list)
     rn_logw_increment_variance_values: list[float] = field(default_factory=list)
     local_acceptance_values: list[float] = field(default_factory=list)
+    invalid_proposal_values: list[float] = field(default_factory=list)
+    metropolis_rejection_values: list[float] = field(default_factory=list)
 
     def update(
         self,
@@ -63,6 +67,10 @@ class TraceAccumulator:
             self.rn_logw_increment_variance_values.append(telemetry.rn_logw_increment_variance)
         if np.isfinite(telemetry.local_acceptance_fraction):
             self.local_acceptance_values.append(telemetry.local_acceptance_fraction)
+        if np.isfinite(telemetry.invalid_proposal_fraction):
+            self.invalid_proposal_values.append(telemetry.invalid_proposal_fraction)
+        if np.isfinite(telemetry.metropolis_rejection_fraction):
+            self.metropolis_rejection_values.append(telemetry.metropolis_rejection_fraction)
 
     def to_trace_values(self, *, walker_count: int) -> dict[str, float]:
         if self.step_count <= 0:
@@ -76,17 +84,19 @@ class TraceAccumulator:
                 "rn_logw_increment_mean": float("nan"),
                 "rn_logw_increment_variance": float("nan"),
                 "local_acceptance_fraction": float("nan"),
+                "metropolis_rejection_fraction": float("nan"),
             }
         proposal_count = self.step_count * walker_count
         killed_fraction = safe_fraction(self.killed_count, proposal_count)
         return {
             "ess_fraction": self.ess_fraction_sum / self.step_count,
             "log_weight_span": self.log_weight_span_sum / self.step_count,
-            "invalid_proposal_fraction": killed_fraction,
+            "invalid_proposal_fraction": finite_mean(self.invalid_proposal_values),
             "hard_wall_kill_fraction": killed_fraction,
             "rn_logk_mean": finite_mean(self.rn_logk_values),
             "rn_logq_mean": finite_mean(self.rn_logq_values),
             "rn_logw_increment_mean": finite_mean(self.rn_logw_increment_values),
             "rn_logw_increment_variance": finite_mean(self.rn_logw_increment_variance_values),
             "local_acceptance_fraction": finite_mean(self.local_acceptance_values),
+            "metropolis_rejection_fraction": finite_mean(self.metropolis_rejection_values),
         }

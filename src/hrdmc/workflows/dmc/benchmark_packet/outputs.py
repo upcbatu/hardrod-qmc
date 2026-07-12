@@ -21,6 +21,10 @@ def write_benchmark_packet_seed_table(
         "r2_plateau_status",
         "r2_plateau_value",
         "paper_rms_radius",
+        "local_step_method",
+        "local_acceptance_fraction_mean",
+        "invalid_proposal_fraction_max",
+        "metropolis_rejection_fraction_max",
         "lag_max_block_count",
         "lag_max_weight_ess_min",
     ]
@@ -184,6 +188,19 @@ def _seed_table_row(payload: dict[str, Any]) -> dict[str, Any]:
         "r2_plateau_status": r2.get("plateau_status", ""),
         "r2_plateau_value": r2.get("plateau_value", ""),
         "paper_rms_radius": r2.get("paper_rms_radius", ""),
+        "local_step_method": rn["metadata"].get("local_step_method", ""),
+        "local_acceptance_fraction_mean": rn["metadata"].get(
+            "local_acceptance_fraction_mean",
+            "",
+        ),
+        "invalid_proposal_fraction_max": rn["metadata"].get(
+            "invalid_proposal_fraction_max",
+            "",
+        ),
+        "metropolis_rejection_fraction_max": rn["metadata"].get(
+            "metropolis_rejection_fraction_max",
+            "",
+        ),
         "lag_max_block_count": _lag_dict_get(r2.get("block_count_by_lag", {}), lag_max),
         "lag_max_weight_ess_min": _lag_dict_get(
             r2.get("block_weight_ess_min_by_lag", {}),
@@ -270,11 +287,7 @@ def _seed_energy_stationarity_rows(stationarity: dict[str, Any]) -> list[dict[st
         if isinstance(row, dict) and "seed" in row
     }
     seeds = stationarity.get("seeds", [])
-    chain_rows = (
-        stationarity.get("diagnostics", {})
-        .get("energy", {})
-        .get("chain_diagnostics", [])
-    )
+    chain_rows = stationarity.get("diagnostics", {}).get("energy", {}).get("chain_diagnostics", [])
     rows: list[dict[str, Any]] = []
     for index, seed in enumerate(seeds if isinstance(seeds, list) else []):
         audit_row = audit_rows.get(seed, {})
@@ -354,11 +367,7 @@ def _aggregate_density_row(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _seed_density_fw_row(payload: dict[str, Any]) -> dict[str, Any]:
-    density = (
-        payload.get("pure_walking", {})
-        .get("observable_results", {})
-        .get("density", {})
-    )
+    density = payload.get("pure_walking", {}).get("observable_results", {}).get("density", {})
     diagnostics = density.get("plateau_diagnostics", {})
     lag_steps = density.get("lag_steps", [])
     lag_max = lag_steps[-1] if lag_steps else ""

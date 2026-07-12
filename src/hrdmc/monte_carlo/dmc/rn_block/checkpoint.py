@@ -9,7 +9,7 @@ import numpy as np
 from hrdmc.io.artifacts import ensure_dir
 from hrdmc.io.schema import to_jsonable
 
-SCHEMA_VERSION = "rn_block_streaming_checkpoint_v1"
+SCHEMA_VERSION = "rn_block_streaming_checkpoint_v2"
 
 
 def save_streaming_checkpoint(
@@ -43,8 +43,6 @@ def load_streaming_checkpoint(path: str | Path) -> tuple[dict[str, Any], dict[st
         if schema != SCHEMA_VERSION:
             raise ValueError(f"unsupported RN streaming checkpoint schema: {schema}")
         arrays = {
-            key: np.asarray(archive[key])
-            for key in archive.files
-            if key != "checkpoint_metadata"
+            key: np.asarray(archive[key]) for key in archive.files if key != "checkpoint_metadata"
         }
     return metadata, arrays

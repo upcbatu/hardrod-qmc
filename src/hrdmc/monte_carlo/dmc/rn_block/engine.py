@@ -93,7 +93,7 @@ def run_rn_block_dmc(
     total_steps = burn_in_steps + production_steps
 
     for step_index in range(1, total_steps + 1):
-        if step_index % rn_interval_steps == 0:
+        if cfg.collective_rn_enabled and step_index % rn_interval_steps == 0:
             advance = advance_rn_block(
                 cfg,
                 system,
@@ -164,6 +164,7 @@ def run_rn_block_dmc(
             "ess_mean": float(np.mean(ess_values)) if ess_values else float("nan"),
             "ess_resample_fraction": cfg.ess_resample_fraction,
             "local_step_method": cfg.local_step_method,
+            "collective_rn_enabled": cfg.collective_rn_enabled,
             "include_guide_ratio": include_guide_ratio,
             "guide_batch_backend": guide_batch_backend(guide),
             "target_backend": transition_backend(target_kernel),
@@ -218,6 +219,7 @@ def run_rn_block_dmc_streaming(
             production_steps=production_steps,
             store_every=store_every,
             rn_interval_steps=rn_interval_steps,
+            collective_rn_enabled=cfg.collective_rn_enabled,
             system=system,
             density_grid=grid,
         )
@@ -230,7 +232,7 @@ def run_rn_block_dmc_streaming(
         )
 
     for step_index in range(state.step_start, total_steps + 1):
-        if step_index % rn_interval_steps == 0:
+        if cfg.collective_rn_enabled and step_index % rn_interval_steps == 0:
             advance = advance_rn_block(
                 cfg,
                 system,
@@ -329,6 +331,7 @@ def run_rn_block_dmc_streaming(
                 production_steps=production_steps,
                 store_every=store_every,
                 rn_interval_steps=rn_interval_steps,
+                collective_rn_enabled=cfg.collective_rn_enabled,
                 system=system,
             )
 
@@ -338,6 +341,7 @@ def run_rn_block_dmc_streaming(
         production_steps=production_steps,
         store_every=store_every,
         rn_interval_steps=rn_interval_steps,
+        collective_rn_enabled=cfg.collective_rn_enabled,
         ess_resample_fraction=cfg.ess_resample_fraction,
         include_guide_ratio=include_guide_ratio,
         guide=guide,
@@ -345,6 +349,7 @@ def run_rn_block_dmc_streaming(
         proposal_kernel=proposal_kernel,
     )
     summary.metadata["local_step_method"] = cfg.local_step_method
+    summary.metadata["collective_rn_enabled"] = cfg.collective_rn_enabled
     return summary
 
 

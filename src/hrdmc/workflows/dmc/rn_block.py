@@ -120,6 +120,7 @@ class RNRunControls:
     grid_extent: float
     n_bins: int
     local_step_method: str = "metropolis"
+    collective_rn_enabled: bool = True
 
     @property
     def burn_in_steps(self) -> int:
@@ -128,12 +129,6 @@ class RNRunControls:
     @property
     def production_steps(self) -> int:
         return max(1, int(round(self.production_tau / self.dt)))
-
-    @property
-    def collective_rn_enabled(self) -> bool:
-        """Whether a collective RN event occurs during this trajectory."""
-        total_time = (self.burn_in_steps + self.production_steps) * self.dt
-        return self.rn_cadence_tau <= total_time
 
 
 @dataclass(frozen=True)
@@ -367,6 +362,7 @@ def run_streaming_seed(
         config=RNBlockDMCConfig(
             tau_block=controls.tau_block,
             rn_cadence_tau=controls.rn_cadence_tau,
+            collective_rn_enabled=controls.collective_rn_enabled,
             component_log_scales=proposal.component_log_scales,
             component_probabilities=proposal.component_probabilities,
             local_step_method=controls.local_step_method,

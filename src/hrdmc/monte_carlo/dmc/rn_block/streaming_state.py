@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 from hrdmc.monte_carlo.dmc.common.guide_api import evaluate_guide, guide_batch_backend, valid_rows
 from hrdmc.monte_carlo.dmc.common.numeric import (
     finite_max,
+    finite_mean,
     finite_min,
     log_weight_span,
     safe_fraction,
@@ -69,6 +70,8 @@ class RNBlockStreamingState:
     ess_fraction_trace: list[float] = field(default_factory=list)
     invalid_proposal_fraction_trace: list[float] = field(default_factory=list)
     hard_wall_kill_fraction_trace: list[float] = field(default_factory=list)
+    local_acceptance_fraction_trace: list[float] = field(default_factory=list)
+    metropolis_rejection_fraction_trace: list[float] = field(default_factory=list)
     zero_weight_excluded_fraction_trace: list[float] = field(default_factory=list)
     rn_logk_mean_trace: list[float] = field(default_factory=list)
     rn_logq_mean_trace: list[float] = field(default_factory=list)
@@ -114,6 +117,7 @@ class RNBlockStreamingState:
         production_steps: int,
         store_every: int,
         rn_interval_steps: int,
+        collective_rn_enabled: bool,
         system: OpenLineHardRodSystem,
         density_grid: FloatArray,
     ) -> RNBlockStreamingState:
@@ -126,6 +130,7 @@ class RNBlockStreamingState:
             production_steps=production_steps,
             store_every=store_every,
             rn_interval_steps=rn_interval_steps,
+            collective_rn_enabled=collective_rn_enabled,
             system=system,
             density_grid=density_grid,
         )
@@ -176,6 +181,11 @@ class RNBlockStreamingState:
             ess_fraction_trace=_list(arrays, "ess_fraction_trace"),
             invalid_proposal_fraction_trace=_list(arrays, "invalid_proposal_fraction_trace"),
             hard_wall_kill_fraction_trace=_list(arrays, "hard_wall_kill_fraction_trace"),
+            local_acceptance_fraction_trace=_list(arrays, "local_acceptance_fraction_trace"),
+            metropolis_rejection_fraction_trace=_list(
+                arrays,
+                "metropolis_rejection_fraction_trace",
+            ),
             zero_weight_excluded_fraction_trace=_list(
                 arrays,
                 "zero_weight_excluded_fraction_trace",
@@ -202,6 +212,12 @@ class RNBlockStreamingState:
                 rn_logw_increment_variance_values=_list(
                     arrays,
                     "interval_trace_rn_logw_increment_variance_values",
+                ),
+                local_acceptance_values=_list(arrays, "interval_trace_local_acceptance_values"),
+                invalid_proposal_values=_list(arrays, "interval_trace_invalid_proposal_values"),
+                metropolis_rejection_values=_list(
+                    arrays,
+                    "interval_trace_metropolis_rejection_values",
                 ),
             ),
         )
@@ -266,6 +282,7 @@ class RNBlockStreamingState:
         production_steps: int,
         store_every: int,
         rn_interval_steps: int,
+        collective_rn_enabled: bool,
         system: OpenLineHardRodSystem,
     ) -> None:
         save_streaming_checkpoint(
@@ -278,6 +295,7 @@ class RNBlockStreamingState:
                 production_steps=production_steps,
                 store_every=store_every,
                 rn_interval_steps=rn_interval_steps,
+                collective_rn_enabled=collective_rn_enabled,
                 system=system,
             ),
             arrays=self._checkpoint_arrays(),
@@ -291,6 +309,7 @@ class RNBlockStreamingState:
         production_steps: int,
         store_every: int,
         rn_interval_steps: int,
+        collective_rn_enabled: bool,
         ess_resample_fraction: float,
         include_guide_ratio: bool,
         guide: DMCGuide,
@@ -321,6 +340,7 @@ class RNBlockStreamingState:
                 production_steps=production_steps,
                 store_every=store_every,
                 rn_interval_steps=rn_interval_steps,
+                collective_rn_enabled=collective_rn_enabled,
                 ess_resample_fraction=ess_resample_fraction,
                 include_guide_ratio=include_guide_ratio,
                 guide=guide,
@@ -339,6 +359,8 @@ class RNBlockStreamingState:
             ess_fraction_trace=_array(self.ess_fraction_trace),
             invalid_proposal_fraction_trace=_array(self.invalid_proposal_fraction_trace),
             hard_wall_kill_fraction_trace=_array(self.hard_wall_kill_fraction_trace),
+            local_acceptance_fraction_trace=_array(self.local_acceptance_fraction_trace),
+            metropolis_rejection_fraction_trace=_array(self.metropolis_rejection_fraction_trace),
             zero_weight_excluded_fraction_trace=_array(self.zero_weight_excluded_fraction_trace),
             rn_logk_mean_trace=_array(self.rn_logk_mean_trace),
             rn_logq_mean_trace=_array(self.rn_logq_mean_trace),
@@ -375,6 +397,10 @@ class RNBlockStreamingState:
         self.ess_fraction_trace.append(trace_values["ess_fraction"])
         self.invalid_proposal_fraction_trace.append(trace_values["invalid_proposal_fraction"])
         self.hard_wall_kill_fraction_trace.append(trace_values["hard_wall_kill_fraction"])
+        self.local_acceptance_fraction_trace.append(trace_values["local_acceptance_fraction"])
+        self.metropolis_rejection_fraction_trace.append(
+            trace_values["metropolis_rejection_fraction"]
+        )
         self.zero_weight_excluded_fraction_trace.append(
             safe_fraction(
                 batch["valid_sample_count"] - batch["included_sample_count"],
@@ -384,9 +410,7 @@ class RNBlockStreamingState:
         self.rn_logk_mean_trace.append(trace_values["rn_logk_mean"])
         self.rn_logq_mean_trace.append(trace_values["rn_logq_mean"])
         self.rn_logw_increment_mean_trace.append(trace_values["rn_logw_increment_mean"])
-        self.rn_logw_increment_variance_trace.append(
-            trace_values["rn_logw_increment_variance"]
-        )
+        self.rn_logw_increment_variance_trace.append(trace_values["rn_logw_increment_variance"])
         self.retained_fraction_trace.append(
             safe_fraction(batch["included_sample_count"], batch["total_sample_count"])
         )
@@ -404,6 +428,7 @@ class RNBlockStreamingState:
         production_steps: int,
         store_every: int,
         rn_interval_steps: int,
+        collective_rn_enabled: bool,
         ess_resample_fraction: float,
         include_guide_ratio: bool,
         guide: DMCGuide,
@@ -419,6 +444,7 @@ class RNBlockStreamingState:
             "production_steps": production_steps,
             "store_every": store_every,
             "rn_interval_steps": rn_interval_steps,
+            "collective_rn_enabled": collective_rn_enabled,
             "rn_event_count": self.rn_event_count,
             "local_step_count": self.local_step_count,
             "killed_count": self.killed_count,
@@ -430,12 +456,14 @@ class RNBlockStreamingState:
             "log_weight_span_max": finite_max(self.log_weight_span_trace),
             "invalid_proposal_fraction_max": finite_max(self.invalid_proposal_fraction_trace),
             "hard_wall_kill_fraction_max": finite_max(self.hard_wall_kill_fraction_trace),
+            "local_acceptance_fraction_mean": finite_mean(self.local_acceptance_fraction_trace),
+            "metropolis_rejection_fraction_max": finite_max(
+                self.metropolis_rejection_fraction_trace
+            ),
             "zero_weight_excluded_fraction_max": finite_max(
                 self.zero_weight_excluded_fraction_trace
             ),
-            "rn_logw_increment_variance_max": finite_max(
-                self.rn_logw_increment_variance_trace
-            ),
+            "rn_logw_increment_variance_max": finite_max(self.rn_logw_increment_variance_trace),
             "finite_local_energy_fraction": finite_fraction,
             "valid_snapshot_fraction": valid_fraction,
             "included_sample_fraction": included_fraction,
@@ -456,6 +484,7 @@ class RNBlockStreamingState:
         production_steps: int,
         store_every: int,
         rn_interval_steps: int,
+        collective_rn_enabled: bool,
         system: OpenLineHardRodSystem,
     ) -> dict[str, Any]:
         return {
@@ -466,6 +495,7 @@ class RNBlockStreamingState:
             "production_steps": production_steps,
             "store_every": store_every,
             "rn_interval_steps": rn_interval_steps,
+            "collective_rn_enabled": collective_rn_enabled,
             "walker_count": int(self.positions.shape[0]),
             "n_particles": int(system.n_particles),
             "energy_numerator": self.energy_numerator,
@@ -514,6 +544,8 @@ class RNBlockStreamingState:
             "ess_fraction_trace": _array(self.ess_fraction_trace),
             "invalid_proposal_fraction_trace": _array(self.invalid_proposal_fraction_trace),
             "hard_wall_kill_fraction_trace": _array(self.hard_wall_kill_fraction_trace),
+            "local_acceptance_fraction_trace": _array(self.local_acceptance_fraction_trace),
+            "metropolis_rejection_fraction_trace": _array(self.metropolis_rejection_fraction_trace),
             "zero_weight_excluded_fraction_trace": _array(self.zero_weight_excluded_fraction_trace),
             "rn_logk_mean_trace": _array(self.rn_logk_mean_trace),
             "rn_logq_mean_trace": _array(self.rn_logq_mean_trace),
@@ -527,6 +559,15 @@ class RNBlockStreamingState:
             ),
             "interval_trace_rn_logw_increment_variance_values": _array(
                 self.interval_trace.rn_logw_increment_variance_values
+            ),
+            "interval_trace_local_acceptance_values": _array(
+                self.interval_trace.local_acceptance_values
+            ),
+            "interval_trace_invalid_proposal_values": _array(
+                self.interval_trace.invalid_proposal_values
+            ),
+            "interval_trace_metropolis_rejection_values": _array(
+                self.interval_trace.metropolis_rejection_values
             ),
         }
 
@@ -548,6 +589,7 @@ def _validate_checkpoint(
     production_steps: int,
     store_every: int,
     rn_interval_steps: int,
+    collective_rn_enabled: bool,
     system: OpenLineHardRodSystem,
     density_grid: FloatArray,
 ) -> None:
@@ -557,6 +599,7 @@ def _validate_checkpoint(
         "production_steps": production_steps,
         "store_every": store_every,
         "rn_interval_steps": rn_interval_steps,
+        "collective_rn_enabled": collective_rn_enabled,
         "n_particles": system.n_particles,
     }
     for key, expected in expected_scalars.items():

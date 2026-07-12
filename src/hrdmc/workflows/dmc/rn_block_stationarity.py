@@ -430,6 +430,14 @@ def summarize_stationarity_from_seed_summaries(
                     "invalid_proposal_fraction_max",
                     float("nan"),
                 ),
+                "local_acceptance_fraction_mean": summary.metadata.get(
+                    "local_acceptance_fraction_mean",
+                    float("nan"),
+                ),
+                "metropolis_rejection_fraction_max": summary.metadata.get(
+                    "metropolis_rejection_fraction_max",
+                    float("nan"),
+                ),
                 "initialization_mode": summary.metadata["initialization_mode"],
                 "target_initial_rms": summary.metadata["target_initial_rms"],
                 "initial_spacing_mean": summary.metadata["initial_spacing_mean"],
@@ -1051,6 +1059,8 @@ def seed_trace_dict(summary: RNBlockStreamingSummary) -> dict[str, np.ndarray]:
         "ess_fraction": require_trace(summary.ess_fraction_trace),
         "invalid_proposal_fraction": require_trace(summary.invalid_proposal_fraction_trace),
         "hard_wall_kill_fraction": require_trace(summary.hard_wall_kill_fraction_trace),
+        "local_acceptance_fraction": require_trace(summary.local_acceptance_fraction_trace),
+        "metropolis_rejection_fraction": require_trace(summary.metropolis_rejection_fraction_trace),
         "zero_weight_excluded_fraction": require_trace(summary.zero_weight_excluded_fraction_trace),
         "rn_logk_mean": require_trace(summary.rn_logk_mean_trace),
         "rn_logq_mean": require_trace(summary.rn_logq_mean_trace),

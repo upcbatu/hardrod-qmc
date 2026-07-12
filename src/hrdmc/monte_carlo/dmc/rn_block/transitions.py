@@ -36,6 +36,8 @@ class RNBlockLocalStepResult:
     local_energies: FloatArray
     killed: NDArray[np.bool_]
     accepted: NDArray[np.bool_] | None = None
+    invalid_proposal: NDArray[np.bool_] | None = None
+    metropolis_rejected: NDArray[np.bool_] | None = None
 
 
 class RNBlockLocalStep(Protocol):
@@ -74,6 +76,8 @@ def euler_drift_diffusion_step(
         local_energies=np.where(killed, local_energies, trial_energies),
         killed=killed,
         accepted=~killed,
+        invalid_proposal=killed,
+        metropolis_rejected=np.zeros(positions.shape[0], dtype=bool),
     )
 
 
@@ -102,6 +106,7 @@ def metropolis_drift_diffusion_step(
     trial = positions + dt * grad_old + np.sqrt(dt) * rng.normal(size=positions.shape)
     trial_energies, trial_valid = evaluate_guide(guide, trial)
     accepted = np.zeros(positions.shape[0], dtype=bool)
+    invalid_proposal = ~trial_valid
     candidate_indices = np.flatnonzero(trial_valid)
 
     if candidate_indices.size:
@@ -111,6 +116,7 @@ def metropolis_drift_diffusion_step(
             candidate_positions,
         )
         finite_drift = grad_new_valid & np.all(np.isfinite(grad_new), axis=1)
+        invalid_proposal[candidate_indices[~finite_drift]] = True
         candidate_indices = candidate_indices[finite_drift]
         grad_new = grad_new[finite_drift]
         if candidate_indices.size:
@@ -141,6 +147,8 @@ def metropolis_drift_diffusion_step(
         local_energies=np.where(accepted, trial_energies, local_energies),
         killed=np.zeros(positions.shape[0], dtype=bool),
         accepted=accepted,
+        invalid_proposal=invalid_proposal,
+        metropolis_rejected=~accepted & ~invalid_proposal,
     )
 
 
@@ -220,10 +228,22 @@ def advance_local_step(
     require_live_weight(next_log_weights)
     accepted = result.accepted
     local_acceptance_fraction = float(np.mean(accepted)) if accepted is not None else float("nan")
+    invalid_proposal = result.invalid_proposal
+    invalid_proposal_fraction = (
+        float(np.mean(invalid_proposal)) if invalid_proposal is not None else float("nan")
+    )
+    metropolis_rejected = result.metropolis_rejected
+    metropolis_rejection_fraction = (
+        float(np.mean(metropolis_rejected)) if metropolis_rejected is not None else float("nan")
+    )
     return AdvanceResult(
         positions=np.where(killed[:, np.newaxis], positions, next_positions),
         local_energies=np.where(killed, local_energies, next_energies),
         log_weights=next_log_weights,
         killed=killed,
-        telemetry=StepTelemetry(local_acceptance_fraction=local_acceptance_fraction),
+        telemetry=StepTelemetry(
+            local_acceptance_fraction=local_acceptance_fraction,
+            invalid_proposal_fraction=invalid_proposal_fraction,
+            metropolis_rejection_fraction=metropolis_rejection_fraction,
+        ),
     )

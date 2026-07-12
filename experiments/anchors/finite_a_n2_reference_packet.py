@@ -153,14 +153,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     repo_root = repo_root_from(Path(__file__))
-    rn_cadence_tau = (
-        args.burn_tau + args.production_tau + args.dt if args.disable_rn else args.rn_cadence
-    )
     controls = RNRunControls(
         dt=args.dt,
         walkers=args.walkers,
         tau_block=args.tau,
-        rn_cadence_tau=rn_cadence_tau,
+        rn_cadence_tau=args.rn_cadence,
+        collective_rn_enabled=not args.disable_rn,
         burn_tau=args.burn_tau,
         production_tau=args.production_tau,
         store_every=args.store_every,
