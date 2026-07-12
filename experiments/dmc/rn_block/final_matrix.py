@@ -13,9 +13,9 @@ from hrdmc.artifacts import repo_root_from
 from hrdmc.io.artifacts import ensure_dir, write_json
 from hrdmc.workflows.dmc.rn_block import RNRunControls, make_grid, parse_case, parse_seeds
 
-DEFAULT_CASES = "N10_A0,N10_A0.1,N10_A1,N10_A10,N20_A0,N20_A0.1,N20_A1,N20_A10"
-DEFAULT_SEEDS = "1001,1002,1003,1004,1005,1006"
-DEFAULT_LAGS = "0,200,400,600,800,1000,1400"
+DEFAULT_CASES = "N10_A0.1,N10_A1,N10_A10,N20_A0.1,N20_A1,N20_A10"
+DEFAULT_SEEDS = "7001,7002"
+DEFAULT_LAGS = "0,400,800,1200,1600,2000,2800"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,12 +27,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--cases", default=DEFAULT_CASES)
     parser.add_argument("--seeds", default=DEFAULT_SEEDS)
-    parser.add_argument("--dt", type=float, default=0.005)
+    parser.add_argument("--dt", type=float, default=0.0025)
+    parser.add_argument(
+        "--local-step-method",
+        choices=("euler", "metropolis"),
+        default="metropolis",
+    )
     parser.add_argument("--walkers", type=int, default=256)
     parser.add_argument("--tau", type=float, default=0.01)
     parser.add_argument("--burn-tau", type=float, default=60.0)
-    parser.add_argument("--production-tau", type=float, default=240.0)
-    parser.add_argument("--store-every", type=int, default=5)
+    parser.add_argument("--production-tau", type=float, default=480.0)
+    parser.add_argument("--store-every", type=int, default=10)
     parser.add_argument(
         "--grid-extent",
         type=float,
@@ -65,15 +70,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--breathing-preburn-log-step", type=float, default=0.04)
     parser.add_argument("--pure-fw-lags", default=DEFAULT_LAGS)
     parser.add_argument("--pure-fw-block-size-steps", type=int, default=1)
-    parser.add_argument("--pure-fw-collection-stride-steps", type=int, default=10)
+    parser.add_argument("--pure-fw-collection-stride-steps", type=int, default=20)
     parser.add_argument("--pure-fw-min-block-count", type=int, default=20)
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
-    parser.add_argument("--parallel-workers", type=int, default=6)
+    parser.add_argument("--parallel-workers", type=int, default=2)
     parser.add_argument("--plot-formats", default="png,pdf")
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path("results/dmc/final_matrix/ho_dmc_baseline"),
+        default=Path("results/dmc/final_matrix/local_mala_dt0025"),
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
@@ -160,6 +165,7 @@ def _case_grid_plan(args: argparse.Namespace, case_id: str) -> dict[str, float |
         store_every=args.store_every,
         grid_extent=requested_extent,
         n_bins=args.n_bins,
+        local_step_method=args.local_step_method,
     )
     grid = make_grid(controls, case)
     planned_extent = float(max(abs(grid[0]), abs(grid[-1])))
@@ -223,6 +229,8 @@ def _benchmark_command(
         _format_number(args.dt),
         "--walkers",
         str(args.walkers),
+        "--local-step-method",
+        args.local_step_method,
         "--tau",
         _format_number(args.tau),
         "--burn-tau",
@@ -325,7 +333,7 @@ def _write_matrix_manifest(
                 "pure_fw_min_walker_weight_ess": args.pure_fw_min_walker_weight_ess,
                 "parallel_workers": args.parallel_workers,
                 "plot_formats": args.plot_formats,
-                "calculation": "drift_diffusion_dmc_without_collective_rn_moves",
+                "calculation": "metropolis_corrected_drift_diffusion_dmc",
             },
             "rows": [merged_records[case_id] for case_id in sorted(merged_records)],
         },

@@ -35,6 +35,7 @@ class RNBlockLocalStepResult:
     positions: FloatArray
     local_energies: FloatArray
     killed: NDArray[np.bool_]
+    accepted: NDArray[np.bool_] | None = None
 
 
 class RNBlockLocalStep(Protocol):
@@ -72,6 +73,74 @@ def euler_drift_diffusion_step(
         positions=np.where(killed[:, np.newaxis], positions, trial),
         local_energies=np.where(killed, local_energies, trial_energies),
         killed=killed,
+        accepted=~killed,
+    )
+
+
+def metropolis_drift_diffusion_step(
+    rng: np.random.Generator,
+    positions: FloatArray,
+    guide: DMCGuide,
+    dt: float,
+    local_energies: FloatArray,
+) -> RNBlockLocalStepResult:
+    """Metropolis-corrected importance-sampled local DMC move.
+
+    The Euler drift-diffusion proposal is asymmetric when the guide drift varies
+    across configuration space.  The acceptance ratio restores detailed balance
+    for the guide-squared distribution when the local-energy branching factor is
+    constant, as in the trapped TG anchor.  An invalid hard-core proposal is a
+    rejection, so the previous valid walker remains live.
+    """
+
+    grad_old, _old_energies, old_valid = guide_grad_energy_valid(guide, positions)
+    if not np.all(old_valid):
+        raise ValueError("metropolis local step requires valid input walkers")
+    if not np.all(np.isfinite(grad_old)):
+        raise ValueError("metropolis local step requires finite guide drift")
+
+    trial = positions + dt * grad_old + np.sqrt(dt) * rng.normal(size=positions.shape)
+    trial_energies, trial_valid = evaluate_guide(guide, trial)
+    accepted = np.zeros(positions.shape[0], dtype=bool)
+    candidate_indices = np.flatnonzero(trial_valid)
+
+    if candidate_indices.size:
+        candidate_positions = trial[candidate_indices]
+        grad_new, _new_energies, grad_new_valid = guide_grad_energy_valid(
+            guide,
+            candidate_positions,
+        )
+        finite_drift = grad_new_valid & np.all(np.isfinite(grad_new), axis=1)
+        candidate_indices = candidate_indices[finite_drift]
+        grad_new = grad_new[finite_drift]
+        if candidate_indices.size:
+            log_old = guide_log_values(guide, positions[candidate_indices])
+            log_new = guide_log_values(guide, trial[candidate_indices])
+            forward_residual = (
+                trial[candidate_indices]
+                - positions[candidate_indices]
+                - dt * grad_old[candidate_indices]
+            )
+            reverse_residual = (
+                positions[candidate_indices] - trial[candidate_indices] - dt * grad_new
+            )
+            log_acceptance = (
+                2.0 * (log_new - log_old)
+                - 0.5
+                * (
+                    np.sum(reverse_residual * reverse_residual, axis=1)
+                    - np.sum(forward_residual * forward_residual, axis=1)
+                )
+                / dt
+            )
+            log_uniform = np.log(rng.random(candidate_indices.size))
+            accepted[candidate_indices] = log_uniform <= np.minimum(log_acceptance, 0.0)
+
+    return RNBlockLocalStepResult(
+        positions=np.where(accepted[:, np.newaxis], trial, positions),
+        local_energies=np.where(accepted, trial_energies, local_energies),
+        killed=np.zeros(positions.shape[0], dtype=bool),
+        accepted=accepted,
     )
 
 
@@ -149,10 +218,12 @@ def advance_local_step(
         log_weights + increment,
     )
     require_live_weight(next_log_weights)
+    accepted = result.accepted
+    local_acceptance_fraction = float(np.mean(accepted)) if accepted is not None else float("nan")
     return AdvanceResult(
         positions=np.where(killed[:, np.newaxis], positions, next_positions),
         local_energies=np.where(killed, local_energies, next_energies),
         log_weights=next_log_weights,
         killed=killed,
-        telemetry=StepTelemetry(),
+        telemetry=StepTelemetry(local_acceptance_fraction=local_acceptance_fraction),
     )

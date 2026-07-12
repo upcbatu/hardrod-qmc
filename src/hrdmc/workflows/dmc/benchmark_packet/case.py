@@ -58,7 +58,7 @@ def summarize_benchmark_packet_case(
     guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
     target_family: str = DEFAULT_RN_TARGET_FAMILY,
 ) -> dict[str, Any]:
-    """Run one RN-DMC packet and derive energy gates plus transported FW."""
+    """Run one DMC packet, optionally with collective RN transport, and derive FW."""
 
     initialization = RNInitializationControls() if initialization is None else initialization
     proposal = RNCollectiveProposalControls() if proposal is None else proposal
@@ -123,6 +123,7 @@ def summarize_benchmark_packet_case(
     energy_status = energy_claim_status(stationarity)
     pure_status = pure_fw_claim_status(pure_summary)
     status = benchmark_packet_status(energy_status=energy_status, pure_status=pure_status)
+    calculation_name = "RN-DMC" if controls.collective_rn_enabled else "DMC"
     return {
         "schema_version": "rn_block_benchmark_packet_v1",
         "status": status,
@@ -147,14 +148,18 @@ def summarize_benchmark_packet_case(
         "pure_config": pure_config_metadata(config),
         "energy_claim_status": energy_status,
         "pure_fw_claim_status": pure_status,
-        "paper_values": paper_values(stationarity, pure_summary),
+        "paper_values": paper_values(
+            stationarity,
+            pure_summary,
+            calculation_name=calculation_name,
+        ),
         "stationarity": stationarity,
         "pure_walking": pure_summary,
         "seed_results": seed_payloads,
         "claim_boundary": (
-            "Single RN-DMC packet: energy from RN-DMC mixed local-energy gate; "
-            "coordinate and density/pair/structure values only from transported "
-            "auxiliary FW in this packet. "
+            f"Single {calculation_name} packet: energy from the mixed local-energy "
+            "estimator; coordinate and density/pair/structure values only from "
+            "transported auxiliary forward walking in this packet. "
             "Hellmann-Feynman energy response remains a separate cross-check workflow."
         ),
     }
@@ -185,9 +190,7 @@ def summarize_pure_seed_payloads(
     aggregate_value = float(aggregate.get("plateau_value", float("nan")))
     aggregate_stderr = float(aggregate.get("plateau_stderr", float("nan")))
     seed_r2_stderr = scalar_seed_stderr(r2_values)
-    pure_r2 = (
-        aggregate_value if np.isfinite(aggregate_value) else scalar_seed_mean(r2_values)
-    )
+    pure_r2 = aggregate_value if np.isfinite(aggregate_value) else scalar_seed_mean(r2_values)
     pure_r2_stderr = _max_finite(aggregate_stderr, seed_r2_stderr)
     paper_rms = float(np.sqrt(pure_r2)) if np.isfinite(pure_r2) and pure_r2 >= 0.0 else float("nan")
     paper_rms_stderr = (
@@ -202,9 +205,7 @@ def summarize_pure_seed_payloads(
     if "r2" in observables:
         observables["r2"] = {
             **observables["r2"],
-            "status": "PURE_FW_GO"
-            if status == "PURE_WALKING_GO"
-            else "PURE_FW_NO_GO",
+            "status": "PURE_FW_GO" if status == "PURE_WALKING_GO" else "PURE_FW_NO_GO",
             "decision_level": "seed_aggregated",
             "aggregate_plateau_status": aggregate.get("plateau_status"),
             "aggregate_plateau_value": aggregate.get("plateau_value"),
@@ -234,9 +235,7 @@ def summarize_pure_seed_payloads(
         "paper_rms_radius_stderr": paper_rms_stderr,
         "paper_rms_radius_seed_stderr": (
             float(0.5 * seed_r2_stderr / paper_rms)
-            if np.isfinite(seed_r2_stderr)
-            and np.isfinite(paper_rms)
-            and paper_rms > 0.0
+            if np.isfinite(seed_r2_stderr) and np.isfinite(paper_rms) and paper_rms > 0.0
             else float("nan")
         ),
         "mean_seed_rms_diagnostic": scalar_seed_mean(rms_values),
@@ -312,9 +311,7 @@ def aggregate_r2_plateau_summary(
         "decision_level": "seed_aggregated",
         "seed_count": len(seed_payloads),
         "seed_plateau_statuses": [
-            payload["pure_walking"]["observable_results"]
-            .get("r2", {})
-            .get("plateau_status", "")
+            payload["pure_walking"]["observable_results"].get("r2", {}).get("plateau_status", "")
             for payload in seed_payloads
         ],
         "values_by_lag": values_by_lag,
@@ -324,9 +321,7 @@ def aggregate_r2_plateau_summary(
         "plateau_status": plateau_status,
         "plateau_value": float(value) if value is not None else float("nan"),
         "plateau_stderr": float(stderr) if stderr is not None else float("nan"),
-        "bias_bracket": None
-        if bracket is None
-        else [float(bracket[0]), float(bracket[1])],
+        "bias_bracket": None if bracket is None else [float(bracket[0]), float(bracket[1])],
         "plateau_diagnostics": diagnostics,
     }
 
@@ -392,8 +387,7 @@ def summarize_pure_observable(
     observable: str,
 ) -> dict[str, Any]:
     results = [
-        payload["pure_walking"]["observable_results"][observable]
-        for payload in seed_payloads
+        payload["pure_walking"]["observable_results"][observable] for payload in seed_payloads
     ]
     values = np.asarray([result["plateau_value"] for result in results], dtype=float)
     if values.ndim == 1:
@@ -437,7 +431,12 @@ def summarize_pure_observable(
     return summary
 
 
-def paper_values(stationarity: dict[str, Any], pure_summary: dict[str, Any]) -> dict[str, Any]:
+def paper_values(
+    stationarity: dict[str, Any],
+    pure_summary: dict[str, Any],
+    *,
+    calculation_name: str,
+) -> dict[str, Any]:
     lda_rms = float(stationarity.get("lda_rms_radius", float("nan")))
     pure_r2 = float(pure_summary.get("pure_r2", float("nan")))
     pure_rms = float(pure_summary.get("paper_rms_radius", float("nan")))
@@ -446,7 +445,7 @@ def paper_values(stationarity: dict[str, Any], pure_summary: dict[str, Any]) -> 
         "energy": {
             "value": stationarity.get("mixed_energy"),
             "stderr": stationarity.get("mixed_energy_conservative_stderr"),
-            "estimator": "RN-DMC mixed local energy",
+            "estimator": f"{calculation_name} mixed local energy",
             "status": energy_claim_status(stationarity),
             "lda_value": stationarity.get("lda_total_energy"),
             "delta_vs_lda": stationarity.get("energy_dmc_minus_lda"),

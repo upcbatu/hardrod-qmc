@@ -42,8 +42,8 @@ DEFAULT_LAGS = "0,10,20,30,40,50,100,200"
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Run one RN-DMC benchmark packet with energy diagnostics and "
-            "transported FW observables."
+            "Run one DMC benchmark packet with energy diagnostics and transported "
+            "FW observables; collective RN transport is optional."
         )
     )
     parser.add_argument(
@@ -53,6 +53,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--seeds", default="1001,1002")
     parser.add_argument("--dt", type=float, default=0.00125)
+    parser.add_argument(
+        "--local-step-method",
+        choices=("euler", "metropolis"),
+        default="metropolis",
+        help="Local drift-diffusion proposal used between any collective moves.",
+    )
     parser.add_argument("--walkers", type=int, default=256)
     parser.add_argument("--tau", type=float, default=0.01)
     parser.add_argument("--rn-cadence", type=float, default=0.01)
@@ -161,6 +167,7 @@ def main() -> None:
         store_every=args.store_every,
         grid_extent=args.grid_extent,
         n_bins=args.n_bins,
+        local_step_method=args.local_step_method,
     )
     initialization = RNInitializationControls(
         mode=args.initialization_mode,
@@ -193,10 +200,11 @@ def main() -> None:
         repo_root,
         ArtifactRoute("dmc", "rn_block", "benchmark_packet"),
     )
+    progress_label = "RN-DMC benchmark packet" if not args.disable_rn else "DMC benchmark packet"
     with rn_progress_bar(
         controls=controls,
         seed_count=len(seeds),
-        label="RN benchmark packet",
+        label=progress_label,
         enabled=progress_requested(args.progress),
     ) as bar:
         payload = summarize_benchmark_packet_case(
@@ -246,7 +254,7 @@ def main() -> None:
         artifacts.extend(output_dir / path for path in plot_paths)
         write_run_manifest(
             output_dir,
-            run_name="rn_block_benchmark_packet",
+            run_name="rn_block_benchmark_packet" if not args.disable_rn else "dmc_benchmark_packet",
             config={
                 "case": case.case_id,
                 "seeds": seeds,

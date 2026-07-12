@@ -16,6 +16,7 @@ class StepTelemetry:
     rn_logq_mean: float = float("nan")
     rn_logw_increment_mean: float = float("nan")
     rn_logw_increment_variance: float = float("nan")
+    local_acceptance_fraction: float = float("nan")
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class TraceAccumulator:
     rn_logq_values: list[float] = field(default_factory=list)
     rn_logw_increment_values: list[float] = field(default_factory=list)
     rn_logw_increment_variance_values: list[float] = field(default_factory=list)
+    local_acceptance_values: list[float] = field(default_factory=list)
 
     def update(
         self,
@@ -59,6 +61,8 @@ class TraceAccumulator:
             self.rn_logw_increment_values.append(telemetry.rn_logw_increment_mean)
         if np.isfinite(telemetry.rn_logw_increment_variance):
             self.rn_logw_increment_variance_values.append(telemetry.rn_logw_increment_variance)
+        if np.isfinite(telemetry.local_acceptance_fraction):
+            self.local_acceptance_values.append(telemetry.local_acceptance_fraction)
 
     def to_trace_values(self, *, walker_count: int) -> dict[str, float]:
         if self.step_count <= 0:
@@ -71,6 +75,7 @@ class TraceAccumulator:
                 "rn_logq_mean": float("nan"),
                 "rn_logw_increment_mean": float("nan"),
                 "rn_logw_increment_variance": float("nan"),
+                "local_acceptance_fraction": float("nan"),
             }
         proposal_count = self.step_count * walker_count
         killed_fraction = safe_fraction(self.killed_count, proposal_count)
@@ -83,4 +88,5 @@ class TraceAccumulator:
             "rn_logq_mean": finite_mean(self.rn_logq_values),
             "rn_logw_increment_mean": finite_mean(self.rn_logw_increment_values),
             "rn_logw_increment_variance": finite_mean(self.rn_logw_increment_variance_values),
+            "local_acceptance_fraction": finite_mean(self.local_acceptance_values),
         }

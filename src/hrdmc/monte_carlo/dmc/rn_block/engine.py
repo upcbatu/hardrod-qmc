@@ -25,6 +25,7 @@ from hrdmc.monte_carlo.dmc.rn_block.transitions import (
     advance_local_step,
     advance_rn_block,
     euler_drift_diffusion_step,
+    metropolis_drift_diffusion_step,
 )
 from hrdmc.monte_carlo.dmc.rn_block.transport import (
     RNTransportEvent,
@@ -69,7 +70,7 @@ def run_rn_block_dmc(
     cfg.validate()
     _validate_run_inputs(dt, burn_in_steps, production_steps, store_every)
     rng = np.random.default_rng() if rng is None else rng
-    stepper = euler_drift_diffusion_step if local_step is None else local_step
+    stepper = _resolve_local_step(cfg, local_step)
     positions = np.asarray(initial_walkers, dtype=float).copy()
     if positions.ndim != 2:
         raise ValueError("initial_walkers must have shape (n_walkers, n_particles)")
@@ -162,6 +163,7 @@ def run_rn_block_dmc(
             "ess_min": float(np.min(ess_values)) if ess_values else float("nan"),
             "ess_mean": float(np.mean(ess_values)) if ess_values else float("nan"),
             "ess_resample_fraction": cfg.ess_resample_fraction,
+            "local_step_method": cfg.local_step_method,
             "include_guide_ratio": include_guide_ratio,
             "guide_batch_backend": guide_batch_backend(guide),
             "target_backend": transition_backend(target_kernel),
@@ -201,7 +203,7 @@ def run_rn_block_dmc_streaming(
     if checkpoint_every_steps is not None and checkpoint_every_steps <= 0:
         raise ValueError("checkpoint_every_steps must be positive")
     rng = np.random.default_rng() if rng is None else rng
-    stepper = euler_drift_diffusion_step if local_step is None else local_step
+    stepper = _resolve_local_step(cfg, local_step)
     grid = np.asarray(density_grid, dtype=float)
     rn_interval_steps = max(1, int(round(cfg.rn_cadence_tau / dt)))
     total_steps = burn_in_steps + production_steps
@@ -256,9 +258,7 @@ def run_rn_block_dmc_streaming(
         state.positions = advance.positions
         state.local_energies = advance.local_energies
         finite_log_weights = advance.log_weights[np.isfinite(advance.log_weights)]
-        weight_gauge_shift = (
-            float(np.max(finite_log_weights)) if finite_log_weights.size else 0.0
-        )
+        weight_gauge_shift = float(np.max(finite_log_weights)) if finite_log_weights.size else 0.0
         state.log_weights = recenter_log_weights(advance.log_weights)
         ess = effective_sample_size(state.log_weights)
         state.record_step(killed=advance.killed, ess=ess, telemetry=advance.telemetry)
@@ -278,9 +278,7 @@ def run_rn_block_dmc_streaming(
         )
         state.record_resample(resampled)
         if transport_observer is not None:
-            production_step_id = (
-                step_index - burn_in_steps if step_index > burn_in_steps else None
-            )
+            production_step_id = step_index - burn_in_steps if step_index > burn_in_steps else None
             r2_rb = (
                 None
                 if transport_com_variance is None
@@ -317,8 +315,10 @@ def run_rn_block_dmc_streaming(
             system=system,
             guide=guide,
         )
-        if checkpoint_file is not None and checkpoint_every_steps is not None and (
-            step_index % checkpoint_every_steps == 0 or step_index == total_steps
+        if (
+            checkpoint_file is not None
+            and checkpoint_every_steps is not None
+            and (step_index % checkpoint_every_steps == 0 or step_index == total_steps)
         ):
             state.save_checkpoint(
                 checkpoint_file,
@@ -332,7 +332,7 @@ def run_rn_block_dmc_streaming(
                 system=system,
             )
 
-    return state.to_summary(
+    summary = state.to_summary(
         dt=dt,
         burn_in_steps=burn_in_steps,
         production_steps=production_steps,
@@ -344,6 +344,19 @@ def run_rn_block_dmc_streaming(
         target_kernel=target_kernel,
         proposal_kernel=proposal_kernel,
     )
+    summary.metadata["local_step_method"] = cfg.local_step_method
+    return summary
+
+
+def _resolve_local_step(
+    config: RNBlockDMCConfig,
+    local_step: RNBlockLocalStep | None,
+) -> RNBlockLocalStep:
+    if local_step is not None:
+        return local_step
+    if config.local_step_method == "metropolis":
+        return metropolis_drift_diffusion_step
+    return euler_drift_diffusion_step
 
 
 def _validate_run_inputs(

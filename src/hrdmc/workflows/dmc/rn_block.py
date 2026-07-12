@@ -119,6 +119,7 @@ class RNRunControls:
     store_every: int
     grid_extent: float
     n_bins: int
+    local_step_method: str = "metropolis"
 
     @property
     def burn_in_steps(self) -> int:
@@ -127,6 +128,12 @@ class RNRunControls:
     @property
     def production_steps(self) -> int:
         return max(1, int(round(self.production_tau / self.dt)))
+
+    @property
+    def collective_rn_enabled(self) -> bool:
+        """Whether a collective RN event occurs during this trajectory."""
+        total_time = (self.burn_in_steps + self.production_steps) * self.dt
+        return self.rn_cadence_tau <= total_time
 
 
 @dataclass(frozen=True)
@@ -362,6 +369,7 @@ def run_streaming_seed(
             rn_cadence_tau=controls.rn_cadence_tau,
             component_log_scales=proposal.component_log_scales,
             component_probabilities=proposal.component_probabilities,
+            local_step_method=controls.local_step_method,
         ),
         rng=rng,
         dt=controls.dt,
@@ -565,19 +573,11 @@ def summarize_case(
             sorted({str(summary.metadata["guide_batch_backend"]) for summary in seed_summaries})
         ),
         "target_backend": ",".join(
-            sorted(
-                {
-                    str(summary.metadata.get("target_backend", ""))
-                    for summary in seed_summaries
-                }
-            )
+            sorted({str(summary.metadata.get("target_backend", "")) for summary in seed_summaries})
         ),
         "proposal_backend": ",".join(
             sorted(
-                {
-                    str(summary.metadata.get("proposal_backend", ""))
-                    for summary in seed_summaries
-                }
+                {str(summary.metadata.get("proposal_backend", "")) for summary in seed_summaries}
             )
         ),
         "seed_summaries": [
@@ -684,12 +684,13 @@ def _run_seed_worker(
             worker_progress.flush()
 
 
-def controls_to_dict(controls: RNRunControls) -> dict[str, float | int]:
+def controls_to_dict(controls: RNRunControls) -> dict[str, float | int | str | bool]:
     return {
         "dt": controls.dt,
         "walkers": controls.walkers,
         "tau_block": controls.tau_block,
         "rn_cadence_tau": controls.rn_cadence_tau,
+        "collective_rn_enabled": controls.collective_rn_enabled,
         "burn_tau": controls.burn_tau,
         "production_tau": controls.production_tau,
         "burn_in_steps": controls.burn_in_steps,
@@ -697,6 +698,7 @@ def controls_to_dict(controls: RNRunControls) -> dict[str, float | int]:
         "store_every": controls.store_every,
         "grid_extent": controls.grid_extent,
         "n_bins": controls.n_bins,
+        "local_step_method": controls.local_step_method,
     }
 
 

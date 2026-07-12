@@ -12,6 +12,7 @@ from hrdmc.monte_carlo.dmc.rn_block.results import RNBlockDMCResult, RNBlockStre
 from hrdmc.monte_carlo.dmc.rn_block.transitions import (
     RNBlockLocalStepResult,
     euler_drift_diffusion_step,
+    metropolis_drift_diffusion_step,
 )
 from hrdmc.monte_carlo.dmc.rn_block.transport import (
     MultiplexedTransportObserver,
@@ -32,6 +33,7 @@ __all__ = [
     "RNTransportEvent",
     "RNTransportObserver",
     "euler_drift_diffusion_step",
+    "metropolis_drift_diffusion_step",
     "log_collective_mixture_density",
     "rn_log_increment",
     "run_rn_block_dmc",

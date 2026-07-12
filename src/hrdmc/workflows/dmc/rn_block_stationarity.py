@@ -236,7 +236,7 @@ def summarize_stationarity_from_seed_summaries(
         "resolved_guide_family": ",".join(
             sorted(
                 {str(summary.metadata.get("resolved_guide_family")) for summary in seed_summaries}
-                )
+            )
         ),
         "target_initial_rms": seed_summaries[0].metadata.get("target_initial_rms", float("nan")),
         "initializer_scope": seed_summaries[0].metadata.get("initializer_scope", ""),
@@ -256,7 +256,7 @@ def summarize_stationarity_from_seed_summaries(
         "gate_split_combined": final_classification,
         "energy_estimator_scope": (
             "mixed local-energy Hamiltonian estimator; candidate paper estimator "
-            "after RN-DMC methodology gates"
+            "after numerical checks"
         ),
         "mixed_coordinate_observable_scope": (
             "diagnostic only; paper R2/RMS require Hellmann-Feynman energy response "
@@ -358,26 +358,16 @@ def summarize_stationarity_from_seed_summaries(
         "stationarity_quarter_z_max_energy": stationarity_audit["energy"][
             "first_last_quarter_z_max"
         ],
-        "stationarity_quarter_z_max_rms": stationarity_audit["rms"][
-            "first_last_quarter_z_max"
-        ],
-        "stationarity_quarter_z_max_r2": stationarity_audit["r2"][
-            "first_last_quarter_z_max"
-        ],
-        "stationarity_late_z_max_energy": stationarity_audit["energy"][
-            "late_cumulative_z_max"
-        ],
+        "stationarity_quarter_z_max_rms": stationarity_audit["rms"]["first_last_quarter_z_max"],
+        "stationarity_quarter_z_max_r2": stationarity_audit["r2"]["first_last_quarter_z_max"],
+        "stationarity_late_z_max_energy": stationarity_audit["energy"]["late_cumulative_z_max"],
         "stationarity_late_z_max_rms": stationarity_audit["rms"]["late_cumulative_z_max"],
         "stationarity_late_z_max_r2": stationarity_audit["r2"]["late_cumulative_z_max"],
         "stationarity_block_z_max_energy": stationarity_audit["energy"][
             "first_last_blocking_z_max"
         ],
-        "stationarity_block_z_max_rms": stationarity_audit["rms"][
-            "first_last_blocking_z_max"
-        ],
-        "stationarity_block_z_max_r2": stationarity_audit["r2"][
-            "first_last_blocking_z_max"
-        ],
+        "stationarity_block_z_max_rms": stationarity_audit["rms"]["first_last_blocking_z_max"],
+        "stationarity_block_z_max_r2": stationarity_audit["r2"]["first_last_blocking_z_max"],
         "correlated_error_energy": correlated_errors["energy"]["status"],
         "correlated_error_rms": correlated_errors["rms"]["status"],
         "correlated_error_r2": correlated_errors["r2"]["status"],
@@ -392,8 +382,7 @@ def summarize_stationarity_from_seed_summaries(
         ],
         "spread_warning_count": int(diagnostics["energy"]["spread_warning_count"]),
         "mixed_coordinate_spread_warning_count": int(
-            diagnostics["rms"]["spread_warning_count"]
-            + diagnostics["r2"]["spread_warning_count"]
+            diagnostics["rms"]["spread_warning_count"] + diagnostics["r2"]["spread_warning_count"]
         ),
         "ess_fraction_min": ess_fraction_min,
         "log_weight_span_max": log_weight_span_max,
@@ -413,19 +402,11 @@ def summarize_stationarity_from_seed_summaries(
             sorted({str(summary.metadata["guide_batch_backend"]) for summary in seed_summaries})
         ),
         "target_backend": ",".join(
-            sorted(
-                {
-                    str(summary.metadata.get("target_backend", ""))
-                    for summary in seed_summaries
-                }
-            )
+            sorted({str(summary.metadata.get("target_backend", "")) for summary in seed_summaries})
         ),
         "proposal_backend": ",".join(
             sorted(
-                {
-                    str(summary.metadata.get("proposal_backend", ""))
-                    for summary in seed_summaries
-                }
+                {str(summary.metadata.get("proposal_backend", "")) for summary in seed_summaries}
             )
         ),
         "trace_artifacts": trace_artifacts,
@@ -592,7 +573,7 @@ def correlated_error_diagnostics(
     }
     spacings = [
         trace_spacing_tau(optional_trace(summary.trace_times)) for summary in seed_summaries
-        ]
+    ]
     return {
         metric: summarize_correlated_error_metric(seeds, traces, spacings)
         for metric, traces in metric_traces.items()
@@ -716,9 +697,7 @@ def summarize_correlated_error_metric(
         "case_correlated_stderr": case_stderr,
         "seed_count": len(seeds),
         "triangulated_seed_count": int(sum(value == TRIANGULATED_ERROR_GO for value in statuses)),
-        "disagree_seed_count": int(
-            sum(value == TRIANGULATED_ERROR_WARNING for value in statuses)
-        ),
+        "disagree_seed_count": int(sum(value == TRIANGULATED_ERROR_WARNING for value in statuses)),
         "unavailable_seed_count": int(
             sum(value == TRIANGULATED_ERROR_UNAVAILABLE for value in statuses)
         ),
@@ -917,9 +896,7 @@ def classify_blocked_case(
         )
         return MIXED_COORDINATE_DIAGNOSTIC if coordinate_repairable else MIXED_OBSERVABLE_WARNING
 
-    if any(
-        diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY" for name in ("energy",)
-    ):
+    if any(diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY" for name in ("energy",)):
         return "WEAK_TRAP_WARNING"
     return "PASS_CANDIDATE"
 
@@ -946,14 +923,10 @@ def hard_chain_no_go(
     *,
     metrics: tuple[str, ...] = ("energy", "rms", "r2"),
 ) -> bool:
-    if any(
-        diagnostics[name]["classification"] in {"NO_GO_RHAT", "NO_GO_NEFF"}
-        for name in metrics
-    ):
+    if any(diagnostics[name]["classification"] in {"NO_GO_RHAT", "NO_GO_NEFF"} for name in metrics):
         return True
     return any(
-        stationarity_audit[name]["reason"]
-        not in {"GO", "SPREAD_WARNING"}
+        stationarity_audit[name]["reason"] not in {"GO", "SPREAD_WARNING"}
         and diagnostics[name]["classification"] == "NO_GO_STATIONARITY"
         for name in metrics
     )
@@ -989,10 +962,7 @@ def mixed_coordinate_diagnostic_status(
         diagnostics["r2"],
     ):
         return "MIXED_COORDINATE_DIAGNOSTIC_PRECISION_WARNING"
-    if any(
-        diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY"
-        for name in ("rms", "r2")
-    ):
+    if any(diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY" for name in ("rms", "r2")):
         return "MIXED_COORDINATE_DIAGNOSTIC_SPREAD_WARNING"
     return "MIXED_COORDINATE_DIAGNOSTIC_GO"
 
@@ -1081,9 +1051,7 @@ def seed_trace_dict(summary: RNBlockStreamingSummary) -> dict[str, np.ndarray]:
         "ess_fraction": require_trace(summary.ess_fraction_trace),
         "invalid_proposal_fraction": require_trace(summary.invalid_proposal_fraction_trace),
         "hard_wall_kill_fraction": require_trace(summary.hard_wall_kill_fraction_trace),
-        "zero_weight_excluded_fraction": require_trace(
-            summary.zero_weight_excluded_fraction_trace
-        ),
+        "zero_weight_excluded_fraction": require_trace(summary.zero_weight_excluded_fraction_trace),
         "rn_logk_mean": require_trace(summary.rn_logk_mean_trace),
         "rn_logq_mean": require_trace(summary.rn_logq_mean_trace),
         "rn_logw_increment_mean": require_trace(summary.rn_logw_increment_mean_trace),

@@ -18,6 +18,7 @@ class RNBlockDMCConfig:
     component_probabilities: tuple[float, ...] = (0.25, 0.50, 0.25)
     rn_cadence_tau: float = 0.005
     ess_resample_fraction: float = 0.35
+    local_step_method: str = "metropolis"
 
     def validate(self) -> None:
         if self.tau_block <= 0.0:
@@ -40,3 +41,5 @@ class RNBlockDMCConfig:
             raise ValueError("ess_resample_fraction must be finite")
         if self.ess_resample_fraction < 0.0 or self.ess_resample_fraction > 1.0:
             raise ValueError("ess_resample_fraction must satisfy 0 <= fraction <= 1")
+        if self.local_step_method not in {"euler", "metropolis"}:
+            raise ValueError("local_step_method must be 'euler' or 'metropolis'")

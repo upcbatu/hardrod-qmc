@@ -61,6 +61,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--walkers", type=int, default=256)
     parser.add_argument("--tau", type=float, default=0.01)
     parser.add_argument("--rn-cadence", type=float, default=0.01)
+    parser.add_argument(
+        "--disable-rn",
+        action="store_true",
+        help="Use only local drift-diffusion DMC steps for the reference packet.",
+    )
+    parser.add_argument(
+        "--local-step-method",
+        choices=("euler", "metropolis"),
+        default="metropolis",
+    )
     parser.add_argument("--burn-tau", type=float, default=60.0)
     parser.add_argument("--production-tau", type=float, default=240.0)
     parser.add_argument("--store-every", type=int, default=40)
@@ -143,16 +153,20 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     repo_root = repo_root_from(Path(__file__))
+    rn_cadence_tau = (
+        args.burn_tau + args.production_tau + args.dt if args.disable_rn else args.rn_cadence
+    )
     controls = RNRunControls(
         dt=args.dt,
         walkers=args.walkers,
         tau_block=args.tau,
-        rn_cadence_tau=args.rn_cadence,
+        rn_cadence_tau=rn_cadence_tau,
         burn_tau=args.burn_tau,
         production_tau=args.production_tau,
         store_every=args.store_every,
         grid_extent=args.grid_extent,
         n_bins=args.n_bins,
+        local_step_method=args.local_step_method,
     )
     seeds = _parse_ints(args.seeds)
     cases = [
@@ -223,9 +237,7 @@ def _build_payload(
         plateau_window_lag_count=args.pure_fw_plateau_window_lag_count,
         block_size_steps=1,
         collection_stride_steps=args.pure_fw_collection_stride_steps,
-        density_plateau_relative_l2_tolerance=(
-            args.density_plateau_relative_l2_tolerance
-        ),
+        density_plateau_relative_l2_tolerance=(args.density_plateau_relative_l2_tolerance),
         transport_invariant_tests_passed=("lag0_identity",),
     )
     tolerances = FiniteAN2ReferenceTolerances(
@@ -275,7 +287,7 @@ def _build_payload(
         "status": status,
         "benchmark_tier": "N=2 finite-a trapped deterministic reference packet",
         "claim_boundary": (
-            "This packet validates the production finite-a RN-DMC/FW flow "
+            "This packet validates the finite-a DMC/FW flow "
             "against the deterministic N=2 trapped hard-rod reference. It is "
             "a finite-a solver anchor, not an N>2 exact benchmark."
         ),
@@ -322,9 +334,7 @@ def _case_table_row(case: dict[str, Any]) -> dict[str, Any]:
         "pure_r2_relative_error": comparison["r2"]["pure_relative_error"],
         "pure_rms_relative_error": comparison["rms"]["pure_relative_error"],
         "pure_density_relative_l2": comparison["density"]["pure_relative_l2"],
-        "density_accounting_abs_error": comparison["density"][
-            "density_accounting_abs_error"
-        ],
+        "density_accounting_abs_error": comparison["density"]["density_accounting_abs_error"],
     }
 
 

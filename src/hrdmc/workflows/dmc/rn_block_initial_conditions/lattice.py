@@ -90,7 +90,7 @@ def initial_walkers_with_metadata(
             "initial_gap_min": array_min_or_none(gaps),
             "init_width_log_sigma": float(init_width_log_sigma),
             "initializer_scope": (
-                "initial-condition preconditioner only; production RN-DMC unchanged"
+                "initial-condition preconditioner only; production DMC unchanged"
             ),
         },
     )
