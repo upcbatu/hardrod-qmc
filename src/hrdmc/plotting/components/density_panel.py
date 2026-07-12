@@ -36,7 +36,7 @@ def draw_density_panel(
             color=tokens.LDA_PREDICTION,
             linestyle=(0, (4, 2)),
             linewidth=1.25,
-            label="LDA envelope (smooth)",
+            label="LDA smooth envelope",
             zorder=1,
         )
     ax.step(
@@ -45,7 +45,7 @@ def draw_density_panel(
         where="mid",
         color=tokens.DMC_PRIMARY,
         linewidth=2.3,
-        label="FW density (bin estimator)",
+        label="FW density",
         zorder=3,
     )
     if mixed_x is not None and mixed_value is not None:
@@ -60,7 +60,7 @@ def draw_density_panel(
             marker="x",
             markevery=max(1, int(mixed_x.size // 16)),
             markersize=4.0,
-            label="mixed diagnostic (bin)",
+            label="mixed density (diagnostic)",
             zorder=4,
         )
     if _should_draw_band(stderr, value, payload):
@@ -78,10 +78,10 @@ def draw_density_panel(
     n_particles = int(payload.get("n_particles", 0) or 0)
     ax.set_title(_density_title(payload), loc="left", pad=6)
     if residual_ax is None:
-        ax.set_xlabel(r"$x$")
+        ax.set_xlabel(r"$x/a_{\mathrm{ho}}$")
     else:
         ax.tick_params(labelbottom=False)
-    ax.set_ylabel(r"$n(x)$")
+    ax.set_ylabel(r"$n(x)a_{\mathrm{ho}}$")
     ax.legend(loc="upper right", fontsize=7.4, frameon=False)
     _draw_density_metrics(ax, x, value, lda_on_x, mixed_x, mixed_value, integral, n_particles)
     if (
@@ -132,7 +132,10 @@ def _density_title(payload: dict[str, Any]) -> str:
         and n_particles is not None
         and rod_length_ho is not None
     ):
-        return f"Density comparison: N={int(n_particles)}, A={float(rod_length_ho):g}"
+        return (
+            f"Density comparison: N={int(n_particles)}, "
+            rf"$a/a_{{\mathrm{{ho}}}}$={float(rod_length_ho):g}"
+        )
     if n_particles is not None and rod_length is not None and omega is not None:
         return (
             f"Density comparison: N={int(n_particles)}, "
@@ -174,13 +177,13 @@ def _draw_density_metrics(
     lines = [density_integral_status(integral, n_particles)]
     if lda_on_x is None:
         return
-    lines.append(f"FW-LDA rel L2: {_relative_l2(value, lda_on_x):.3f}")
+    lines.append(f"FW--LDA relative L2: {_relative_l2(value, lda_on_x):.3f}")
     if mixed_x is not None and mixed_value is not None:
         mixed_on_x = np.interp(x, mixed_x, mixed_value)
         mixed_l2 = _relative_l2(mixed_on_x, lda_on_x)
         fw_l2 = _relative_l2(value, lda_on_x)
-        lines.append(f"mixed-LDA rel L2: {mixed_l2:.3f}")
-        lines.append(f"FW-mixed rel L2: {_relative_l2(value, mixed_on_x):.3f}")
+        lines.append(f"mixed--LDA relative L2: {mixed_l2:.3f}")
+        lines.append(f"FW--mixed relative L2: {_relative_l2(value, mixed_on_x):.3f}")
         if np.isfinite(fw_l2) and np.isfinite(mixed_l2) and fw_l2 > mixed_l2:
             lines.append("FW farther from LDA than mixed")
     ax.text(
@@ -245,8 +248,8 @@ def _draw_density_residuals(
     max_abs = max(float(np.nanmax(np.abs(residual))) for residual in residuals)
     if max_abs > 0.0 and np.isfinite(max_abs):
         ax.set_ylim(-1.15 * max_abs, 1.15 * max_abs)
-    ax.set_xlabel(r"$x$")
-    ax.set_ylabel(r"$\Delta n$")
+    ax.set_xlabel(r"$x/a_{\mathrm{ho}}$")
+    ax.set_ylabel(r"$\Delta n\,a_{\mathrm{ho}}$")
     ax.set_title("Residual to LDA envelope", loc="left", pad=3, fontsize=8.5)
     ax.legend(loc="upper right", fontsize=7.2)
 
