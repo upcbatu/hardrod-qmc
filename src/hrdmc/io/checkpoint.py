@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from hrdmc.io.artifacts import utc_timestamp, write_json_atomic
+from hrdmc.artifacts import utc_timestamp, write_json_atomic
 
 CHECKPOINT_SCHEMA_VERSION = "hrdmc_run_checkpoint_v1"
 
