@@ -1,3 +1,7 @@
+from hrdmc.estimators.mixed.streaming import (
+    StreamingBatchObservables,
+    streaming_batch_observables,
+)
 from hrdmc.estimators.mixed.weighted import (
     WeightedConfigurationSet,
     WeightedObservableResult,
@@ -10,10 +14,12 @@ from hrdmc.estimators.mixed.weighted import (
 )
 
 __all__ = [
+    "StreamingBatchObservables",
     "WeightedConfigurationSet",
     "WeightedObservableResult",
     "estimate_weighted_observables",
     "filter_weighted_configurations",
+    "streaming_batch_observables",
     "weighted_density_profile_on_grid",
     "weighted_energy",
     "weighted_r2_radius",

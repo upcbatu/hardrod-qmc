@@ -11,36 +11,29 @@ from hrdmc.monte_carlo.dmc.common.guide_api import (
     guide_grad_energy_valid,
     guide_log_values,
 )
-from hrdmc.monte_carlo.dmc.common.numeric import finite_mean, finite_variance
 from hrdmc.monte_carlo.dmc.common.population import require_live_weight
-from hrdmc.monte_carlo.dmc.rn_block._collective import sample_collective_mixture
-from hrdmc.monte_carlo.dmc.rn_block._telemetry import (
-    AdvanceResult,
-    StepTelemetry,
+from hrdmc.monte_carlo.dmc.local.mobility import local_step_mobility
+from hrdmc.monte_carlo.dmc.local.telemetry import (
+    DMCAdvanceResult,
+    DMCStepTelemetry,
 )
-from hrdmc.monte_carlo.dmc.rn_block.config import RNBlockDMCConfig
-from hrdmc.monte_carlo.dmc.rn_block.weights import (
-    importance_sampled_rn_log_increment,
-    rn_log_increment,
-)
-from hrdmc.systems.open_line import OpenLineHardRodSystem
-from hrdmc.systems.propagators import ProposalTransitionKernel, TargetTransitionKernel
 from hrdmc.wavefunctions.api import DMCGuide
 
 FloatArray = NDArray[np.float64]
 
 
 @dataclass(frozen=True)
-class RNBlockLocalStepResult:
+class DMCStepResult:
     positions: FloatArray
     local_energies: FloatArray
     killed: NDArray[np.bool_]
     accepted: NDArray[np.bool_] | None = None
     invalid_proposal: NDArray[np.bool_] | None = None
     metropolis_rejected: NDArray[np.bool_] | None = None
+    drift_norm_max: float = float("nan")
 
 
-class RNBlockLocalStep(Protocol):
+class DMCStep(Protocol):
     def __call__(
         self,
         rng: np.random.Generator,
@@ -48,7 +41,7 @@ class RNBlockLocalStep(Protocol):
         guide: DMCGuide,
         dt: float,
         local_energies: FloatArray,
-    ) -> RNBlockLocalStepResult: ...
+    ) -> DMCStepResult: ...
 
 
 def euler_drift_diffusion_step(
@@ -57,27 +50,21 @@ def euler_drift_diffusion_step(
     guide: DMCGuide,
     dt: float,
     local_energies: FloatArray,
-) -> RNBlockLocalStepResult:
-    """Default local DMC proposal in harmonic-oscillator units.
-
-    The physical Hamiltonian has kinetic term -1/2 sum_i d_i^2. The associated
-    importance-sampled drift-diffusion move has diffusion coefficient D=1/2,
-    hence drift velocity grad log(Psi_T) and Gaussian variance dt per
-    coordinate.
-    """
+) -> DMCStepResult:
+    """Euler importance-sampled drift-diffusion step in oscillator units."""
 
     grad, _current_energies, _current_valid = guide_grad_energy_valid(guide, positions)
-    drift = grad
-    trial = positions + dt * drift + np.sqrt(dt) * rng.normal(size=positions.shape)
+    trial = positions + dt * grad + np.sqrt(dt) * rng.normal(size=positions.shape)
     trial_energies, valid = evaluate_guide(guide, trial)
     killed = ~valid
-    return RNBlockLocalStepResult(
+    return DMCStepResult(
         positions=np.where(killed[:, np.newaxis], positions, trial),
         local_energies=np.where(killed, local_energies, trial_energies),
         killed=killed,
         accepted=~killed,
         invalid_proposal=killed,
         metropolis_rejected=np.zeros(positions.shape[0], dtype=bool),
+        drift_norm_max=float(np.max(np.linalg.norm(grad, axis=1))),
     )
 
 
@@ -87,14 +74,11 @@ def metropolis_drift_diffusion_step(
     guide: DMCGuide,
     dt: float,
     local_energies: FloatArray,
-) -> RNBlockLocalStepResult:
-    """Metropolis-corrected importance-sampled local DMC move.
+) -> DMCStepResult:
+    """MALA importance-sampled drift-diffusion step.
 
-    The Euler drift-diffusion proposal is asymmetric when the guide drift varies
-    across configuration space.  The acceptance ratio restores detailed balance
-    for the guide-squared distribution when the local-energy branching factor is
-    constant, as in the trapped TG anchor.  An invalid hard-core proposal is a
-    rejection, so the previous valid walker remains live.
+    Invalid hard-core proposals and Metropolis rejections leave the previous
+    valid walker live; branching is applied afterwards by ``advance_local_step``.
     """
 
     grad_old, _old_energies, old_valid = guide_grad_energy_valid(guide, positions)
@@ -142,74 +126,29 @@ def metropolis_drift_diffusion_step(
             log_uniform = np.log(rng.random(candidate_indices.size))
             accepted[candidate_indices] = log_uniform <= np.minimum(log_acceptance, 0.0)
 
-    return RNBlockLocalStepResult(
+    return DMCStepResult(
         positions=np.where(accepted[:, np.newaxis], trial, positions),
         local_energies=np.where(accepted, trial_energies, local_energies),
         killed=np.zeros(positions.shape[0], dtype=bool),
         accepted=accepted,
         invalid_proposal=invalid_proposal,
         metropolis_rejected=~accepted & ~invalid_proposal,
-    )
-
-
-def advance_rn_block(
-    config: RNBlockDMCConfig,
-    system: OpenLineHardRodSystem,
-    guide: DMCGuide,
-    target_kernel: TargetTransitionKernel,
-    proposal_kernel: ProposalTransitionKernel,
-    rng: np.random.Generator,
-    positions: FloatArray,
-    local_energies: FloatArray,
-    log_weights: FloatArray,
-    *,
-    include_guide_ratio: bool,
-) -> AdvanceResult:
-    old_positions = positions
-    proposal = sample_collective_mixture(config, system, proposal_kernel, rng, old_positions)
-    target_log_density = target_kernel.log_density(
-        old_positions,
-        proposal.x_new,
-        config.tau_block,
-    )
-    if include_guide_ratio:
-        increment = importance_sampled_rn_log_increment(
-            target_log_density,
-            proposal.log_q_forward,
-            guide_log_values(guide, old_positions),
-            guide_log_values(guide, proposal.x_new),
-        )
-    else:
-        increment = rn_log_increment(target_log_density, proposal.log_q_forward)
-    trial_energies, valid = evaluate_guide(guide, proposal.x_new)
-    killed = (~valid) | (~np.isfinite(increment))
-    next_log_weights = np.full_like(log_weights, -np.inf, dtype=float)
-    live = ~killed
-    next_log_weights[live] = log_weights[live] + increment[live]
-    require_live_weight(next_log_weights)
-    return AdvanceResult(
-        positions=np.where(killed[:, np.newaxis], old_positions, proposal.x_new),
-        local_energies=np.where(killed, local_energies, trial_energies),
-        log_weights=next_log_weights,
-        killed=killed,
-        telemetry=StepTelemetry(
-            rn_logk_mean=finite_mean(target_log_density),
-            rn_logq_mean=finite_mean(proposal.log_q_forward),
-            rn_logw_increment_mean=finite_mean(increment),
-            rn_logw_increment_variance=finite_variance(increment),
-        ),
+        drift_norm_max=float(np.max(np.linalg.norm(grad_old, axis=1))),
     )
 
 
 def advance_local_step(
-    local_step: RNBlockLocalStep,
+    local_step: DMCStep,
     guide: DMCGuide,
     rng: np.random.Generator,
     positions: FloatArray,
     local_energies: FloatArray,
     log_weights: FloatArray,
     dt: float,
-) -> AdvanceResult:
+    *,
+    center: float = 0.0,
+    rod_length: float = 0.0,
+) -> DMCAdvanceResult:
     result = local_step(rng, positions, guide, dt, local_energies)
     next_positions = np.asarray(result.positions, dtype=float)
     next_energies = np.asarray(result.local_energies, dtype=float)
@@ -227,23 +166,34 @@ def advance_local_step(
     )
     require_live_weight(next_log_weights)
     accepted = result.accepted
-    local_acceptance_fraction = float(np.mean(accepted)) if accepted is not None else float("nan")
     invalid_proposal = result.invalid_proposal
-    invalid_proposal_fraction = (
-        float(np.mean(invalid_proposal)) if invalid_proposal is not None else float("nan")
-    )
     metropolis_rejected = result.metropolis_rejected
-    metropolis_rejection_fraction = (
-        float(np.mean(metropolis_rejected)) if metropolis_rejected is not None else float("nan")
+    mobility = local_step_mobility(
+        positions,
+        next_positions,
+        center=center,
+        rod_length=rod_length,
     )
-    return AdvanceResult(
+    return DMCAdvanceResult(
         positions=np.where(killed[:, np.newaxis], positions, next_positions),
         local_energies=np.where(killed, local_energies, next_energies),
         log_weights=next_log_weights,
         killed=killed,
-        telemetry=StepTelemetry(
-            local_acceptance_fraction=local_acceptance_fraction,
-            invalid_proposal_fraction=invalid_proposal_fraction,
-            metropolis_rejection_fraction=metropolis_rejection_fraction,
+        telemetry=DMCStepTelemetry(
+            local_acceptance_fraction=(
+                float(np.mean(accepted)) if accepted is not None else float("nan")
+            ),
+            invalid_proposal_fraction=(
+                float(np.mean(invalid_proposal)) if invalid_proposal is not None else float("nan")
+            ),
+            metropolis_rejection_fraction=(
+                float(np.mean(metropolis_rejected))
+                if metropolis_rejected is not None
+                else float("nan")
+            ),
+            drift_norm_max=result.drift_norm_max,
+            configuration_esjd=mobility.configuration_esjd,
+            r2_esjd=mobility.r2_esjd,
+            weighted_free_gap_esjd=mobility.weighted_free_gap_esjd,
         ),
     )

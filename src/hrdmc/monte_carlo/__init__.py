@@ -1,22 +1,26 @@
 from hrdmc.monte_carlo.dmc import (
     DiffusionMonteCarloEngine,
+    DMCConfig,
     DMCResult,
-    RNBlockDMCConfig,
-    RNBlockDMCResult,
+    DMCStreamingSummary,
     WalkerSet,
     normalize_weights,
+    run_dmc,
+    run_dmc_streaming,
     systematic_resample,
 )
 from hrdmc.monte_carlo.vmc import MetropolisVMC, VMCResult
 
 __all__ = [
+    "DMCConfig",
     "DMCResult",
+    "DMCStreamingSummary",
     "DiffusionMonteCarloEngine",
     "MetropolisVMC",
-    "RNBlockDMCConfig",
-    "RNBlockDMCResult",
     "VMCResult",
     "WalkerSet",
     "normalize_weights",
+    "run_dmc",
+    "run_dmc_streaming",
     "systematic_resample",
 ]

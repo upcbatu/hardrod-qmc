@@ -24,13 +24,8 @@ from hrdmc.monte_carlo.dmc.common.population import (
     systematic_resample,
 )
 from hrdmc.monte_carlo.dmc.common.results import WeightedDMCResult
-from hrdmc.monte_carlo.dmc.common.streaming import (
-    StreamingBatchObservables,
-    streaming_batch_observables,
-)
 
 __all__ = [
-    "StreamingBatchObservables",
     "WeightedDMCResult",
     "effective_sample_size",
     "evaluate_guide",
@@ -49,7 +44,6 @@ __all__ = [
     "recenter_log_weights",
     "require_live_weight",
     "safe_fraction",
-    "streaming_batch_observables",
     "systematic_resample",
     "valid_rows",
 ]

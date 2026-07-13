@@ -12,11 +12,10 @@ from hrdmc.monte_carlo.dmc.common.population import (
 from hrdmc.monte_carlo.dmc.common.population import (
     systematic_resample as _systematic_resample,
 )
-from hrdmc.monte_carlo.dmc.common.results import WeightedDMCResult
+from hrdmc.monte_carlo.dmc.local.results import DMCResult
 
 FloatArray = NDArray[np.float64]
 IntArray = NDArray[np.int64]
-DMCResult = WeightedDMCResult
 
 
 @dataclass

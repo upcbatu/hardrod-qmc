@@ -12,13 +12,13 @@ FloatArray = NDArray[np.float64]
 
 
 @dataclass(frozen=True)
-class RNBlockDMCResult(WeightedDMCResult):
-    """Result contract for RN-block DMC runs."""
+class DMCResult(WeightedDMCResult):
+    """Result contract for DMC runs."""
 
 
 @dataclass(frozen=True)
-class RNBlockStreamingSummary:
-    """Compact RN-block DMC result that does not retain raw snapshots."""
+class DMCStreamingSummary:
+    """Compact DMC result that does not retain raw snapshots."""
 
     stored_batch_count: int
     sample_count: int
@@ -37,17 +37,30 @@ class RNBlockStreamingSummary:
     rms_radius_trace: FloatArray | None = None
     r2_radius_trace: FloatArray | None = None
     local_energy_variance_trace: FloatArray | None = None
+    local_energy_median_trace: FloatArray | None = None
+    local_energy_mad_trace: FloatArray | None = None
+    local_energy_p001_trace: FloatArray | None = None
+    local_energy_p01_trace: FloatArray | None = None
+    local_energy_p99_trace: FloatArray | None = None
+    local_energy_p999_trace: FloatArray | None = None
     log_weight_span_trace: FloatArray | None = None
     ess_fraction_trace: FloatArray | None = None
     invalid_proposal_fraction_trace: FloatArray | None = None
     hard_wall_kill_fraction_trace: FloatArray | None = None
     local_acceptance_fraction_trace: FloatArray | None = None
     metropolis_rejection_fraction_trace: FloatArray | None = None
+    drift_norm_max_trace: FloatArray | None = None
+    configuration_esjd_trace: FloatArray | None = None
+    r2_esjd_trace: FloatArray | None = None
+    weighted_free_gap_esjd_trace: FloatArray | None = None
+    weighted_free_gap_mean_trace: FloatArray | None = None
+    free_gap_min_trace: FloatArray | None = None
+    free_gap_p01_trace: FloatArray | None = None
     zero_weight_excluded_fraction_trace: FloatArray | None = None
-    rn_logk_mean_trace: FloatArray | None = None
-    rn_logq_mean_trace: FloatArray | None = None
-    rn_logw_increment_mean_trace: FloatArray | None = None
-    rn_logw_increment_variance_trace: FloatArray | None = None
+    scheduled_log_target_mean_trace: FloatArray | None = None
+    scheduled_log_proposal_mean_trace: FloatArray | None = None
+    scheduled_log_weight_increment_mean_trace: FloatArray | None = None
+    scheduled_log_weight_increment_variance_trace: FloatArray | None = None
     retained_fraction_trace: FloatArray | None = None
 
     @property
@@ -77,6 +90,12 @@ class RNBlockStreamingSummary:
             "r2_radius_trace": _array_or_none(self.r2_radius_trace),
             "rms_radius_trace": _array_or_none(self.rms_radius_trace),
             "local_energy_variance_trace": _array_or_none(self.local_energy_variance_trace),
+            "local_energy_median_trace": _array_or_none(self.local_energy_median_trace),
+            "local_energy_mad_trace": _array_or_none(self.local_energy_mad_trace),
+            "local_energy_p001_trace": _array_or_none(self.local_energy_p001_trace),
+            "local_energy_p01_trace": _array_or_none(self.local_energy_p01_trace),
+            "local_energy_p99_trace": _array_or_none(self.local_energy_p99_trace),
+            "local_energy_p999_trace": _array_or_none(self.local_energy_p999_trace),
             "log_weight_span_trace": _array_or_none(self.log_weight_span_trace),
             "ess_fraction_trace": _array_or_none(self.ess_fraction_trace),
             "invalid_proposal_fraction_trace": _array_or_none(self.invalid_proposal_fraction_trace),
@@ -85,14 +104,25 @@ class RNBlockStreamingSummary:
             "metropolis_rejection_fraction_trace": _array_or_none(
                 self.metropolis_rejection_fraction_trace
             ),
+            "drift_norm_max_trace": _array_or_none(self.drift_norm_max_trace),
+            "configuration_esjd_trace": _array_or_none(self.configuration_esjd_trace),
+            "r2_esjd_trace": _array_or_none(self.r2_esjd_trace),
+            "weighted_free_gap_esjd_trace": _array_or_none(self.weighted_free_gap_esjd_trace),
+            "weighted_free_gap_mean_trace": _array_or_none(self.weighted_free_gap_mean_trace),
+            "free_gap_min_trace": _array_or_none(self.free_gap_min_trace),
+            "free_gap_p01_trace": _array_or_none(self.free_gap_p01_trace),
             "zero_weight_excluded_fraction_trace": _array_or_none(
                 self.zero_weight_excluded_fraction_trace
             ),
-            "rn_logk_mean_trace": _array_or_none(self.rn_logk_mean_trace),
-            "rn_logq_mean_trace": _array_or_none(self.rn_logq_mean_trace),
-            "rn_logw_increment_mean_trace": _array_or_none(self.rn_logw_increment_mean_trace),
-            "rn_logw_increment_variance_trace": _array_or_none(
-                self.rn_logw_increment_variance_trace
+            "scheduled_log_target_mean_trace": _array_or_none(self.scheduled_log_target_mean_trace),
+            "scheduled_log_proposal_mean_trace": _array_or_none(
+                self.scheduled_log_proposal_mean_trace
+            ),
+            "scheduled_log_weight_increment_mean_trace": _array_or_none(
+                self.scheduled_log_weight_increment_mean_trace
+            ),
+            "scheduled_log_weight_increment_variance_trace": _array_or_none(
+                self.scheduled_log_weight_increment_variance_trace
             ),
             "retained_fraction_trace": _array_or_none(self.retained_fraction_trace),
         }

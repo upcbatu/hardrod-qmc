@@ -5,12 +5,12 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from hrdmc.monte_carlo.dmc.rn_block._collective_coordinates import (
+from hrdmc.monte_carlo.dmc.collective_rn.config import CollectiveRNConfig
+from hrdmc.monte_carlo.dmc.collective_rn.coordinates import (
     breathing_log_jacobian,
     inverse_scale_reduced_cloud,
     scale_reduced_cloud,
 )
-from hrdmc.monte_carlo.dmc.rn_block.config import RNBlockDMCConfig
 from hrdmc.systems.open_line import OpenLineHardRodSystem
 from hrdmc.systems.propagators import ProposalTransitionKernel, TargetTransitionKernel
 
@@ -31,7 +31,7 @@ class CollectiveProposal:
 
 
 def sample_collective_mixture(
-    config: RNBlockDMCConfig,
+    config: CollectiveRNConfig,
     system: OpenLineHardRodSystem,
     proposal_kernel: ProposalTransitionKernel,
     rng: np.random.Generator,
@@ -44,7 +44,7 @@ def sample_collective_mixture(
     probs = np.asarray(config.component_probabilities, dtype=float)
     log_scales = np.asarray(config.component_log_scales, dtype=float)
     component_ids = rng.choice(log_scales.size, size=x_old.shape[0], p=probs)
-    base = proposal_kernel.sample(rng, x_old, config.tau_block)
+    base = proposal_kernel.sample(rng, x_old, config.step_tau)
     x_new = np.empty_like(base)
     selected_log_jac = np.empty(x_old.shape[0], dtype=float)
     for component_id, log_scale in enumerate(log_scales):
@@ -66,7 +66,7 @@ def sample_collective_mixture(
 
 
 def log_collective_mixture_density(
-    config: RNBlockDMCConfig,
+    config: CollectiveRNConfig,
     system: OpenLineHardRodSystem,
     proposal_base_kernel: TargetTransitionKernel,
     x_old: FloatArray,
@@ -84,7 +84,7 @@ def log_collective_mixture_density(
     terms = np.empty((log_scales.size, x_old.shape[0]), dtype=float)
     for idx, (prob, log_scale) in enumerate(zip(probs, log_scales, strict=True)):
         preimage = inverse_scale_reduced_cloud(system, x_new, log_scale=float(log_scale))
-        log_base = proposal_base_kernel.log_density(x_old, preimage, config.tau_block)
+        log_base = proposal_base_kernel.log_density(x_old, preimage, config.step_tau)
         inverse_log_jac = -breathing_log_jacobian(system, float(log_scale))
         terms[idx] = np.log(float(prob)) + log_base + inverse_log_jac
     return _logsumexp(terms, axis=0)
