@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -150,6 +151,7 @@ def run_dmc(
             "ess_mean": float(np.mean(ess_values)) if ess_values else float("nan"),
             "ess_resample_fraction": cfg.ess_resample_fraction,
             "local_step_method": cfg.local_step_method,
+            "drift_limiter": cfg.drift_limiter,
             "guide_batch_backend": guide_batch_backend(guide),
             **_scheduled_metadata(
                 scheduled_move,
@@ -369,6 +371,7 @@ def run_dmc_streaming(
         ),
     )
     summary.metadata["local_step_method"] = cfg.local_step_method
+    summary.metadata["drift_limiter"] = cfg.drift_limiter
     return summary
 
 
@@ -377,9 +380,14 @@ def _resolve_local_step(
     local_step: DMCStep | None,
 ) -> DMCStep:
     if local_step is not None:
+        if config.drift_limiter != "none":
+            raise ValueError("configured drift_limiter cannot be applied to a custom local_step")
         return local_step
     if config.local_step_method == "metropolis":
-        return metropolis_drift_diffusion_step
+        return partial(
+            metropolis_drift_diffusion_step,
+            drift_limiter=config.drift_limiter,
+        )
     return euler_drift_diffusion_step
 
 
@@ -447,7 +455,11 @@ def _build_resume_identity(
     if walkers.ndim != 2 or walkers.shape[1] != system.n_particles:
         raise ValueError("initial_walkers must have shape (n_walkers, n_particles)")
     step_identity = (
-        {"kind": "configured", "method": config.local_step_method}
+        {
+            "kind": "configured",
+            "method": config.local_step_method,
+            "drift_limiter": config.drift_limiter,
+        }
         if local_step is None
         else {
             "kind": "callable",

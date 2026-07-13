@@ -22,6 +22,54 @@ from hrdmc.wavefunctions.api import DMCGuide
 FloatArray = NDArray[np.float64]
 
 
+def limit_drift(
+    drift: FloatArray,
+    dt: float,
+    *,
+    method: str = "none",
+) -> FloatArray:
+    """Return the proposal drift used by the local Metropolis kernel.
+
+    ``umrigar`` applies the parameter-free ``a=1`` velocity limiter of
+    Umrigar, Nightingale, and Runge (J. Chem. Phys. 99, 2865, 1993, Eq. 33;
+    doi:10.1063/1.465195) independently to each one-dimensional particle
+    coordinate.  The raw guide drift remains unchanged for local-energy
+    evaluation and diagnostics.
+    """
+
+    values = np.asarray(drift, dtype=float)
+    if method == "none":
+        return values
+    if method != "umrigar":
+        raise ValueError("drift limiter method must be 'none' or 'umrigar'")
+    if not np.isfinite(dt) or dt <= 0.0:
+        raise ValueError("dt must be finite and positive")
+    scale = 2.0 / (1.0 + np.hypot(1.0, np.sqrt(2.0 * dt) * values))
+    return values * scale
+
+
+def _metropolis_log_acceptance(
+    positions_old: FloatArray,
+    positions_new: FloatArray,
+    log_guide_old: FloatArray,
+    log_guide_new: FloatArray,
+    proposal_drift_old: FloatArray,
+    proposal_drift_new: FloatArray,
+    dt: float,
+) -> FloatArray:
+    forward_residual = positions_new - positions_old - dt * proposal_drift_old
+    reverse_residual = positions_old - positions_new - dt * proposal_drift_new
+    return (
+        2.0 * (log_guide_new - log_guide_old)
+        - 0.5
+        * (
+            np.sum(reverse_residual * reverse_residual, axis=1)
+            - np.sum(forward_residual * forward_residual, axis=1)
+        )
+        / dt
+    )
+
+
 @dataclass(frozen=True)
 class DMCStepResult:
     positions: FloatArray
@@ -74,6 +122,8 @@ def metropolis_drift_diffusion_step(
     guide: DMCGuide,
     dt: float,
     local_energies: FloatArray,
+    *,
+    drift_limiter: str = "none",
 ) -> DMCStepResult:
     """MALA importance-sampled drift-diffusion step.
 
@@ -87,7 +137,8 @@ def metropolis_drift_diffusion_step(
     if not np.all(np.isfinite(grad_old)):
         raise ValueError("metropolis local step requires finite guide drift")
 
-    trial = positions + dt * grad_old + np.sqrt(dt) * rng.normal(size=positions.shape)
+    proposal_drift_old = limit_drift(grad_old, dt, method=drift_limiter)
+    trial = positions + dt * proposal_drift_old + np.sqrt(dt) * rng.normal(size=positions.shape)
     trial_energies, trial_valid = evaluate_guide(guide, trial)
     accepted = np.zeros(positions.shape[0], dtype=bool)
     invalid_proposal = ~trial_valid
@@ -104,24 +155,17 @@ def metropolis_drift_diffusion_step(
         candidate_indices = candidate_indices[finite_drift]
         grad_new = grad_new[finite_drift]
         if candidate_indices.size:
+            proposal_drift_new = limit_drift(grad_new, dt, method=drift_limiter)
             log_old = guide_log_values(guide, positions[candidate_indices])
             log_new = guide_log_values(guide, trial[candidate_indices])
-            forward_residual = (
-                trial[candidate_indices]
-                - positions[candidate_indices]
-                - dt * grad_old[candidate_indices]
-            )
-            reverse_residual = (
-                positions[candidate_indices] - trial[candidate_indices] - dt * grad_new
-            )
-            log_acceptance = (
-                2.0 * (log_new - log_old)
-                - 0.5
-                * (
-                    np.sum(reverse_residual * reverse_residual, axis=1)
-                    - np.sum(forward_residual * forward_residual, axis=1)
-                )
-                / dt
+            log_acceptance = _metropolis_log_acceptance(
+                positions[candidate_indices],
+                trial[candidate_indices],
+                log_old,
+                log_new,
+                proposal_drift_old[candidate_indices],
+                proposal_drift_new,
+                dt,
             )
             log_uniform = np.log(rng.random(candidate_indices.size))
             accepted[candidate_indices] = log_uniform <= np.minimum(log_acceptance, 0.0)
