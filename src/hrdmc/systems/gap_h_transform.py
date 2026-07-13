@@ -25,11 +25,11 @@ FloatArray = NDArray[np.float64]
 
 @dataclass
 class OpenHardRodTrapGapHTransformProposalKernel:
-    """Gap-space h-transform proposal for trapped open-line RN-DMC.
+    """Gap-space h-transform proposal for an optional collective DMC move.
 
     Systems owns this proposal because it is purely coordinate geometry plus
-    system Green-kernel structure. The RN engine still owns sampling weights,
-    population control, and acceptance accounting.
+    system Green-kernel structure. The collective-move extension owns its
+    proposal correction; the local DMC engine owns population evolution.
     """
 
     system: OpenLineHardRodSystem
@@ -173,9 +173,9 @@ class OpenHardRodTrapGapHProductTargetKernel:
         log_h += table.log_density(gaps_old, gaps_new)
         log_psi_old = self._ground_log_value(q_old, gaps_old, table)
         log_psi_new = self._ground_log_value(q_new, gaps_new, table)
-        product_energy = 0.5 * self.trap.omega + (
-            self.system.n_particles - 1
-        ) * table.relative_energy
+        product_energy = (
+            0.5 * self.trap.omega + (self.system.n_particles - 1) * table.relative_energy
+        )
         out = log_h - tau * product_energy + log_psi_old - log_psi_new
         invalid = (
             np.any(~np.isfinite(x_old), axis=1)
@@ -236,13 +236,13 @@ class OpenN2HardRodTrapExactKernel:
     """Raw N=2 finite-a trapped hard-rod heat kernel from the relative solver.
 
     The table stores the normalized ground-state h-transform for the relative
-    gap. RN-DMC requires the raw Hamiltonian kernel, so this target converts the
-    h-transform density back with
+    gap. The collective correction requires the raw Hamiltonian kernel, so this
+    target converts the h-transform density back with
 
         K = p_h * exp(-tau * E0) * psi0(old) / psi0(new).
 
     With the matching gap-h guide and the same h-transform proposal, the guide
-    ratio in the RN increment cancels the psi0 ratio and leaves only the
+    ratio in the collective increment cancels the psi0 ratio and leaves only the
     expected constant energy shift when the proposal exactly equals p_h.
     """
 

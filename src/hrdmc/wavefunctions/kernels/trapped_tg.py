@@ -42,15 +42,11 @@ def reduced_tg_closed_form_local_energy_batch(
     weights = gap_index * (n_particles - gap_index)
     constant = (
         0.5 * float(omega) * n_particles**2
-        + float(omega) ** 2
-        * float(rod_length) ** 2
-        * n_particles
-        * (n_particles**2 - 1)
-        / 24.0
+        + float(omega) ** 2 * float(rod_length) ** 2 * n_particles * (n_particles**2 - 1) / 24.0
     )
-    return np.full(walkers, constant, dtype=float) + 0.5 * float(omega) ** 2 * float(
-        rod_length
-    ) * (free_gaps @ weights)
+    return np.full(walkers, constant, dtype=float) + 0.5 * float(omega) ** 2 * float(rod_length) * (
+        free_gaps @ weights
+    )
 
 
 def reduced_tg_relative_width_local_energy_batch(
@@ -80,9 +76,7 @@ def reduced_tg_relative_width_local_energy_batch(
     delta = float(relative_alpha) - float(omega)
     if delta == 0.0:
         return base
-    offsets = float(rod_length) * (
-        np.arange(n_particles, dtype=float) - 0.5 * (n_particles - 1)
-    )
+    offsets = float(rod_length) * (np.arange(n_particles, dtype=float) - 0.5 * (n_particles - 1))
     reduced = x - offsets[np.newaxis, :]
     internal = reduced - np.mean(reduced, axis=1, keepdims=True)
     internal_norm2 = np.sum(internal * internal, axis=1)
@@ -217,7 +211,7 @@ def _reduced_tg_log_batch_python(
             internal = reduced - com
             value = (
                 -0.5 * alpha * n_particles * com * com
-                -0.5 * relative_alpha * float(np.sum(internal * internal))
+                - 0.5 * relative_alpha * float(np.sum(internal * internal))
                 + pair_power * pair_log
             )
             log_values[walker] = value
@@ -349,7 +343,7 @@ if NUMBA_AVAILABLE:
                 internal_norm2 = reduced_square_sum - n_particles * com * com
                 value = (
                     -0.5 * alpha * n_particles * com * com
-                    -0.5 * relative_alpha * internal_norm2
+                    - 0.5 * relative_alpha * internal_norm2
                     + pair_power * pair_log
                 )
                 log_values[walker] = value

@@ -8,6 +8,35 @@ from numpy.typing import NDArray
 
 FloatArray = NDArray[np.float64]
 
+BASE_TRAP_QUADRATIC_COUPLING = 0.5
+
+
+def lambda_from_relative_offset(
+    relative_offset: float,
+    *,
+    lambda0: float = BASE_TRAP_QUADRATIC_COUPLING,
+) -> float:
+    """Map a relative trap-coupling offset to ``lambda=lambda0*(1+epsilon)``.
+
+    The trapped oscillator-unit Hamiltonian has ``lambda0=1/2`` in
+    ``V(q)=lambda0*(q-q0)^2``.  Keeping this mapping with the external
+    potential gives guides, estimators, and workflows one Hamiltonian owner.
+    """
+
+    if not np.isfinite(relative_offset):
+        raise ValueError("relative_offset must be finite")
+    if not np.isfinite(lambda0) or not np.isclose(
+        lambda0,
+        BASE_TRAP_QUADRATIC_COUPLING,
+        rtol=0.0,
+        atol=1.0e-15,
+    ):
+        raise ValueError("lambda0 must equal the oscillator-unit base coupling 0.5")
+    lambda_value = float(lambda0 * (1.0 + relative_offset))
+    if lambda_value <= 0.0:
+        raise ValueError("relative_offset must keep lambda positive")
+    return lambda_value
+
 
 class ExternalPotential(Protocol):
     def values(self, positions: FloatArray) -> FloatArray: ...

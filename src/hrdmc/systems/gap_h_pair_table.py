@@ -169,11 +169,7 @@ def _relative_pair_hamiltonian(y: FloatArray, omega: float) -> FloatArray:
     diagonal = np.full(n, 2.0 / (dy * dy), dtype=float)
     diagonal += 0.25 * omega * omega * y * y
     off_diagonal = np.full(n - 1, -1.0 / (dy * dy), dtype=float)
-    return (
-        np.diag(diagonal)
-        + np.diag(off_diagonal, k=1)
-        + np.diag(off_diagonal, k=-1)
-    )
+    return np.diag(diagonal) + np.diag(off_diagonal, k=1) + np.diag(off_diagonal, k=-1)
 
 
 def _default_pair_y_max(rod_length: float, omega: float) -> float:

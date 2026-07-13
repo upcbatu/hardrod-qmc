@@ -1,4 +1,10 @@
-from hrdmc.systems.external_potential import CosinePotential, HarmonicTrap, ZeroPotential
+from hrdmc.systems.external_potential import (
+    BASE_TRAP_QUADRATIC_COUPLING,
+    CosinePotential,
+    HarmonicTrap,
+    ZeroPotential,
+    lambda_from_relative_offset,
+)
 from hrdmc.systems.gap_h_transform import (
     OpenHardRodTrapGapHProductTargetKernel,
     OpenHardRodTrapGapHTransformProposalKernel,
@@ -22,6 +28,7 @@ from hrdmc.systems.propagators import (
 from hrdmc.systems.reduced import excluded_length
 
 __all__ = [
+    "BASE_TRAP_QUADRATIC_COUPLING",
     "CosinePotential",
     "HardRodSystem",
     "HarmonicMehlerKernel",
@@ -41,5 +48,6 @@ __all__ = [
     "harmonic_oscillator_heat_log_matrix",
     "harmonic_com_ground_variance",
     "log_free_ordered_hardrod_kernel",
+    "lambda_from_relative_offset",
     "transition_backend",
 ]

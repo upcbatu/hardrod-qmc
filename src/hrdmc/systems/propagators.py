@@ -255,8 +255,8 @@ class OpenHardRodTrapPrimitiveKernel:
             rod_length=self.system.rod_length,
             tau=tau,
         )
-        endpoint_weight = -0.5 * tau * (
-            _trap_total_batch(self.trap, x_old) + _trap_total_batch(self.trap, x_new)
+        endpoint_weight = (
+            -0.5 * tau * (_trap_total_batch(self.trap, x_old) + _trap_total_batch(self.trap, x_new))
         )
         return log_free + endpoint_weight
 

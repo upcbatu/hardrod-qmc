@@ -23,7 +23,7 @@ class HardRodJastrowTrial:
     on the reduced length L' = L - N a.
 
     The nearest-neighbor-only mode is NOT claimed as a paper equation. It is a
-    lightweight scaffold trial amplitude for early VMC smoke tests. Final DMC
+    lightweight scaffold trial amplitude for early VMC validation runs. Final DMC
     benchmarks should use the all-pair form or supervisor-provided trial forms.
     """
 

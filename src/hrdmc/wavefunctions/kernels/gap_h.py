@@ -350,8 +350,7 @@ if NUMBA_AVAILABLE:
                     centered = x[walker, particle] - center
                     trap_sum += centered * centered
                     local_sum += (
-                        lap[walker, particle]
-                        + grad[walker, particle] * grad[walker, particle]
+                        lap[walker, particle] + grad[walker, particle] * grad[walker, particle]
                     )
                 local[walker] = -0.5 * local_sum + 0.5 * omega2 * trap_sum
             else:
