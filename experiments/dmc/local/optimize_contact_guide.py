@@ -25,6 +25,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--case", default="N20_A10")
     parser.add_argument("--seed", type=int, default=9401)
     parser.add_argument("--dt", type=float, default=0.00025)
+    parser.add_argument(
+        "--drift-limiter",
+        choices=("none", "umrigar"),
+        default="none",
+        help="Finite-timestep MALA drift limiter; the guide-squared target is unchanged.",
+    )
     parser.add_argument("--walkers", type=int, default=256)
     parser.add_argument("--burn-tau", type=float, default=20.0)
     parser.add_argument("--sample-tau", type=float, default=10.0)
@@ -53,6 +59,7 @@ def main() -> None:
     case = parse_case(args.case)
     controls = ContactGuideOptimizationControls(
         dt=args.dt,
+        drift_limiter=args.drift_limiter,
         walkers=args.walkers,
         burn_tau=args.burn_tau,
         sample_tau=args.sample_tau,

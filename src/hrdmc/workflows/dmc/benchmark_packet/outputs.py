@@ -101,6 +101,7 @@ def write_benchmark_packet_seed_table(
         "r2_plateau_value",
         "rms_radius",
         "local_step_method",
+        "drift_limiter",
         "local_acceptance_fraction_mean",
         "invalid_proposal_fraction_max",
         "metropolis_rejection_fraction_max",
@@ -291,6 +292,7 @@ def _seed_table_row(payload: dict[str, Any]) -> dict[str, Any]:
         "r2_plateau_value": r2.get("plateau_value", ""),
         "rms_radius": r2.get("rms_radius", ""),
         "local_step_method": dmc["metadata"].get("local_step_method", ""),
+        "drift_limiter": dmc["metadata"].get("drift_limiter", ""),
         "local_acceptance_fraction_mean": dmc["metadata"].get(
             "local_acceptance_fraction_mean",
             "",

@@ -24,6 +24,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--case", default="N20_A1")
     parser.add_argument("--seed", type=int, default=7003)
     parser.add_argument("--dt", type=float, default=0.000625)
+    parser.add_argument(
+        "--drift-limiter",
+        choices=("none", "umrigar"),
+        default="none",
+        help="Finite-timestep MALA drift limiter; the guide-squared target is unchanged.",
+    )
     parser.add_argument("--walkers", type=int, default=512)
     parser.add_argument("--duration-tau", type=float, default=60.0)
     parser.add_argument("--store-every", type=int, default=40)
@@ -81,6 +87,7 @@ def main() -> None:
         }
     controls = GuideMALADiagnosticControls(
         dt=args.dt,
+        drift_limiter=args.drift_limiter,
         walkers=args.walkers,
         duration_tau=args.duration_tau,
         store_every=args.store_every,

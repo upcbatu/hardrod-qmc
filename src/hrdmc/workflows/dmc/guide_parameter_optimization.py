@@ -57,6 +57,7 @@ class ContactGuideOptimizationControls:
     beta_grid_points: int = 26
     min_reweight_ess_fraction: float = 0.10
     max_configurations: int = 100_000
+    drift_limiter: str = "none"
 
     @property
     def burn_steps(self) -> int:
@@ -77,6 +78,8 @@ class ContactGuideOptimizationControls:
     def validate(self) -> None:
         if self.dt <= 0.0 or not np.isfinite(self.dt):
             raise ValueError("dt must be finite and positive")
+        if self.drift_limiter not in {"none", "umrigar"}:
+            raise ValueError("drift_limiter must be 'none' or 'umrigar'")
         if self.walkers <= 0:
             raise ValueError("walkers must be positive")
         if self.burn_tau <= 0.0 or self.sample_tau <= 0.0:
@@ -142,6 +145,7 @@ def run_contact_guide_optimization(
         grid_extent=controls.grid_extent,
         n_bins=controls.n_bins,
         local_step_method="metropolis",
+        drift_limiter=controls.drift_limiter,
         relative_alpha=controls.reference_relative_alpha,
         contact_beta=controls.reference_contact_beta,
     )
@@ -185,6 +189,7 @@ def run_contact_guide_optimization(
             guide,
             controls.dt,
             local_energies,
+            drift_limiter=controls.drift_limiter,
         )
         positions = np.asarray(result.positions, dtype=float)
         local_energies = np.asarray(result.local_energies, dtype=float)

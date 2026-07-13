@@ -459,6 +459,7 @@ def summarize_stationarity_from_seed_summaries(
                 "target_backend": summary.metadata.get("target_backend", ""),
                 "proposal_backend": summary.metadata.get("proposal_backend", ""),
                 "local_step_method": summary.metadata.get("local_step_method", ""),
+                "drift_limiter": summary.metadata.get("drift_limiter", ""),
                 "relative_alpha": summary.metadata.get("relative_alpha"),
                 "contact_beta": summary.metadata.get("contact_beta"),
                 "response_lambda": summary.metadata.get("response_lambda"),

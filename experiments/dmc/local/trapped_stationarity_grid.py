@@ -39,6 +39,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--seeds", default="301,302,303,304")
     parser.add_argument("--dt", type=float, default=0.00125)
+    parser.add_argument(
+        "--drift-limiter",
+        choices=("none", "umrigar"),
+        default="none",
+        help="Finite-timestep MALA drift limiter; branching and local energy are unchanged.",
+    )
     parser.add_argument("--walkers", type=int, default=512)
     collective = parser.add_argument_group("optional collective RN move")
     collective.add_argument("--collective-rn", action="store_true")
@@ -177,6 +183,7 @@ def main() -> None:
         store_every=args.store_every,
         grid_extent=args.grid_extent,
         n_bins=args.n_bins,
+        drift_limiter=args.drift_limiter,
         relative_alpha=relative_alpha,
         contact_beta=contact_beta,
     )

@@ -56,6 +56,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="metropolis",
         help="Local drift-diffusion proposal used between any collective moves.",
     )
+    parser.add_argument(
+        "--drift-limiter",
+        choices=("none", "umrigar"),
+        default="none",
+        help="Finite-timestep MALA drift limiter; branching and local energy are unchanged.",
+    )
     parser.add_argument("--walkers", type=int, default=256)
     collective = parser.add_argument_group("optional collective RN move")
     collective.add_argument(
@@ -226,6 +232,7 @@ def main() -> None:
         n_bins=args.n_bins,
         ess_resample_fraction=args.ess_resample_fraction,
         local_step_method=args.local_step_method,
+        drift_limiter=args.drift_limiter,
         relative_alpha=args.relative_alpha,
         contact_beta=contact_beta,
     )

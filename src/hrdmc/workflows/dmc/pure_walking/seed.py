@@ -127,6 +127,7 @@ def compact_dmc_seed_summary(summary: DMCStreamingSummary) -> dict[str, Any]:
             "ess_fraction_min": summary.metadata.get("ess_fraction_min"),
             "log_weight_span_max": summary.metadata.get("log_weight_span_max"),
             "local_step_method": summary.metadata.get("local_step_method"),
+            "drift_limiter": summary.metadata.get("drift_limiter"),
             "local_acceptance_fraction_mean": summary.metadata.get(
                 "local_acceptance_fraction_mean"
             ),

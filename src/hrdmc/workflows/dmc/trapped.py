@@ -111,6 +111,7 @@ class DMCRunControls:
     n_bins: int
     ess_resample_fraction: float = 0.35
     local_step_method: str = "metropolis"
+    drift_limiter: str = "none"
     relative_alpha: float | None = None
     contact_beta: float | None = None
     response_lambda: float | None = None
@@ -132,6 +133,10 @@ class DMCRunControls:
             raise ValueError("ess_resample_fraction must lie in [0, 1]")
         if self.local_step_method not in {"euler", "metropolis"}:
             raise ValueError("local_step_method must be 'euler' or 'metropolis'")
+        if self.drift_limiter not in {"none", "umrigar"}:
+            raise ValueError("drift_limiter must be 'none' or 'umrigar'")
+        if self.local_step_method != "metropolis" and self.drift_limiter != "none":
+            raise ValueError("drift_limiter is only supported for metropolis local steps")
 
     @property
     def burn_in_steps(self) -> int:
@@ -358,6 +363,7 @@ def run_streaming_seed(
         config=DMCConfig(
             ess_resample_fraction=controls.ess_resample_fraction,
             local_step_method=controls.local_step_method,
+            drift_limiter=controls.drift_limiter,
         ),
         scheduled_move=scheduled_move,
         rng=rng,
@@ -389,6 +395,7 @@ def run_streaming_seed(
     summary.metadata["guide_family"] = guide_family
     summary.metadata["resolved_guide_family"] = _guide_family_name(guide)
     summary.metadata["local_step_method"] = controls.local_step_method
+    summary.metadata["drift_limiter"] = controls.drift_limiter
     if controls.relative_alpha is not None:
         summary.metadata["relative_alpha"] = controls.relative_alpha
     if controls.contact_beta is not None:
@@ -441,6 +448,7 @@ def validate_streaming_against_raw(
     config = DMCConfig(
         ess_resample_fraction=controls.ess_resample_fraction,
         local_step_method=controls.local_step_method,
+        drift_limiter=controls.drift_limiter,
     )
     raw = run_dmc(
         initial_walkers=raw_initial,
@@ -705,6 +713,8 @@ def controls_to_dict(controls: DMCRunControls) -> dict[str, float | int | str | 
     }
     if not np.isclose(controls.ess_resample_fraction, 0.35):
         values["ess_resample_fraction"] = controls.ess_resample_fraction
+    if controls.drift_limiter != "none":
+        values["drift_limiter"] = controls.drift_limiter
     if controls.relative_alpha is not None:
         values["relative_alpha"] = controls.relative_alpha
     if controls.contact_beta is not None:
