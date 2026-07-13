@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 from typing import Any
 
 from hrdmc.artifacts import ArtifactRoute, artifact_dir, repo_root_from
-from hrdmc.io import progress_requested
-from hrdmc.io.schema import to_jsonable
+from hrdmc.io import print_run_summary, progress_requested
 from hrdmc.theory.units import HO_TRAP_OMEGA
 from hrdmc.workflows.anchors.exact_validation import (
     HomogeneousRingAnchor,
@@ -20,32 +18,39 @@ from hrdmc.workflows.anchors.exact_validation import (
     write_exact_validation_manifest,
     write_packet_artifacts,
 )
-from hrdmc.workflows.dmc.rn_block import (
-    RNRunControls,
+from hrdmc.workflows.dmc.trapped import (
+    DMCRunControls,
     controls_to_dict,
+    dmc_progress_bar,
     resolve_parallel_workers,
-    rn_progress_bar,
 )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run the canonical exact-validation packet for RN-block artifacts."
+        description="Run exact trapped and homogeneous validation cases."
     )
     parser.add_argument("--trapped-n-values", default="2,4")
-    parser.add_argument(
-        "--trapped-omega-values",
-        default=f"{HO_TRAP_OMEGA:g}",
-        help="Trap frequencies in harmonic-oscillator units; default is omega=1.",
-    )
     parser.add_argument("--homogeneous-n-values", default="4,8")
     parser.add_argument("--homogeneous-eta-values", default="0.1,0.5")
     parser.add_argument("--rod-length", type=float, default=0.5)
     parser.add_argument("--seeds", default="301,302")
     parser.add_argument("--dt", type=float, default=0.00125)
+    parser.add_argument(
+        "--local-step-method",
+        choices=("euler", "metropolis"),
+        default="metropolis",
+    )
     parser.add_argument("--walkers", type=int, default=256)
-    parser.add_argument("--tau", type=float, default=0.01)
-    parser.add_argument("--rn-cadence", type=float, default=0.005)
+    parser.add_argument(
+        "--relative-alpha",
+        type=float,
+        default=None,
+        help=(
+            "Optional reduced-coordinate internal Gaussian width for trapped "
+            "TG guide anchors. The center-of-mass width remains harmonic."
+        ),
+    )
     parser.add_argument("--burn-tau", type=float, default=20.0)
     parser.add_argument("--production-tau", type=float, default=40.0)
     parser.add_argument("--store-every", type=int, default=20)
@@ -65,9 +70,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--homogeneous-tolerance", type=float, default=1e-7)
     parser.add_argument("--homogeneous-seed", type=int, default=20260511)
     parser.add_argument("--pure-fw-lags", default="0,10,20")
+    parser.add_argument("--pure-fw-density-lags", default=None)
     parser.add_argument("--pure-fw-observables", default="r2,density")
     parser.add_argument("--pure-fw-min-block-count", type=int, default=20)
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
+    parser.add_argument("--pure-fw-min-source-ancestor-ess", type=float, default=30.0)
+    parser.add_argument("--pure-fw-max-source-family-fraction", type=float, default=0.25)
+    parser.add_argument("--pure-fw-plateau-window-lag-count", type=int, default=4)
+    parser.add_argument("--pure-fw-collection-stride-steps", type=int, default=1)
+    parser.add_argument(
+        "--pure-fw-density-collection-stride-steps",
+        type=int,
+        default=None,
+    )
     parser.add_argument(
         "--density-plateau-relative-l2-tolerance",
         type=float,
@@ -82,25 +97,26 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--plot-formats", default="png,pdf")
     parser.add_argument("--progress", action="store_true")
     parser.add_argument("--no-write", action="store_true")
+    parser.add_argument("--verbose-json", action="store_true")
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
     repo_root = repo_root_from(Path(__file__))
-    controls = RNRunControls(
+    controls = DMCRunControls(
         dt=args.dt,
         walkers=args.walkers,
-        tau_block=args.tau,
-        rn_cadence_tau=args.rn_cadence,
         burn_tau=args.burn_tau,
         production_tau=args.production_tau,
         store_every=args.store_every,
         grid_extent=args.grid_extent,
         n_bins=args.n_bins,
+        local_step_method=args.local_step_method,
+        relative_alpha=args.relative_alpha,
     )
     seeds = _parse_ints(args.seeds)
-    trapped_anchors = _trapped_anchors(args.trapped_n_values, args.trapped_omega_values)
+    trapped_anchors = _trapped_anchors(args.trapped_n_values)
     homogeneous_anchors = _homogeneous_anchors(
         args.homogeneous_n_values,
         args.homogeneous_eta_values,
@@ -114,26 +130,45 @@ def main() -> None:
         homogeneous_anchors=homogeneous_anchors,
         requested_workers=requested_workers,
     )
+    output_dir: Path | None = None
     if not args.no_write:
-        output_dir = args.output_dir or artifact_dir(
-            repo_root,
-            ArtifactRoute("dmc", "rn_block", "exact_validation_packet"),
+        write_output_dir = Path(
+            args.output_dir
+            or artifact_dir(
+                repo_root,
+                ArtifactRoute("dmc", "local", "exact_validation_packet"),
+            )
         )
+        output_dir = write_output_dir
         paths = write_packet_artifacts(
-            output_dir,
+            write_output_dir,
             payload,
             _parse_str_tuple(args.plot_formats),
         )
-        write_exact_validation_manifest(output_dir, payload, paths, controls, seeds, sys.argv)
-    print(json.dumps(to_jsonable(payload), indent=2, allow_nan=False))
-    if payload["status"] != "passed":
+        write_exact_validation_manifest(write_output_dir, payload, paths, controls, seeds, sys.argv)
+    print_run_summary(
+        run="exact_validation_packet",
+        status=str(payload["status"]),
+        summary={
+            "anchor_count": len(payload["anchor_table"]),
+            "trapped_anchor_count": len(trapped_anchors),
+            "homogeneous_anchor_count": len(homogeneous_anchors),
+        },
+        artifacts={
+            "summary": None if output_dir is None else str(output_dir / "summary.json"),
+            "output_dir": None if output_dir is None else str(output_dir),
+        },
+        verbose_payload=payload,
+        verbose_json=args.verbose_json,
+    )
+    if payload["status"] != "accepted":
         raise SystemExit(1)
 
 
 def _build_payload(
     *,
     args: argparse.Namespace,
-    controls: RNRunControls,
+    controls: DMCRunControls,
     seeds: list[int],
     trapped_anchors: list[TrappedTGAnchor],
     homogeneous_anchors: list[HomogeneousRingAnchor],
@@ -141,10 +176,10 @@ def _build_payload(
 ) -> dict[str, Any]:
     trapped_payloads: list[dict[str, Any]] = []
     trapped_rows: list[dict[str, Any]] = []
-    with rn_progress_bar(
+    with dmc_progress_bar(
         controls=controls,
         seed_count=len(seeds) * max(1, len(trapped_anchors)),
-        label="RN exact validation packet",
+        label="Exact validation packet",
         enabled=progress_requested(args.progress),
     ) as bar:
         for anchor in trapped_anchors:
@@ -155,12 +190,20 @@ def _build_payload(
                 worker_count=requested_workers,
                 energy_tolerance=args.energy_tolerance,
                 pure_lag_steps=tuple(_parse_ints(args.pure_fw_lags)),
+                pure_density_lag_steps=(
+                    None
+                    if args.pure_fw_density_lags is None
+                    else tuple(_parse_ints(args.pure_fw_density_lags))
+                ),
                 pure_observables=tuple(_parse_str_tuple(args.pure_fw_observables)),
                 pure_min_block_count=args.pure_fw_min_block_count,
                 pure_min_walker_weight_ess=args.pure_fw_min_walker_weight_ess,
-                density_plateau_relative_l2_tolerance=(
-                    args.density_plateau_relative_l2_tolerance
-                ),
+                pure_min_source_ancestor_ess=(args.pure_fw_min_source_ancestor_ess),
+                pure_max_source_family_fraction=(args.pure_fw_max_source_family_fraction),
+                pure_plateau_window_lag_count=(args.pure_fw_plateau_window_lag_count),
+                pure_collection_stride_steps=args.pure_fw_collection_stride_steps,
+                pure_density_collection_stride_steps=(args.pure_fw_density_collection_stride_steps),
+                density_plateau_relative_l2_tolerance=(args.density_plateau_relative_l2_tolerance),
                 pure_r2_relative_tolerance=args.pure_r2_relative_tolerance,
                 pure_rms_relative_tolerance=args.pure_rms_relative_tolerance,
                 pure_density_l2_tolerance=args.pure_density_l2_tolerance,
@@ -180,20 +223,17 @@ def _build_payload(
         )
         for index, anchor in enumerate(homogeneous_anchors)
     ]
-    homogeneous_rows = [
-        anchor_row_from_homogeneous(row) for row in homogeneous_payloads
-    ]
+    homogeneous_rows = [anchor_row_from_homogeneous(row) for row in homogeneous_payloads]
     anchor_table = [*trapped_rows, *homogeneous_rows]
-    status = "passed" if all(bool(row["passed"]) for row in anchor_table) else "failed"
+    status = (
+        "accepted"
+        if all(bool(row["accepted"]) for row in anchor_table)
+        else "one_or_more_exact_references_unresolved"
+    )
     return {
-        "schema_version": "rn_block_exact_validation_packet_v2",
+        "schema_version": "dmc_exact_validation_packet_v3",
         "status": status,
-        "benchmark_tier": "canonical exact validation packet",
-        "claim_boundary": (
-            "exact anchors validate RN-DMC energy, transported FW coordinate "
-            "observables, units, wavefunctions, and artifact plumbing; they are "
-            "not finite-a trapped benchmark truth"
-        ),
+        "validation": "exact trapped TG and homogeneous hard-rod cases",
         "controls": controls_to_dict(controls),
         "seeds": seeds,
         "parallel_workers_requested": requested_workers,
@@ -203,12 +243,8 @@ def _build_payload(
     }
 
 
-def _trapped_anchors(n_values: str, omega_values: str) -> list[TrappedTGAnchor]:
-    return [
-        TrappedTGAnchor(n_particles=n, omega=omega)
-        for n in _parse_ints(n_values)
-        for omega in _parse_floats(omega_values)
-    ]
+def _trapped_anchors(n_values: str) -> list[TrappedTGAnchor]:
+    return [TrappedTGAnchor(n_particles=n, omega=HO_TRAP_OMEGA) for n in _parse_ints(n_values)]
 
 
 def _homogeneous_anchors(

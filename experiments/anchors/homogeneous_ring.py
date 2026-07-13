@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import argparse
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
+from hrdmc.artifacts import ensure_dir, write_json
 from hrdmc.estimators import estimate_local_energy
-from hrdmc.io.artifacts import ensure_dir, write_json
+from hrdmc.io import print_run_summary
 from hrdmc.monte_carlo.vmc import MetropolisVMC
 from hrdmc.systems import excluded_length
 from hrdmc.systems.hard_rods import HardRodSystem
@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--tolerance",
         type=float,
         default=1e-9,
-        help="Absolute per-particle energy tolerance for pass/fail",
+        help="Absolute per-particle energy acceptance tolerance",
     )
     parser.add_argument(
         "--output-dir",
@@ -51,6 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run and print the benchmark without writing summary.json",
     )
+    parser.add_argument("--verbose-json", action="store_true")
     return parser
 
 
@@ -95,7 +96,7 @@ def run_case(
     estimated_per_particle = energy.mean / system.n_particles
     energy_error = estimated_per_particle - exact_per_particle
     valid_fraction = float(np.mean([system.is_valid(x) for x in result.snapshots]))
-    passed = (
+    accepted = (
         np.isfinite(energy.mean)
         and abs(energy_error) <= tolerance
         and valid_fraction == 1.0
@@ -103,7 +104,7 @@ def run_case(
     )
 
     return {
-        "passed": bool(passed),
+        "accepted": bool(accepted),
         "n_particles": system.n_particles,
         "length": system.length,
         "density": system.density,
@@ -151,22 +152,30 @@ def main() -> None:
         for index, case in enumerate(default_cases())
     ]
     max_error = max(float(case["energy_per_particle_abs_error"]) for case in cases)
-    passed = all(bool(case["passed"]) for case in cases)
+    accepted = all(bool(case["accepted"]) for case in cases)
     summary = {
-        "status": "passed" if passed else "failed",
+        "status": "accepted" if accepted else "reference_mismatch",
         "benchmark": "homogeneous hard-rod ring exact-wavefunction validation",
-        "benchmark_tier": "exact_trial_local_energy",
+        "benchmark_method": "exact_trial_local_energy",
         "units": "hbar^2/m=1",
         "tolerance_energy_per_particle_abs": args.tolerance,
         "max_energy_per_particle_abs_error": max_error,
         "case_count": len(cases),
         "cases": cases,
     }
+    out_dir: Path | None = None
     if not args.no_write:
         out_dir = ensure_dir(args.output_dir or repo_root / "results" / "homogeneous_validation")
         write_json(out_dir / "summary.json", summary)
-    print(json.dumps(summary, indent=2))
-    if not passed:
+    print_run_summary(
+        run="homogeneous_ring",
+        status=str(summary["status"]),
+        summary={"case_count": len(cases), "max_abs_error": max_error},
+        artifacts={"summary": None if out_dir is None else str(out_dir / "summary.json")},
+        verbose_payload=summary,
+        verbose_json=args.verbose_json,
+    )
+    if not accepted:
         raise SystemExit(1)
 
 

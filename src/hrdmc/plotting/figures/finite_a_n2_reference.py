@@ -63,7 +63,7 @@ def _write_scorecard(
     ax.set_xticklabels(labels, rotation=25, ha="right")
     ax.set_yticks(np.arange(len(metrics)))
     ax.set_yticklabels([metric[0] for metric in metrics])
-    ax.set_title("error / tolerance; green means below declared gate")
+    ax.set_title("error / tolerance; green means within the declared tolerance")
     for row in range(ratios.shape[0]):
         for col in range(ratios.shape[1]):
             ratio = ratios[row, col]
@@ -188,7 +188,7 @@ def _write_density_case(
         color=tokens.INK,
         linestyle="-",
         marker="s",
-        label="N=2 reference bin average (gate)",
+        label="N=2 reference bin average (comparison reference)",
         linewidth=2.25,
         zorder=5,
     )
@@ -387,7 +387,7 @@ def _density_status_text(case: dict[str, Any]) -> str:
         f"FW rel-L2={_number(l2)}   mixed rel-L2={_number(mixed_l2)}\n"
         f"FW closer on density: {'yes' if fw_closer else 'no'}   "
         f"density accounting abs={_number(accounting)}\n"
-        "Gate comparison uses histogram-bin averages."
+        "Numerical comparison uses histogram-bin averages."
     )
 
 

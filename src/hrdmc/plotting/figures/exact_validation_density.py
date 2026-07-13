@@ -15,6 +15,7 @@ from hrdmc.theory import (
     trapped_tg_density_profile,
     trapped_tg_density_profile_semiclassical,
 )
+from hrdmc.theory.units import HO_TRAP_OMEGA
 
 
 def write_trapped_tg_density_plots(
@@ -133,7 +134,7 @@ def _write_single_density_plot(
             color=tokens.LDA_PREDICTION,
             linestyle="-",
             linewidth=2.35,
-            label="exact TG bin average (gate)",
+            label="exact TG bin average (comparison reference)",
             marker="s",
             marker_every=max(1, int(x.size // 32)),
             marker_size=3.0,
@@ -175,7 +176,7 @@ def _write_single_density_plot(
     ax.text(
         0.01,
         0.02,
-        "Gate comparison uses histogram-bin values; smooth exact is visual context only.",
+        "Numerical comparison uses histogram-bin values; smooth exact is visual context only.",
         transform=ax.transAxes,
         fontsize=7,
         color=tokens.INK_SOFT,
@@ -328,16 +329,15 @@ def _dense_trapped_tg_density_from_anchor(
     exact_solution = anchor.get("exact_solution", {})
     try:
         n_particles = int(exact_solution.get("n_particles"))
-        omega = float(exact_solution.get("omega"))
     except (TypeError, ValueError):
         return x, fallback_density
-    if not np.isfinite(omega) or x.size < 2:
+    if x.size < 2:
         return x, fallback_density
     dense_x = np.linspace(float(np.min(x)), float(np.max(x)), max(900, 20 * x.size))
     dense_density = trapped_tg_density_profile(
         dense_x,
         n_particles=n_particles,
-        omega=omega,
+        omega=HO_TRAP_OMEGA,
     )
     return dense_x, dense_density
 
@@ -374,20 +374,11 @@ def _draw_tg_density_limit_panel(
             alpha=0.85,
             label=f"N={n_particles} LDA limit",
         )
-    ax.set_title(f"omega={omega:g}")
+    ax.set_title("oscillator units")
     ax.set_xlabel(r"$x$")
     ax.set_ylabel(r"$n(x)$")
     ax.legend(loc="upper right", fontsize=7.1, ncol=2)
 
 
 def _trapped_anchor_omegas(payload: dict[str, Any]) -> list[float]:
-    values: list[float] = []
-    for anchor in payload.get("trapped_tg_anchors", []):
-        exact = anchor.get("exact_solution", {})
-        try:
-            omega = float(exact.get("omega"))
-        except (TypeError, ValueError):
-            continue
-        if np.isfinite(omega) and omega not in values:
-            values.append(omega)
-    return values
+    return [HO_TRAP_OMEGA] if payload.get("trapped_tg_anchors") else []

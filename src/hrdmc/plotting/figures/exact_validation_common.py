@@ -148,23 +148,30 @@ def format_float(value: object, *, precision: int = 6) -> str:
 def metric_status(value: float, tolerance: float) -> str:
     if not np.isfinite(value) or not np.isfinite(tolerance):
         return "na"
-    return "go" if value <= tolerance else "no_go"
+    return "accepted" if value <= tolerance else "rejected"
 
 
 def status_name(status: object) -> str:
     raw = str(status).lower()
-    if raw in {"passed", "pass", "go"}:
-        return "go"
+    if raw == "accepted":
+        return "accepted"
+    if "not_evaluated" in raw or "unavailable" in raw:
+        return "na"
     if raw in {"warning", "warn", "precision_warning"}:
         return "warn"
-    if raw in {"failed", "fail", "no_go"}:
-        return "no_go"
-    if "warning" in raw:
+    if any(token in raw for token in ("warning", "unresolved", "insufficient", "no_blocks")):
         return "warn"
-    if "no_go" in raw or "failed" in raw or "fail" in raw:
-        return "no_go"
-    if "go" in raw or "passed" in raw:
-        return "go"
+    if any(
+        token in raw
+        for token in (
+            "mismatch",
+            "invalid",
+            "collapse",
+            "nonstationary",
+            "disagree",
+        )
+    ):
+        return "rejected"
     return "na"
 
 
@@ -173,24 +180,24 @@ def status_color(status: object) -> str:
     return tokens.STATUS_COLORS.get(normalized, tokens.REGIME_NA)
 
 
-def fw_gate_status(gate: str) -> str:
-    if gate == "PURE_WALKING_GO":
-        return "go"
-    if gate in {"PURE_WALKING_PLATEAU_NO_GO", "PURE_WALKING_INSUFFICIENT_SAMPLES_NO_GO"}:
+def fw_status_color(status: str) -> str:
+    if status == "accepted":
+        return "accepted"
+    if status in {"plateau_unresolved", "insufficient_samples"}:
         return "warn"
-    if gate == "?":
+    if status == "?":
         return "na"
-    return "no_go"
+    return "rejected"
 
 
-def compact_fw_gate(gate: str) -> str:
-    if gate == "PURE_WALKING_GO":
-        return "FW GO"
-    if gate == "PURE_WALKING_PLATEAU_NO_GO":
-        return "PLATEAU NO-GO"
-    if gate == "PURE_WALKING_INSUFFICIENT_SAMPLES_NO_GO":
-        return "SAMPLE NO-GO"
-    return gate.replace("PURE_WALKING_", "")[:15]
+def compact_fw_status(status: str) -> str:
+    if status == "accepted":
+        return "FW ACCEPTED"
+    if status == "plateau_unresolved":
+        return "NO PLATEAU"
+    if status == "insufficient_samples":
+        return "LOW SAMPLE"
+    return status[:15]
 
 
 def anchor_label(anchor: dict[str, Any]) -> str:
@@ -217,7 +224,7 @@ def disable_layout_engine(fig: Any) -> None:  # noqa: ANN401
 
 def draw_packet_header(fig: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
     text = (
-        "canonical exact validation packet  "
+        "exact-reference validation packet  "
         f"status={payload.get('status', '?')}  "
         f"anchors={len(payload.get('anchor_table', []))}"
     )

@@ -33,11 +33,11 @@ def finite_a_n2_reference_comparison(
     *,
     tolerances: FiniteAN2ReferenceTolerances,
 ) -> dict[str, Any]:
-    paper = packet.get("paper_values", {})
-    energy = paper.get("energy", {})
-    r2 = paper.get("r2", {})
-    rms = paper.get("rms", {})
-    density = paper.get("density", {})
+    estimates = packet.get("estimates", {})
+    energy = estimates.get("energy", {})
+    r2 = estimates.get("r2", {})
+    rms = estimates.get("rms", {})
+    density = estimates.get("density", {})
     bin_edges = _optional_array(density.get("bin_edges"))
     exact_density = _exact_bin_density(reference, bin_edges)
     pure_density = _optional_array(density.get("value"))
@@ -66,8 +66,8 @@ def finite_a_n2_reference_comparison(
         exact_density_integral,
     )
 
-    gates = {
-        "benchmark_packet": packet.get("status") == "BENCHMARK_PACKET_GO",
+    checks = {
+        "benchmark_packet": packet.get("status") == "accepted",
         "energy_reference": _passes(energy_abs_error, tolerances.energy_abs),
         "pure_r2_reference": _passes(
             pure_r2_relative_error,
@@ -86,10 +86,34 @@ def finite_a_n2_reference_comparison(
             tolerances.density_accounting_abs,
         ),
     }
-    status = finite_a_n2_status(gates)
+    status = finite_a_n2_status(
+        checks,
+        benchmark_status=str(packet.get("status", "benchmark_unresolved")),
+    )
     return {
         "status": status,
-        "gates": {name: "passed" if passed else "failed" for name, passed in gates.items()},
+        "checks": {
+            "benchmark_packet": (
+                "accepted"
+                if checks["benchmark_packet"]
+                else str(packet.get("status", "unavailable"))
+            ),
+            "energy_reference": (
+                "accepted" if checks["energy_reference"] else "reference_mismatch"
+            ),
+            "pure_r2_reference": (
+                "accepted" if checks["pure_r2_reference"] else "reference_mismatch"
+            ),
+            "pure_rms_reference": (
+                "accepted" if checks["pure_rms_reference"] else "reference_mismatch"
+            ),
+            "pure_density_reference": (
+                "accepted" if checks["pure_density_reference"] else "reference_mismatch"
+            ),
+            "density_accounting": (
+                "accepted" if checks["density_accounting"] else "density_normalization_mismatch"
+            ),
+        },
         "tolerances": tolerances.to_payload(),
         "reference": reference.to_metadata(),
         "energy": {
@@ -140,34 +164,26 @@ def finite_a_n2_reference_comparison(
                 exact_density.tolist() if exact_density is not None else None
             ),
             "pure_fw_n_x": pure_density.tolist() if pure_density is not None else None,
-            "mixed_diagnostic_n_x": (
-                mixed_density.tolist() if mixed_density is not None else None
-            ),
+            "mixed_diagnostic_n_x": (mixed_density.tolist() if mixed_density is not None else None),
             "status": density.get("status"),
         },
-        "claim_boundary": (
-            "N=2 finite-a trapped deterministic reference. This validates the "
-            "finite-a RN-DMC/FW packet only for N=2 at the declared a, omega, "
-            "dt, population, seed, and tolerance settings; it is not an N>2 "
-            "exact reference."
-        ),
     }
 
 
-def finite_a_n2_status(gates: dict[str, bool]) -> str:
-    if not gates["benchmark_packet"]:
-        return "FINITE_A_N2_BENCHMARK_PACKET_NO_GO"
-    if not gates["energy_reference"]:
-        return "FINITE_A_N2_ENERGY_REFERENCE_NO_GO"
-    if not gates["pure_r2_reference"]:
-        return "FINITE_A_N2_R2_REFERENCE_NO_GO"
-    if not gates["pure_rms_reference"]:
-        return "FINITE_A_N2_RMS_REFERENCE_NO_GO"
-    if not gates["pure_density_reference"]:
-        return "FINITE_A_N2_DENSITY_REFERENCE_NO_GO"
-    if not gates["density_accounting"]:
-        return "FINITE_A_N2_DENSITY_ACCOUNTING_NO_GO"
-    return "FINITE_A_N2_REFERENCE_PACKET_GO"
+def finite_a_n2_status(checks: dict[str, bool], *, benchmark_status: str) -> str:
+    if not checks["benchmark_packet"]:
+        return benchmark_status
+    if not checks["energy_reference"]:
+        return "energy_reference_mismatch"
+    if not checks["pure_r2_reference"]:
+        return "r2_reference_mismatch"
+    if not checks["pure_rms_reference"]:
+        return "rms_reference_mismatch"
+    if not checks["pure_density_reference"]:
+        return "density_reference_mismatch"
+    if not checks["density_accounting"]:
+        return "density_normalization_mismatch"
+    return "accepted"
 
 
 def _exact_bin_density(

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,20 +9,18 @@ from typing import Any
 import numpy as np
 
 from hrdmc.artifacts import ArtifactRoute, artifact_dir, repo_root_from
-from hrdmc.io import progress_requested
+from hrdmc.io import print_run_summary, progress_requested
 from hrdmc.io.progress import QueuedProgress
-from hrdmc.monte_carlo.dmc.rn_block import (
-    RNBlockDMCConfig,
-    RNBlockStreamingSummary,
-    run_rn_block_dmc_streaming,
+from hrdmc.monte_carlo.dmc.local import (
+    DMCConfig,
+    DMCStreamingSummary,
+    run_dmc_streaming,
 )
 from hrdmc.plotting import write_exact_tg_trap_plots
 from hrdmc.runners import run_seed_batch
 from hrdmc.systems import (
-    HarmonicMehlerKernel,
     HarmonicTrap,
     OpenLineHardRodSystem,
-    OrderedHarmonicOscillatorHeatKernel,
 )
 from hrdmc.theory import (
     trapped_tg_density_profile,
@@ -33,14 +30,14 @@ from hrdmc.theory import (
 )
 from hrdmc.theory.units import HO_TRAP_OMEGA
 from hrdmc.wavefunctions.guides import ReducedTGHardRodGuide
-from hrdmc.workflows.dmc.rn_block import (
-    RNRunControls,
+from hrdmc.workflows.dmc.initial_conditions import initial_walkers
+from hrdmc.workflows.dmc.trapped import (
+    DMCRunControls,
     controls_to_dict,
-    initial_walkers,
+    dmc_progress_bar,
+    dmc_run_config,
     resolve_parallel_workers,
-    rn_progress_bar,
-    rn_run_config,
-    write_rn_run_artifacts,
+    write_dmc_run_artifacts,
 )
 
 
@@ -63,19 +60,11 @@ class ExactTGTrapConfig:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Validate RN-block DMC against exact trapped TG.")
+    parser = argparse.ArgumentParser(description="Validate local DMC against exact trapped TG.")
     parser.add_argument("--n-particles", type=int, default=4)
-    parser.add_argument(
-        "--omega",
-        type=float,
-        default=HO_TRAP_OMEGA,
-        help="Trap frequency in harmonic-oscillator units; default is omega=1.",
-    )
     parser.add_argument("--seeds", default="301,302,303,304")
     parser.add_argument("--dt", type=float, default=0.00125)
     parser.add_argument("--walkers", type=int, default=512)
-    parser.add_argument("--tau", type=float, default=0.01)
-    parser.add_argument("--rn-cadence", type=float, default=0.005)
     parser.add_argument("--burn-tau", type=float, default=1.0)
     parser.add_argument("--production-tau", type=float, default=2.0)
     parser.add_argument("--store-every", type=int, default=10)
@@ -87,18 +76,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--plot-formats", default="png")
     parser.add_argument("--progress", action="store_true")
     parser.add_argument("--no-write", action="store_true")
+    parser.add_argument("--verbose-json", action="store_true")
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
     repo_root = repo_root_from(Path(__file__))
-    exact_config = ExactTGTrapConfig(n_particles=args.n_particles, omega=args.omega)
-    controls = RNRunControls(
+    exact_config = ExactTGTrapConfig(
+        n_particles=args.n_particles,
+        omega=HO_TRAP_OMEGA,
+    )
+    controls = DMCRunControls(
         dt=args.dt,
         walkers=args.walkers,
-        tau_block=args.tau,
-        rn_cadence_tau=args.rn_cadence,
         burn_tau=args.burn_tau,
         production_tau=args.production_tau,
         store_every=args.store_every,
@@ -108,10 +99,10 @@ def main() -> None:
     seeds = _parse_seeds(args.seeds)
     requested_workers = resolve_parallel_workers(len(seeds), args.parallel_workers)
     density_grid = np.linspace(-controls.grid_extent, controls.grid_extent, controls.n_bins)
-    with rn_progress_bar(
+    with dmc_progress_bar(
         controls=controls,
         seed_count=len(seeds),
-        label=f"RN exact TG N{args.n_particles}",
+        label=f"Exact TG N{args.n_particles}",
         enabled=progress_requested(args.progress),
     ) as bar:
         seed_summaries, actual_workers = _run_exact_seed_summaries(
@@ -127,18 +118,17 @@ def main() -> None:
     density_integrals = np.asarray([summary.density_integral for summary in seed_summaries])
     density_profile = _density_profile_payload(exact_config, seed_summaries)
     abs_error = abs(float(np.mean(energy_values)) - exact_config.exact_energy_total)
-    status = "passed" if abs_error <= args.energy_tolerance else "failed"
-    case_id = f"N{args.n_particles}_a0_omega{args.omega:g}"
+    status = "accepted" if abs_error <= args.energy_tolerance else "reference_mismatch"
+    case_id = f"N{args.n_particles}_A0"
     payload = {
-        "schema_version": "rn_block_exact_tg_trap_v2",
+        "schema_version": "dmc_exact_tg_trap_v3",
         "status": status,
-        "benchmark_tier": "exact trapped TG RN-block DMC validation",
-        "claim_boundary": "exact a=0 harmonic TG anchor; not a finite-rod trapped benchmark",
+        "validation": "exact trapped TG local DMC energy and density",
         "exact_solution": {
             "model": "zero-length hard rods in a harmonic trap",
-            "formula": "E0 = N^2 * omega / 2",
+            "units": "harmonic oscillator units",
+            "formula": "E0 = N^2 / 2",
             "n_particles": exact_config.n_particles,
-            "omega": exact_config.omega,
             "energy_total": exact_config.exact_energy_total,
             "r2_radius": exact_config.exact_r2_radius,
             "rms_radius": exact_config.exact_rms_radius,
@@ -182,43 +172,62 @@ def main() -> None:
             for seed, summary in zip(seeds, seed_summaries, strict=True)
         ],
     }
+    output_dir: Path | None = None
     if not args.no_write:
-        output_dir = args.output_dir or artifact_dir(
-            repo_root, ArtifactRoute("dmc", "rn_block", "exact_tg_trap")
+        write_output_dir = Path(
+            args.output_dir
+            or artifact_dir(repo_root, ArtifactRoute("dmc", "local", "exact_tg_trap"))
         )
+        output_dir = write_output_dir
         plot_paths = write_exact_tg_trap_plots(
-            output_dir,
+            write_output_dir,
             payload,
             formats=_parse_str_tuple(args.plot_formats),
         )
         payload["plots"] = plot_paths
-        write_rn_run_artifacts(
-            output_dir,
+        write_dmc_run_artifacts(
+            write_output_dir,
             payload=payload,
             rows=[],
-            run_name="rn_block_exact_tg_trap",
-            config=rn_run_config(
-                run_kind="rn_block_exact_tg_trap",
+            run_name="dmc_exact_tg_trap",
+            config=dmc_run_config(
+                run_kind="dmc_exact_tg_trap",
                 cases=[case_id],
                 seeds=seeds,
                 controls=controls,
+                collective_rn=None,
                 parallel_workers=args.parallel_workers,
             ),
             command=sys.argv,
-            extra_artifacts=[output_dir / path for path in plot_paths],
+            extra_artifacts=[write_output_dir / path for path in plot_paths],
         )
-    print(json.dumps(payload, indent=2))
+    print_run_summary(
+        run="exact_tg_trap",
+        status=status,
+        summary={
+            "case": case_id,
+            "seed_count": len(seeds),
+            "mixed_energy": payload["mixed_energy"],
+            "absolute_energy_error": abs_error,
+        },
+        artifacts={
+            "summary": None if output_dir is None else str(output_dir / "summary.json"),
+            "output_dir": None if output_dir is None else str(output_dir),
+        },
+        verbose_payload=payload,
+        verbose_json=args.verbose_json,
+    )
 
 
 def _run_exact_seed_summaries(
     exact_config: ExactTGTrapConfig,
-    controls: RNRunControls,
+    controls: DMCRunControls,
     seeds: list[int],
     density_grid: np.ndarray,
     *,
     worker_count: int,
     progress: Any,
-) -> tuple[list[RNBlockStreamingSummary], int]:
+) -> tuple[list[DMCStreamingSummary], int]:
     return run_seed_batch(
         seeds,
         worker_count=worker_count,
@@ -243,11 +252,11 @@ def _run_exact_seed_summaries(
 
 def _exact_seed_worker(
     exact_config: ExactTGTrapConfig,
-    controls: RNRunControls,
+    controls: DMCRunControls,
     seed: int,
     density_grid: np.ndarray,
     progress_queue: Any | None = None,
-) -> tuple[int, RNBlockStreamingSummary]:
+) -> tuple[int, DMCStreamingSummary]:
     worker_progress = QueuedProgress(progress_queue) if progress_queue is not None else None
     try:
         return seed, _run_exact_seed(
@@ -264,12 +273,12 @@ def _exact_seed_worker(
 
 def _run_exact_seed(
     exact_config: ExactTGTrapConfig,
-    controls: RNRunControls,
+    controls: DMCRunControls,
     seed: int,
     density_grid: np.ndarray,
     *,
     progress: Any | None = None,
-) -> RNBlockStreamingSummary:
+) -> DMCStreamingSummary:
     system = OpenLineHardRodSystem(n_particles=exact_config.n_particles, rod_length=0.0)
     trap = HarmonicTrap(omega=exact_config.omega)
     guide = ReducedTGHardRodGuide(
@@ -278,19 +287,12 @@ def _run_exact_seed(
         alpha=exact_config.omega,
     )
     rng = np.random.default_rng(seed)
-    return run_rn_block_dmc_streaming(
+    return run_dmc_streaming(
         initial_walkers=initial_walkers(system, controls.walkers, rng),
         guide=guide,
         system=system,
-        target_kernel=OrderedHarmonicOscillatorHeatKernel(system=system, trap=trap),
-        proposal_kernel=HarmonicMehlerKernel(trap=trap),
         density_grid=density_grid,
-        config=RNBlockDMCConfig(
-            tau_block=controls.tau_block,
-            rn_cadence_tau=controls.rn_cadence_tau,
-            component_log_scales=(-0.02, 0.0, 0.02),
-            component_probabilities=(0.25, 0.5, 0.25),
-        ),
+        config=DMCConfig(),
         rng=rng,
         dt=controls.dt,
         burn_in_steps=controls.burn_in_steps,
@@ -315,7 +317,7 @@ def _stderr(values: np.ndarray) -> float:
 
 def _density_profile_payload(
     exact_config: ExactTGTrapConfig,
-    seed_summaries: list[RNBlockStreamingSummary],
+    seed_summaries: list[DMCStreamingSummary],
 ) -> dict[str, Any]:
     first = seed_summaries[0]
     edges = first.density_bin_edges

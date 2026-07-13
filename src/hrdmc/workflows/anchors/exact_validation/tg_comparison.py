@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from hrdmc.monte_carlo.dmc.rn_block import RNBlockStreamingSummary
+from hrdmc.monte_carlo.dmc.local import DMCStreamingSummary
 from hrdmc.theory import (
     trapped_tg_density_profile,
     trapped_tg_density_profile_semiclassical,
@@ -17,7 +17,7 @@ from hrdmc.workflows.anchors.exact_validation.models import TrappedTGAnchor
 
 def density_profile_payload(
     anchor: TrappedTGAnchor,
-    seed_summaries: list[RNBlockStreamingSummary],
+    seed_summaries: list[DMCStreamingSummary],
     pure_summary: dict[str, Any],
 ) -> dict[str, Any]:
     first = seed_summaries[0]
@@ -63,7 +63,7 @@ def density_profile_payload(
 def trapped_tg_exact_comparison(
     anchor: TrappedTGAnchor,
     *,
-    seed_summaries: list[RNBlockStreamingSummary],
+    seed_summaries: list[DMCStreamingSummary],
     pure_summary: dict[str, Any],
     density_profile: dict[str, Any],
     energy_abs_error: float,
@@ -79,7 +79,7 @@ def trapped_tg_exact_comparison(
     mixed_r2 = float(np.mean([summary.r2_radius for summary in seed_summaries]))
     mixed_rms = float(np.mean([summary.rms_radius for summary in seed_summaries]))
     pure_r2 = _optional_float(pure_summary.get("pure_r2"))
-    pure_rms = _optional_float(pure_summary.get("paper_rms_radius"))
+    pure_rms = _optional_float(pure_summary.get("rms_radius"))
     mixed_r2_rel = _relative_error(mixed_r2, exact_r2)
     mixed_rms_rel = _relative_error(mixed_rms, exact_rms)
     pure_r2_rel = _relative_error(pure_r2, exact_r2)
@@ -100,41 +100,49 @@ def trapped_tg_exact_comparison(
         density_profile.get("bin_edges"),
     )
     pure_density_integral = _optional_float(density_profile.get("pure_fw_integral"))
-    exact_density_integral = _optional_float(
-        density_profile.get("exact_bin_averaged_integral")
-    )
+    exact_density_integral = _optional_float(density_profile.get("exact_bin_averaged_integral"))
     density_accounting_abs_error = _optional_abs_difference(
         pure_density_integral,
         exact_density_integral,
     )
     density_bin_count = _density_bin_count(density_profile.get("bin_edges"))
-    energy_gate = energy_abs_error <= energy_tolerance
-    pure_gate = pure_summary.get("status") == "PURE_WALKING_GO"
-    r2_gate = _passes_tolerance(pure_r2_rel, pure_r2_relative_tolerance)
-    rms_gate = _passes_tolerance(pure_rms_rel, pure_rms_relative_tolerance)
-    density_l2_gate = _passes_tolerance(density_l2, pure_density_l2_tolerance)
-    density_resolution_gate = density_bin_count >= density_shape_min_bins
-    density_accounting_gate = _passes_tolerance(
+    energy_accepted = energy_abs_error <= energy_tolerance
+    r2_accepted = _passes_tolerance(pure_r2_rel, pure_r2_relative_tolerance)
+    rms_accepted = _passes_tolerance(pure_rms_rel, pure_rms_relative_tolerance)
+    density_l2_accepted = _passes_tolerance(density_l2, pure_density_l2_tolerance)
+    density_resolution_accepted = density_bin_count >= density_shape_min_bins
+    density_accounting_accepted = _passes_tolerance(
         density_accounting_abs_error,
         density_accounting_tolerance,
     )
-    density_gate = density_l2_gate and density_resolution_gate and density_accounting_gate
-    full_gate = energy_gate and pure_gate and r2_gate and rms_gate and density_gate
+    density_accepted = (
+        density_l2_accepted and density_resolution_accepted and density_accounting_accepted
+    )
     relative_errors = [
-        value
-        for value in (pure_r2_rel, pure_rms_rel, density_l2)
-        if value is not None
+        value for value in (pure_r2_rel, pure_rms_rel, density_l2) if value is not None
     ]
     return {
-        "full_engine_gate": "passed" if full_gate else "failed",
-        "energy_gate": "passed" if energy_gate else "failed",
-        "transported_fw_gate": str(pure_summary.get("status", "PURE_WALKING_NO_GO")),
-        "pure_r2_gate": "passed" if r2_gate else "failed",
-        "pure_rms_gate": "passed" if rms_gate else "failed",
-        "pure_density_gate": "passed" if density_gate else "failed",
-        "pure_density_l2_gate": "passed" if density_l2_gate else "failed",
-        "density_resolution_gate": "passed" if density_resolution_gate else "failed",
-        "density_accounting_gate": "passed" if density_accounting_gate else "failed",
+        "status": _exact_comparison_status(
+            energy_accepted=energy_accepted,
+            pure_status=str(pure_summary.get("status", "not_evaluated")),
+            r2_accepted=r2_accepted,
+            rms_accepted=rms_accepted,
+            density_l2_accepted=density_l2_accepted,
+            density_resolution_accepted=density_resolution_accepted,
+            density_accounting_accepted=density_accounting_accepted,
+        ),
+        "energy_status": "accepted" if energy_accepted else "reference_mismatch",
+        "transported_fw_status": str(pure_summary.get("status", "not_evaluated")),
+        "pure_r2_status": "accepted" if r2_accepted else "reference_mismatch",
+        "pure_rms_status": "accepted" if rms_accepted else "reference_mismatch",
+        "pure_density_status": "accepted" if density_accepted else "reference_mismatch",
+        "pure_density_l2_status": ("accepted" if density_l2_accepted else "reference_mismatch"),
+        "density_resolution_status": (
+            "accepted" if density_resolution_accepted else "insufficient_resolution"
+        ),
+        "density_accounting_status": (
+            "accepted" if density_accounting_accepted else "density_normalization_mismatch"
+        ),
         "density_bin_count": density_bin_count,
         "density_shape_min_bins": density_shape_min_bins,
         "pure_density_integral": pure_density_integral,
@@ -168,13 +176,34 @@ def trapped_tg_exact_comparison(
             pure_rms_relative_tolerance,
             pure_density_l2_tolerance,
         ),
-        "claim_boundary": (
-            "Full trapped TG anchor passes only when RN-DMC energy and transported "
-            "FW r2/rms/density all match exact TG within declared tolerances and "
-            "the density grid is fine enough for a shape claim with explicit "
-            "finite-grid density accounting."
-        ),
     }
+
+
+def _exact_comparison_status(
+    *,
+    energy_accepted: bool,
+    pure_status: str,
+    r2_accepted: bool,
+    rms_accepted: bool,
+    density_l2_accepted: bool,
+    density_resolution_accepted: bool,
+    density_accounting_accepted: bool,
+) -> str:
+    if not energy_accepted:
+        return "energy_reference_mismatch"
+    if pure_status != "accepted":
+        return pure_status
+    if not r2_accepted:
+        return "r2_reference_mismatch"
+    if not rms_accepted:
+        return "rms_reference_mismatch"
+    if not density_l2_accepted:
+        return "density_reference_mismatch"
+    if not density_resolution_accepted:
+        return "insufficient_density_resolution"
+    if not density_accounting_accepted:
+        return "density_normalization_mismatch"
+    return "accepted"
 
 
 def _density_bin_count(bin_edges: object) -> int:

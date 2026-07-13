@@ -50,7 +50,7 @@ def run_homogeneous_ring_anchor(
     max_abs_error = float(np.max(np.abs(per_particle - exact_per_particle)))
     return {
         "anchor_id": anchor.anchor_id,
-        "status": "passed" if max_abs_error <= tolerance else "failed",
+        "status": "accepted" if max_abs_error <= tolerance else "reference_mismatch",
         "anchor_type": "homogeneous_finite_a_ring_local_energy",
         "formula": "E_N/N = pi^2 * (N^2 - 1) / (6 * (L - N*a)^2)",
         "n_particles": system.n_particles,

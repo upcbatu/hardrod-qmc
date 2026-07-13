@@ -47,8 +47,7 @@ def hard_rod_lda_density_from_local_mu(
     densities = np.zeros_like(values, dtype=float)
     positive = values > 0.0
     densities[positive] = [
-        invert_hard_rod_chemical_potential(float(mu), rod_length)
-        for mu in values[positive]
+        invert_hard_rod_chemical_potential(float(mu), rod_length) for mu in values[positive]
     ]
     if scalar_input:
         return float(densities[0])
@@ -121,10 +120,7 @@ def hard_rod_lda_density_small_a_expansion(
         raise ValueError("rod_length must be non-negative")
     if np.any(values < 0.0):
         raise ValueError("local_mu must be non-negative")
-    densities = (
-        np.sqrt(2.0 * values) / np.pi
-        - (8.0 * rod_length * values) / (3.0 * np.pi**2)
-    )
+    densities = np.sqrt(2.0 * values) / np.pi - (8.0 * rod_length * values) / (3.0 * np.pi**2)
     densities = np.maximum(densities, 0.0)
     if scalar_input:
         return float(densities[0])

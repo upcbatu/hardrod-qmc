@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from hrdmc.estimators.pure.forward_walking import PureWalkingResult
-from hrdmc.monte_carlo.dmc.rn_block import RNBlockStreamingSummary
+from hrdmc.monte_carlo.dmc.local import DMCStreamingSummary
 
 
 @dataclass(frozen=True)
@@ -13,7 +13,7 @@ class TrappedTGAnchor:
 
     @property
     def anchor_id(self) -> str:
-        return f"trapped_tg_N{self.n_particles}_omega{self.omega:g}"
+        return f"trapped_tg_N{self.n_particles}_A0"
 
 
 @dataclass(frozen=True)
@@ -29,5 +29,5 @@ class HomogeneousRingAnchor:
 @dataclass(frozen=True)
 class TrappedTGSeedRun:
     seed: int
-    rn_summary: RNBlockStreamingSummary
+    dmc_summary: DMCStreamingSummary
     pure_result: PureWalkingResult

@@ -128,7 +128,6 @@ class HarmonicOscillatorUnitMetadata:
     energy_unit: str = "hbar*Omega"
     time_unit: str = "1/Omega"
     report_energy_unit: str = "hbar*Omega"
-    trap_omega: float = HO_TRAP_OMEGA
 
 
 def harmonic_oscillator_unit_metadata() -> dict[str, float | str]:
@@ -140,6 +139,4 @@ def harmonic_oscillator_unit_metadata() -> dict[str, float | str]:
         "energy_unit": units.energy_unit,
         "time_unit": units.time_unit,
         "report_energy_unit": units.report_energy_unit,
-        "dimensionless_trap_omega": units.trap_omega,
-        "trap_omega": units.trap_omega,
     }

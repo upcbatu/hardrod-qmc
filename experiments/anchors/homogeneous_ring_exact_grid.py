@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,7 +9,8 @@ from typing import Any
 
 import numpy as np
 
-from hrdmc.io.artifacts import ensure_dir, write_json
+from hrdmc.artifacts import ensure_dir, write_json
+from hrdmc.io import print_run_summary
 from hrdmc.systems import excluded_length
 from hrdmc.systems.hard_rods import HardRodSystem
 from hrdmc.theory import (
@@ -43,6 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--skip-plots", action="store_true")
     parser.add_argument("--no-write", action="store_true")
+    parser.add_argument("--verbose-json", action="store_true")
     return parser
 
 
@@ -66,14 +67,10 @@ def main() -> None:
     ]
     max_abs_error = max(float(row["max_energy_per_particle_abs_error"]) for row in rows)
     max_relative_error = max(float(row["max_energy_per_particle_relative_error"]) for row in rows)
-    passed = all(bool(row["passed"]) for row in rows)
+    accepted = all(bool(row["accepted"]) for row in rows)
     payload = {
-        "status": "passed" if passed else "failed",
-        "benchmark_tier": "homogeneous finite-a hard-rod exact ring validation",
-        "claim_boundary": (
-            "exact homogeneous ring local-energy anchor; not a trapped benchmark "
-            "and not an LDA validation"
-        ),
+        "status": "accepted" if accepted else "reference_mismatch",
+        "validation": "homogeneous finite-A hard-rod exact ring energy",
         "source_basis": "Mazzanti2008HardRods finite-N reduced-length mapping",
         "formula": "E_N/N = pi^2 * (N^2 - 1) / (6 * (L - N*a)^2)",
         "units": "hbar^2/m=1",
@@ -85,6 +82,7 @@ def main() -> None:
         "case_count": len(rows),
         "cases": rows,
     }
+    output_dir: Path | None = None
     if not args.no_write:
         output_dir = ensure_dir(
             args.output_dir or repo_root / "results" / "homogeneous_ring_exact_grid"
@@ -94,8 +92,22 @@ def main() -> None:
         if not args.skip_plots:
             payload["plots"] = write_plots(output_dir, rows)
             write_json(output_dir / "summary.json", payload)
-    print(json.dumps(payload, indent=2))
-    if not passed:
+    print_run_summary(
+        run="homogeneous_ring_exact_grid",
+        status=str(payload["status"]),
+        summary={
+            "case_count": len(rows),
+            "max_abs_error": max_abs_error,
+            "max_relative_error": max_relative_error,
+        },
+        artifacts={
+            "summary": None if output_dir is None else str(output_dir / "summary.json"),
+            "case_table": None if output_dir is None else str(output_dir / "case_table.csv"),
+        },
+        verbose_payload=payload,
+        verbose_json=args.verbose_json,
+    )
+    if not accepted:
         raise SystemExit(1)
 
 
@@ -141,7 +153,7 @@ def run_case(
     relative_denominator = max(1.0, abs(exact_per_particle))
     max_relative_error = float(max_abs_error / relative_denominator)
     return {
-        "passed": bool(max_abs_error <= tolerance),
+        "accepted": bool(max_abs_error <= tolerance),
         "case_id": case.case_id,
         "n_particles": system.n_particles,
         "rod_length": system.rod_length,
@@ -204,7 +216,7 @@ def write_case_table(path: Path, rows: list[dict[str, Any]]) -> None:
         "energy_per_particle_thermodynamic",
         "max_energy_per_particle_abs_error",
         "max_energy_per_particle_relative_error",
-        "passed",
+        "accepted",
     ]
     with path.open("w", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=fields)
@@ -277,8 +289,10 @@ def plot_finite_vs_thermodynamic_energy(plt, rows: list[dict[str, Any]], output_
         ax.plot(eta, finite, marker="o", linewidth=1.4, label=f"N={n_particles}")
 
     thermo_rows = sorted(
-        {float(row["packing_fraction"]): float(row["energy_per_particle_thermodynamic"])
-         for row in rows}.items()
+        {
+            float(row["packing_fraction"]): float(row["energy_per_particle_thermodynamic"])
+            for row in rows
+        }.items()
     )
     ax.plot(
         [item[0] for item in thermo_rows],

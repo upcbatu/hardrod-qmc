@@ -10,21 +10,19 @@ from hrdmc.workflows.anchors.finite_a_n2.comparison import (
     finite_a_n2_reference_comparison,
 )
 from hrdmc.workflows.dmc.benchmark_packet import summarize_benchmark_packet_case
-from hrdmc.workflows.dmc.rn_block import (
-    DEFAULT_RN_GUIDE_FAMILY,
-    DEFAULT_RN_PROPOSAL_FAMILY,
-    DEFAULT_RN_TARGET_FAMILY,
-    RNCase,
-    RNCollectiveProposalControls,
-    RNRunControls,
+from hrdmc.workflows.dmc.collective_rn import CollectiveRNControls
+from hrdmc.workflows.dmc.initial_conditions import InitializationControls
+from hrdmc.workflows.dmc.trapped import (
+    DEFAULT_GUIDE_FAMILY,
+    DMCRunControls,
+    TrappedCase,
     controls_to_dict,
 )
-from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 
 
 def summarize_finite_a_n2_reference_case(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seeds: list[int],
     *,
     pure_config: PureWalkingConfig,
@@ -35,13 +33,11 @@ def summarize_finite_a_n2_reference_case(
     progress: ProgressBar | None = None,
     trace_output_dir: Any | None = None,
     ess_warning_fraction: float = 0.20,
-    ess_no_go_fraction: float = 0.10,
+    ess_invalid_fraction: float = 0.10,
     log_weight_span_warning: float = 50.0,
-    initialization: RNInitializationControls | None = None,
-    proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    initialization: InitializationControls | None = None,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
 ) -> dict[str, Any]:
     """Run the production finite-a packet and compare it to the N=2 reference."""
 
@@ -64,13 +60,11 @@ def summarize_finite_a_n2_reference_case(
         progress=progress,
         trace_output_dir=trace_output_dir,
         ess_warning_fraction=ess_warning_fraction,
-        ess_no_go_fraction=ess_no_go_fraction,
+        ess_invalid_fraction=ess_invalid_fraction,
         log_weight_span_warning=log_weight_span_warning,
         initialization=initialization,
-        proposal=proposal,
-        proposal_family=proposal_family,
+        collective_rn=collective_rn,
         guide_family=guide_family,
-        target_family=target_family,
     )
     comparison = finite_a_n2_reference_comparison(
         benchmark,
@@ -78,12 +72,11 @@ def summarize_finite_a_n2_reference_case(
         tolerances=tolerances,
     )
     return {
-        "schema_version": "finite_a_n2_reference_case_v1",
+        "schema_version": "finite_a_n2_reference_case_v2",
         "status": comparison["status"],
         "case_id": case.case_id,
         "n_particles": case.n_particles,
         "rod_length": case.rod_length,
-        "omega": case.omega,
         **case.unit_metadata(),
         "controls": controls_to_dict(controls),
         "seeds": seeds,
@@ -93,13 +86,9 @@ def summarize_finite_a_n2_reference_case(
         "reference_grid_points": reference_grid_points,
         "reference_y_max": reference_y_max,
         "initialization_mode": benchmark.get("initialization_mode"),
-        "proposal_family": proposal_family,
         "guide_family": guide_family,
-        "target_family": target_family,
-        "component_log_scales": benchmark.get("component_log_scales"),
-        "component_probabilities": benchmark.get("component_probabilities"),
+        "collective_rn_controls": (None if collective_rn is None else collective_rn.to_metadata()),
         "reference": reference.to_metadata(),
         "comparison": comparison,
         "benchmark_packet": benchmark,
-        "claim_boundary": comparison["claim_boundary"],
     }

@@ -6,7 +6,7 @@ from typing import Any
 from hrdmc.plotting import tokens
 from hrdmc.plotting.figures.exact_validation_common import (
     anchor_label,
-    compact_fw_gate,
+    compact_fw_status,
     disable_layout_engine,
     draw_empty_table,
     draw_metric_chip,
@@ -18,7 +18,7 @@ from hrdmc.plotting.figures.exact_validation_common import (
     finite_value,
     format_float,
     format_percent,
-    fw_gate_status,
+    fw_status_color,
     value_pair,
 )
 from hrdmc.plotting.style import save_figure
@@ -94,8 +94,7 @@ def _draw_trapped_scorecard(
     ax.text(
         0.0,
         1.02,
-        "Trapped Tonks-Girardeau anchors: full RN-DMC engine against analytic "
-        "harmonic TG reference",
+        "Trapped Tonks-Girardeau anchors: DMC engine against analytic harmonic TG reference",
         transform=ax.transAxes,
         fontsize=10.5,
         fontweight="semibold",
@@ -114,7 +113,7 @@ def _draw_trapped_scorecard(
         0.0,
         0.925,
         "Color key: green = metric within tolerance; red = metric outside "
-        "tolerance; yellow FW gate = plateau/sample gate, not exact-reference error.",
+        "tolerance; yellow FW status = unresolved plateau/sample support, not reference error.",
         transform=ax.transAxes,
         fontsize=7.8,
         color=tokens.INK_SOFT,
@@ -126,7 +125,7 @@ def _draw_trapped_scorecard(
         (0.37, "R2: FW / exact"),
         (0.54, "RMS: FW / exact"),
         (0.70, "density L2: FW / mixed"),
-        (0.82, "FW gate"),
+        (0.82, "FW status"),
         (0.94, "overall"),
     )
     draw_table_header(ax, columns, y=0.865)
@@ -180,14 +179,18 @@ def _draw_trapped_scorecard(
         density_text = (
             f"FW={format_percent(density_error)}",
             "mixed="
-            + format_percent(
-                finite_value(comparison.get("mixed_density_relative_l2_diagnostic"))
-            ),
+            + format_percent(finite_value(comparison.get("mixed_density_relative_l2_diagnostic"))),
         )
         draw_multiline_metric(ax, 0.70, y, density_text, density_error, density_tol)
 
-        fw_gate = str(comparison.get("transported_fw_gate", "?"))
-        draw_status_chip(ax, 0.82, y, compact_fw_gate(fw_gate), fw_gate_status(fw_gate))
+        fw_status = str(comparison.get("transported_fw_status", "?"))
+        draw_status_chip(
+            ax,
+            0.82,
+            y,
+            compact_fw_status(fw_status),
+            fw_status_color(fw_status),
+        )
         draw_status_chip(
             ax,
             0.94,
@@ -208,8 +211,7 @@ def _draw_homogeneous_sanity_scorecard(
     ax.text(
         0.0,
         1.03,
-        "Local-energy formula check only; this does not run the canonical "
-        "trapped RN-DMC benchmark.",
+        "Local-energy formula check only; this does not run the canonical trapped DMC benchmark.",
         transform=ax.transAxes,
         fontsize=8.3,
         color=tokens.INK,

@@ -60,7 +60,7 @@ def _write_energy_plot(
             fmt="o",
             color=tokens.DMC_PRIMARY,
             capsize=4,
-            label="RN-DMC mean",
+            label="DMC mean",
         )
         ax.set_xlim(-0.7, xs.size + 0.7)
         ax.set_xticks([*xs, xs.size])
@@ -115,7 +115,7 @@ def _write_density_plot(
             mixed_n,
             color=tokens.DMC_PRIMARY,
             linewidth=1.85,
-            label="RN-DMC mixed density diagnostic",
+            label="DMC mixed density diagnostic",
         )
     ax.set_title("Exact trapped TG density anchor")
     ax.set_xlabel(r"$x$")
@@ -123,7 +123,7 @@ def _write_density_plot(
     ax.text(
         0.02,
         0.05,
-        "a=0 exact TG validation; density is diagnostic unless estimator gates request it",
+        "a=0 exact TG validation; density is diagnostic unless a pure estimator is evaluated",
         transform=ax.transAxes,
         ha="left",
         va="bottom",

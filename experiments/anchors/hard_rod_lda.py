@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
+from hrdmc.io import print_run_summary
 from hrdmc.workflows.anchors.hard_rod_lda import (
     HardRodLDADiagnosticConfig,
     run_hard_rod_lda_diagnostic,
@@ -11,9 +11,7 @@ from hrdmc.workflows.anchors.hard_rod_lda import (
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Build analytic trapped hard-rod LDA diagnostics."
-    )
+    parser = argparse.ArgumentParser(description="Build analytic trapped hard-rod LDA diagnostics.")
     parser.add_argument("--n-particles", type=int, default=8)
     parser.add_argument("--rod-lengths", default="0,0.02,0.05,0.1,0.18803,0.4")
     parser.add_argument("--x-extent", type=float, default=8.0)
@@ -25,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-plots", action="store_true")
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--no-write", action="store_true")
+    parser.add_argument("--verbose-json", action="store_true")
     return parser
 
 
@@ -51,8 +50,21 @@ def main() -> None:
         command=_command_from_args(args),
         write=not args.no_write,
     )
-    print(json.dumps(payload, indent=2, sort_keys=True))
-    if payload["status"] != "passed":
+    print_run_summary(
+        run="hard_rod_lda",
+        status=str(payload["status"]),
+        summary={
+            "n_particles": args.n_particles,
+            "rod_length_count": len(config.rod_lengths),
+        },
+        artifacts={
+            "summary": None if args.no_write else str(output_dir / "summary.json"),
+            "output_dir": None if args.no_write else str(output_dir),
+        },
+        verbose_payload=payload,
+        verbose_json=args.verbose_json,
+    )
+    if payload["status"] != "accepted":
         raise SystemExit(1)
 
 

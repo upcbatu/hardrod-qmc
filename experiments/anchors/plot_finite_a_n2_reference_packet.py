@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from hrdmc.io.artifacts import write_json_atomic
+from hrdmc.artifacts import write_json_atomic
 from hrdmc.plotting.figures.finite_a_n2_reference import (
     write_finite_a_n2_reference_plots,
 )

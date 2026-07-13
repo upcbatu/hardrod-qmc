@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from hrdmc.io.artifacts import (
+from hrdmc.artifacts import (
     build_run_provenance,
     ensure_dir,
     write_json_atomic,
@@ -63,29 +63,24 @@ def run_hard_rod_lda_diagnostic(
         for rod_length in config.rod_lengths
     ]
     max_cubic_abs_error = max(float(case["cubic_max_abs_error"]) for case in cases)
-    status = "passed" if max_cubic_abs_error <= config.cubic_abs_tolerance else "failed"
+    status = (
+        "accepted" if max_cubic_abs_error <= config.cubic_abs_tolerance else "reference_mismatch"
+    )
     payload: dict[str, Any] = {
-        "schema_version": "hard_rod_lda_diagnostic_v1",
+        "schema_version": "hard_rod_lda_diagnostic_v2",
         "status": status,
-        "claim_boundary": (
-            "analytic trapped hard-rod LDA diagnostic; no DMC samples and no "
-            "finite-N exact benchmark claim"
-        ),
+        "method": "analytic trapped hard-rod LDA diagnostic",
         "units": {
             "length": "harmonic oscillator length a_ho",
             "energy": "hbar*Omega",
             "trap_potential": "V(x)=x^2/2",
         },
         "formulae": {
-            "local_equation": (
-                "mu_loc = pi^2*n^2*(3-A*n)/(6*(1-A*n)^3)"
-            ),
+            "local_equation": ("mu_loc = pi^2*n^2*(3-A*n)/(6*(1-A*n)^3)"),
             "cubic_variable": "y = A*n/(1-A*n)",
             "cubic_equation": "2*y^3 + 3*y^2 = 6*A^2*mu_loc/pi^2",
             "density_recovery": "n = y/(A*(1+y))",
-            "small_A_expansion": (
-                "n(mu_loc,A)=sqrt(2*mu_loc)/pi - 8*A*mu_loc/(3*pi^2) + O(A^2)"
-            ),
+            "small_A_expansion": ("n(mu_loc,A)=sqrt(2*mu_loc)/pi - 8*A*mu_loc/(3*pi^2) + O(A^2)"),
             "tg_semicircle": "n_TG(x)=sqrt(max(2*(mu_0-x^2/2),0))/pi",
         },
         "config": _config_payload(config),
@@ -380,8 +375,7 @@ def _plot_cubic_equivalence(
     ax_top.plot(x, cubic, linestyle="--", linewidth=1.3, label="explicit cubic")
     ax_top.set_ylabel(r"$n(x)a_{\rm ho}$")
     ax_top.set_title(
-        f"Equivalent hard-rod LDA inversions, N={config.n_particles}, "
-        f"A={rod_length:g}"
+        f"Equivalent hard-rod LDA inversions, N={config.n_particles}, A={rod_length:g}"
     )
     ax_top.legend(frameon=False, fontsize=8)
     ax_bottom.plot(x, cubic - profile.n_x, linewidth=1.1, color="black")
