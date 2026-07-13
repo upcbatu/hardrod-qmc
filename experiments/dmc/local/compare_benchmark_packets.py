@@ -4,7 +4,8 @@ import argparse
 import json
 from pathlib import Path
 
-from hrdmc.io.artifacts import write_json
+from hrdmc.artifacts import write_json
+from hrdmc.io import print_run_summary
 from hrdmc.plotting import write_benchmark_packet_comparison_plots
 
 
@@ -20,6 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--plot-formats", default="png,pdf")
+    parser.add_argument("--verbose-json", action="store_true")
     return parser
 
 
@@ -35,13 +37,20 @@ def main() -> None:
     manifest = {
         "schema_version": "benchmark_packet_comparison_manifest_v1",
         "packets": [
-            {"label": label, "summary": str(summary_path)}
-            for label, summary_path, _ in loaded
+            {"label": label, "summary": str(summary_path)} for label, summary_path, _ in loaded
         ],
         "plots": plot_paths,
     }
     write_json(args.output_dir / "comparison_manifest.json", manifest)
-    print(json.dumps(manifest, indent=2, allow_nan=False))
+    manifest_path = args.output_dir / "comparison_manifest.json"
+    print_run_summary(
+        run="compare_benchmark_packets",
+        status="completed",
+        summary={"packet_count": len(loaded), "plot_count": len(plot_paths)},
+        artifacts={"manifest": str(manifest_path), "output_dir": str(args.output_dir)},
+        verbose_payload=manifest,
+        verbose_json=args.verbose_json,
+    )
 
 
 def _load_packet(value: str) -> tuple[str, Path, dict]:
