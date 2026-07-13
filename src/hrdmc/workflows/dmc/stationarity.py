@@ -5,38 +5,41 @@ from typing import Any, cast
 import numpy as np
 
 from hrdmc.analysis import (
+    CHAIN_ACCEPTED,
+    CHAIN_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
+    CHAIN_RHAT_ABOVE_LIMIT,
+    CHAIN_SPREAD_WARNING,
+    CHAIN_TRACE_NONSTATIONARY,
+    CORRELATED_ERROR_AGREEMENT,
+    CORRELATED_ERROR_DISAGREEMENT,
+    CORRELATED_ERROR_UNAVAILABLE,
     blocking_curve,
     detect_blocking_plateau,
     diagnose_chains,
     relative_density_l2_error,
     triangulated_error_estimate,
 )
-from hrdmc.io.artifacts import ensure_dir
+from hrdmc.artifacts import ensure_dir
 from hrdmc.io.progress import ProgressBar, QueuedProgress
-from hrdmc.monte_carlo.dmc.rn_block import RNBlockStreamingSummary
+from hrdmc.monte_carlo.dmc.local import DMCStreamingSummary
 from hrdmc.runners import run_seed_batch
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
-from hrdmc.workflows.dmc.rn_block import (
-    DEFAULT_RN_GUIDE_FAMILY,
-    DEFAULT_RN_PROPOSAL_FAMILY,
-    DEFAULT_RN_TARGET_FAMILY,
-    RNCase,
-    RNCollectiveProposalControls,
-    RNRunControls,
+from hrdmc.workflows.dmc.collective_rn import CollectiveRNControls
+from hrdmc.workflows.dmc.initial_conditions import InitializationControls
+from hrdmc.workflows.dmc.trapped import (
+    DEFAULT_GUIDE_FAMILY,
+    DMCRunControls,
+    TrappedCase,
     build_case_geometry,
     make_grid,
     resolve_parallel_workers,
     run_streaming_seed,
 )
-from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 
-GO_CLASSIFICATIONS = {"GO", "WARNING_SPREAD_ONLY"}
-TRIANGULATED_ERROR_GO = "TRIANGULATED_2_OF_3"
-TRIANGULATED_ERROR_WARNING = "DISAGREE_HONEST_LARGE"
-TRIANGULATED_ERROR_UNAVAILABLE = "CORRELATED_ERROR_UNAVAILABLE"
-TRIANGULATED_PRECISION_WARNING = "TRIANGULATED_PRECISION_WARNING"
-MIXED_OBSERVABLE_WARNING = "MIXED_OBSERVABLE_WARNING"
-MIXED_COORDINATE_DIAGNOSTIC = "PASS_CANDIDATE_MIXED_COORDINATE_DIAGNOSTIC"
+ACCEPTED_CHAIN_CLASSIFICATIONS = {CHAIN_ACCEPTED, CHAIN_SPREAD_WARNING}
+TRIANGULATED_PRECISION_WARNING = "blocking_plateau_unresolved_correlated_error_available"
+MIXED_OBSERVABLE_WARNING = "mixed_coordinate_precision_warning"
+MIXED_COORDINATE_DIAGNOSTIC = "energy_accepted_mixed_coordinate_diagnostic_unresolved"
 BLOCKING_CURVE_MIN_BLOCKS = 16
 BLOCKING_PLATEAU_MIN_BLOCKS = 32
 BLOCKING_PLATEAU_WINDOW = 3
@@ -45,25 +48,21 @@ BLOCKING_PLATEAU_SIGMA_TOL = 1.0
 
 
 def summarize_stationarity_case(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seeds: list[int],
     *,
     parallel_workers: int | None = None,
     progress: ProgressBar | None = None,
     trace_output_dir: Any | None = None,
     ess_warning_fraction: float = 0.20,
-    ess_no_go_fraction: float = 0.10,
+    ess_invalid_fraction: float = 0.10,
     log_weight_span_warning: float = 50.0,
-    initialization: RNInitializationControls | None = None,
-    proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    initialization: InitializationControls | None = None,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
 ) -> dict[str, Any]:
-    initialization = RNInitializationControls() if initialization is None else initialization
-    proposal = RNCollectiveProposalControls() if proposal is None else proposal
-    proposal.validate()
+    initialization = InitializationControls() if initialization is None else initialization
     grid = make_grid(controls, case)
     worker_count = resolve_parallel_workers(len(seeds), parallel_workers)
     seed_summaries, actual_worker_count = run_stationarity_seeds(
@@ -74,10 +73,8 @@ def summarize_stationarity_case(
         worker_count=worker_count,
         progress=progress,
         initialization=initialization,
-        proposal=proposal,
-        proposal_family=proposal_family,
+        collective_rn=collective_rn,
         guide_family=guide_family,
-        target_family=target_family,
     )
     return summarize_stationarity_from_seed_summaries(
         case,
@@ -89,36 +86,32 @@ def summarize_stationarity_case(
         requested_worker_count=worker_count,
         trace_output_dir=trace_output_dir,
         ess_warning_fraction=ess_warning_fraction,
-        ess_no_go_fraction=ess_no_go_fraction,
+        ess_invalid_fraction=ess_invalid_fraction,
         log_weight_span_warning=log_weight_span_warning,
         initialization=initialization,
-        proposal=proposal,
-        proposal_family=proposal_family,
+        collective_rn=collective_rn,
         guide_family=guide_family,
-        target_family=target_family,
     )
 
 
 def summarize_stationarity_from_seed_summaries(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seeds: list[int],
     grid: np.ndarray,
-    seed_summaries: list[RNBlockStreamingSummary],
+    seed_summaries: list[DMCStreamingSummary],
     actual_worker_count: int,
     *,
     requested_worker_count: int | None = None,
     trace_output_dir: Any | None = None,
     ess_warning_fraction: float = 0.20,
-    ess_no_go_fraction: float = 0.10,
+    ess_invalid_fraction: float = 0.10,
     log_weight_span_warning: float = 50.0,
-    initialization: RNInitializationControls,
-    proposal: RNCollectiveProposalControls,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    initialization: InitializationControls,
+    collective_rn: CollectiveRNControls | None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
 ) -> dict[str, Any]:
-    """Aggregate stationarity gates from already-run seed summaries."""
+    """Aggregate stationarity diagnostics from already-run seed summaries."""
 
     if requested_worker_count is None:
         requested_worker_count = actual_worker_count
@@ -174,27 +167,20 @@ def summarize_stationarity_from_seed_summaries(
     )
     ess_fraction_min = min_seed_metadata(seed_summaries, "ess_fraction_min")
     log_weight_span_max = max_seed_metadata(seed_summaries, "log_weight_span_max")
-    rn_weight_status = classify_rn_weight_status(
+    population_weight_status = classify_population_weight_status(
         ess_fraction_min=ess_fraction_min,
         log_weight_span_max=log_weight_span_max,
         ess_warning_fraction=ess_warning_fraction,
-        ess_no_go_fraction=ess_no_go_fraction,
+        ess_invalid_fraction=ess_invalid_fraction,
         log_weight_span_warning=log_weight_span_warning,
     )
-    rn_weight_controlled = rn_weight_status != "RN_WEIGHT_NO_GO"
-    hygiene_gate = density_accounting_clean and valid_finite_clean and rn_weight_controlled
-    old_case_gate = (
-        density_accounting_clean
-        and valid_finite_clean
-        and rn_weight_controlled
-        and all(
-            diagnostics[name]["classification"] in GO_CLASSIFICATIONS
-            for name in ("energy", "rms", "r2")
-        )
+    population_weights_controlled = population_weight_status != "weight_collapse"
+    base_numerics_valid = (
+        density_accounting_clean and valid_finite_clean and population_weights_controlled
     )
     final_classification = classify_blocked_case(
-        hygiene_gate=hygiene_gate,
-        rn_weight_status=rn_weight_status,
+        base_numerics_valid=base_numerics_valid,
+        population_weight_status=population_weight_status,
         energy=spread["energy"],
         rms=spread["rms"],
         r2=spread["r2"],
@@ -202,18 +188,18 @@ def summarize_stationarity_from_seed_summaries(
         stationarity_audit=stationarity_audit,
         correlated_errors=correlated_errors,
     )
-    case_gate = final_classification in {
-        "PASS_CANDIDATE",
-        "WEAK_TRAP_WARNING",
+    validation_passed = final_classification in {
+        "accepted",
+        "spread_warning",
         MIXED_OBSERVABLE_WARNING,
         MIXED_COORDINATE_DIAGNOSTIC,
         TRIANGULATED_PRECISION_WARNING,
     }
     classification = classify_case(
-        case_gate=case_gate,
+        validation_passed=validation_passed,
         density_accounting_clean=density_accounting_clean,
         valid_finite_clean=valid_finite_clean,
-        rn_weight_controlled=rn_weight_controlled,
+        population_weights_controlled=population_weights_controlled,
         diagnostics=diagnostics,
         final_classification=final_classification,
     )
@@ -223,16 +209,14 @@ def summarize_stationarity_from_seed_summaries(
         "case_id": case.case_id,
         "n_particles": case.n_particles,
         "rod_length": case.rod_length,
-        "omega": case.omega,
         **case.unit_metadata(),
         "initialization_mode": initialization.mode,
         "init_width_log_sigma": initialization.init_width_log_sigma,
         "breathing_preburn_steps": initialization.breathing_preburn_steps,
         "breathing_preburn_log_step": initialization.breathing_preburn_log_step,
-        **proposal.to_metadata(),
-        "proposal_family": proposal_family,
+        "collective_rn_controls": (None if collective_rn is None else collective_rn.to_metadata()),
         "guide_family": guide_family,
-        "target_family": target_family,
+        "collective_rn_enabled": collective_rn is not None,
         "resolved_guide_family": ",".join(
             sorted(
                 {str(summary.metadata.get("resolved_guide_family")) for summary in seed_summaries}
@@ -240,26 +224,22 @@ def summarize_stationarity_from_seed_summaries(
         ),
         "target_initial_rms": seed_summaries[0].metadata.get("target_initial_rms", float("nan")),
         "initializer_scope": seed_summaries[0].metadata.get("initializer_scope", ""),
-        "case_gate": case_gate,
-        "old_case_gate": old_case_gate,
-        "hygiene_gate": hygiene_gate,
+        "validation_passed": validation_passed,
+        "base_numerics_valid": base_numerics_valid,
         "classification": classification,
         "final_classification": final_classification,
-        "gate_split_methodology": methodology_gate_status(
+        "method_status": method_status(
             density_accounting_clean=density_accounting_clean,
             valid_finite_clean=valid_finite_clean,
-            rn_weight_status=rn_weight_status,
+            population_weight_status=population_weight_status,
             diagnostics=diagnostics,
             stationarity_audit=stationarity_audit,
         ),
-        "gate_split_precision": precision_gate_status(final_classification),
-        "gate_split_combined": final_classification,
-        "energy_estimator_scope": (
-            "mixed local-energy Hamiltonian estimator; candidate paper estimator "
-            "after numerical checks"
-        ),
-        "mixed_coordinate_observable_scope": (
-            "diagnostic only; paper R2/RMS require Hellmann-Feynman energy response "
+        "precision_status": precision_status(final_classification),
+        "diagnostic_status": final_classification,
+        "energy_estimator": "mixed local-energy Hamiltonian estimator",
+        "mixed_coordinate_observable_status": (
+            "diagnostic only; pure R2/RMS require Hellmann-Feynman energy response "
             "or transported auxiliary forward walking"
         ),
         "mixed_coordinate_diagnostic_status": mixed_coordinate_diagnostic_status(
@@ -268,10 +248,10 @@ def summarize_stationarity_from_seed_summaries(
             diagnostics=diagnostics,
             stationarity_audit=stationarity_audit,
         ),
-        "paper_r2_estimator_status": "NOT_EVALUATED_HF_OR_FW_REQUIRED",
-        "paper_rms_estimator_status": "NOT_EVALUATED_HF_OR_FW_REQUIRED",
-        "paper_density_estimator_status": "NOT_EVALUATED_TRANSPORTED_FW_REQUIRED",
-        "paper_pair_structure_estimator_status": "NOT_EVALUATED_TRANSPORTED_FW_REQUIRED",
+        "pure_r2_estimator_status": "not_evaluated_hf_or_fw_required",
+        "pure_rms_estimator_status": "not_evaluated_hf_or_fw_required",
+        "pure_density_estimator_status": "not_evaluated_transported_fw_required",
+        "pure_pair_structure_estimator_status": "not_evaluated_transported_fw_required",
         "seeds": seeds,
         "seed_count": len(seeds),
         "parallel_workers": actual_worker_count,
@@ -301,7 +281,7 @@ def summarize_stationarity_from_seed_summaries(
         "density_integral": density_integral,
         "density_accounting_clean": density_accounting_clean,
         "valid_finite_clean": valid_finite_clean,
-        "rn_weight_controlled": rn_weight_controlled,
+        "population_weights_controlled": population_weights_controlled,
         "lost_out_of_grid_sample_count_total": int(
             sum(summary.lost_out_of_grid_sample_count for summary in seed_summaries)
         ),
@@ -315,7 +295,7 @@ def summarize_stationarity_from_seed_summaries(
             "x": grid.tolist(),
             "mixed_n_x": density.tolist(),
             "lda_n_x": lda.n_x.tolist(),
-            "estimator": "mixed coordinate diagnostic; paper density requires transported FW",
+            "estimator": "mixed coordinate diagnostic; pure density requires transported FW",
         },
         "uncertainty_status": case_uncertainty_status([energy_uncertainty]),
         "mixed_coordinate_uncertainty_status": case_uncertainty_status(
@@ -386,10 +366,10 @@ def summarize_stationarity_from_seed_summaries(
         ),
         "ess_fraction_min": ess_fraction_min,
         "log_weight_span_max": log_weight_span_max,
-        "rn_weight_status": rn_weight_status,
-        "rn_weight_ess_warning_fraction": ess_warning_fraction,
-        "rn_weight_ess_no_go_fraction": ess_no_go_fraction,
-        "rn_weight_log_weight_span_warning": log_weight_span_warning,
+        "population_weight_status": population_weight_status,
+        "population_weight_ess_warning_fraction": ess_warning_fraction,
+        "population_weight_ess_invalid_fraction": ess_invalid_fraction,
+        "population_weight_log_weight_span_warning": log_weight_span_warning,
         "initial_to_production_rms_ratio": float(
             np.mean(
                 [
@@ -438,6 +418,21 @@ def summarize_stationarity_from_seed_summaries(
                     "metropolis_rejection_fraction_max",
                     float("nan"),
                 ),
+                "drift_norm_max": summary.metadata.get("drift_norm_max", float("nan")),
+                "configuration_esjd_mean": summary.metadata.get(
+                    "configuration_esjd_mean",
+                    float("nan"),
+                ),
+                "r2_esjd_mean": summary.metadata.get("r2_esjd_mean", float("nan")),
+                "weighted_free_gap_esjd_mean": summary.metadata.get(
+                    "weighted_free_gap_esjd_mean",
+                    float("nan"),
+                ),
+                "free_gap_min": summary.metadata.get("free_gap_min", float("nan")),
+                "free_gap_p01_min": summary.metadata.get(
+                    "free_gap_p01_min",
+                    float("nan"),
+                ),
                 "initialization_mode": summary.metadata["initialization_mode"],
                 "target_initial_rms": summary.metadata["target_initial_rms"],
                 "initial_spacing_mean": summary.metadata["initial_spacing_mean"],
@@ -463,7 +458,11 @@ def summarize_stationarity_from_seed_summaries(
                 "guide_batch_backend": summary.metadata["guide_batch_backend"],
                 "target_backend": summary.metadata.get("target_backend", ""),
                 "proposal_backend": summary.metadata.get("proposal_backend", ""),
-                "target_family": summary.metadata.get("target_family", target_family),
+                "local_step_method": summary.metadata.get("local_step_method", ""),
+                "relative_alpha": summary.metadata.get("relative_alpha"),
+                "contact_beta": summary.metadata.get("contact_beta"),
+                "response_lambda": summary.metadata.get("response_lambda"),
+                "collective_rn": summary.metadata.get("collective_rn"),
                 "guide_family": summary.metadata.get("guide_family", ""),
                 "resolved_guide_family": summary.metadata.get("resolved_guide_family", ""),
             }
@@ -476,22 +475,18 @@ def summarize_stationarity_from_seed_summaries(
 
 
 def run_stationarity_seeds(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seeds: list[int],
     density_grid: np.ndarray,
     *,
     worker_count: int,
     progress: ProgressBar | None,
-    initialization: RNInitializationControls | None = None,
-    proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
-) -> tuple[list[RNBlockStreamingSummary], int]:
-    initialization = RNInitializationControls() if initialization is None else initialization
-    proposal = RNCollectiveProposalControls() if proposal is None else proposal
-    proposal.validate()
+    initialization: InitializationControls | None = None,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
+) -> tuple[list[DMCStreamingSummary], int]:
+    initialization = InitializationControls() if initialization is None else initialization
     return run_seed_batch(
         seeds,
         worker_count=worker_count,
@@ -504,10 +499,8 @@ def run_stationarity_seeds(
             density_grid,
             progress_queue,
             initialization,
-            proposal,
-            proposal_family,
+            collective_rn,
             guide_family,
-            target_family,
         ),
         run_serial_seed=lambda seed: run_streaming_seed(
             case,
@@ -516,29 +509,23 @@ def run_stationarity_seeds(
             density_grid=density_grid,
             progress=progress,
             initialization=initialization,
-            proposal=proposal,
-            proposal_family=proposal_family,
+            collective_rn=collective_rn,
             guide_family=guide_family,
-            target_family=target_family,
         ),
     )
 
 
 def run_seed_worker(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seed: int,
     density_grid: np.ndarray,
     progress_queue: Any | None = None,
-    initialization: RNInitializationControls | None = None,
-    proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
-) -> tuple[int, RNBlockStreamingSummary]:
-    initialization = RNInitializationControls() if initialization is None else initialization
-    proposal = RNCollectiveProposalControls() if proposal is None else proposal
-    proposal.validate()
+    initialization: InitializationControls | None = None,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
+) -> tuple[int, DMCStreamingSummary]:
+    initialization = InitializationControls() if initialization is None else initialization
     worker_progress = QueuedProgress(progress_queue) if progress_queue is not None else None
     try:
         return seed, run_streaming_seed(
@@ -548,17 +535,15 @@ def run_seed_worker(
             density_grid=density_grid,
             progress=worker_progress,
             initialization=initialization,
-            proposal=proposal,
-            proposal_family=proposal_family,
+            collective_rn=collective_rn,
             guide_family=guide_family,
-            target_family=target_family,
         )
     finally:
         if worker_progress is not None:
             worker_progress.flush()
 
 
-def diagnose_stationarity(seed_summaries: list[RNBlockStreamingSummary]) -> dict[str, dict]:
+def diagnose_stationarity(seed_summaries: list[DMCStreamingSummary]) -> dict[str, dict]:
     times_by_seed = [require_trace(summary.trace_times) for summary in seed_summaries]
     energy_by_seed = [require_trace(summary.mixed_energy_trace) for summary in seed_summaries]
     r2_by_seed = [require_trace(summary.r2_radius_trace) for summary in seed_summaries]
@@ -572,7 +557,7 @@ def diagnose_stationarity(seed_summaries: list[RNBlockStreamingSummary]) -> dict
 
 def correlated_error_diagnostics(
     seeds: list[int],
-    seed_summaries: list[RNBlockStreamingSummary],
+    seed_summaries: list[DMCStreamingSummary],
 ) -> dict[str, dict[str, Any]]:
     metric_traces = {
         "energy": [optional_trace(summary.mixed_energy_trace) for summary in seed_summaries],
@@ -614,7 +599,7 @@ def stationarity_metric_audit(
         per_seed.append({"seed": int(seed), "failures": failures, **stationarity_row_values(row)})
     unique_reasons = sorted(set(reasons))
     return {
-        "reason": "+".join(unique_reasons) if unique_reasons else "GO",
+        "reason": "+".join(unique_reasons) if unique_reasons else "accepted",
         "failing_seeds": failing_seeds,
         "failing_seed_count": len(failing_seeds),
         "slope_z_max": max_finite(row["slope_z_autocorr_adjusted"] for row in rows),
@@ -629,13 +614,13 @@ def stationarity_metric_audit(
 def stationarity_row_failures(row: dict[str, Any]) -> list[str]:
     failures: list[str] = []
     if not bool(row.get("trend_clean", False)):
-        failures.append("TREND")
+        failures.append("trend_detected")
     if not bool(row.get("cumulative_drift_clean", False)):
-        failures.append("CUMULATIVE_DRIFT")
+        failures.append("cumulative_drift")
     if not bool(row.get("blocking_clean", False)):
-        failures.append("BLOCK_DRIFT")
+        failures.append("block_drift")
     if bool(row.get("spread_warning", False)):
-        failures.append("SPREAD_WARNING")
+        failures.append("spread_warning")
     return failures
 
 
@@ -667,13 +652,13 @@ def summarize_correlated_error_metric(
             row = {
                 "seed": int(seed),
                 "trace_spacing_tau": float(spacing),
-                "status": TRIANGULATED_ERROR_UNAVAILABLE,
+                "status": CORRELATED_ERROR_UNAVAILABLE,
                 "conservative_stderr": float("nan"),
                 "overlap_pair_count": 0,
                 "estimates": [],
             }
             rows.append(row)
-            statuses.append(TRIANGULATED_ERROR_UNAVAILABLE)
+            statuses.append(CORRELATED_ERROR_UNAVAILABLE)
         else:
             result = triangulated_error_estimate(trace, trace_spacing_tau=spacing)
             rows.append(
@@ -688,26 +673,30 @@ def summarize_correlated_error_metric(
                 finite_stderrs.append(float(result.conservative_stderr))
 
     if not finite_stderrs:
-        status = TRIANGULATED_ERROR_UNAVAILABLE
+        status = CORRELATED_ERROR_UNAVAILABLE
         case_stderr = float("nan")
-    elif any(value == TRIANGULATED_ERROR_UNAVAILABLE for value in statuses):
-        status = TRIANGULATED_ERROR_UNAVAILABLE
+    elif any(value == CORRELATED_ERROR_UNAVAILABLE for value in statuses):
+        status = CORRELATED_ERROR_UNAVAILABLE
         case_stderr = float("nan")
-    elif all(value == TRIANGULATED_ERROR_GO for value in statuses):
-        status = TRIANGULATED_ERROR_GO
+    elif all(value == CORRELATED_ERROR_AGREEMENT for value in statuses):
+        status = CORRELATED_ERROR_AGREEMENT
         case_stderr = float(np.sqrt(np.sum(np.square(finite_stderrs))) / len(seeds))
     else:
-        status = TRIANGULATED_ERROR_WARNING
+        status = CORRELATED_ERROR_DISAGREEMENT
         case_stderr = float(np.sqrt(np.sum(np.square(finite_stderrs))) / len(seeds))
 
     return {
         "status": status,
         "case_correlated_stderr": case_stderr,
         "seed_count": len(seeds),
-        "triangulated_seed_count": int(sum(value == TRIANGULATED_ERROR_GO for value in statuses)),
-        "disagree_seed_count": int(sum(value == TRIANGULATED_ERROR_WARNING for value in statuses)),
+        "triangulated_seed_count": int(
+            sum(value == CORRELATED_ERROR_AGREEMENT for value in statuses)
+        ),
+        "disagree_seed_count": int(
+            sum(value == CORRELATED_ERROR_DISAGREEMENT for value in statuses)
+        ),
         "unavailable_seed_count": int(
-            sum(value == TRIANGULATED_ERROR_UNAVAILABLE for value in statuses)
+            sum(value == CORRELATED_ERROR_UNAVAILABLE for value in statuses)
         ),
         "per_seed": rows,
     }
@@ -725,7 +714,7 @@ def trace_spacing_tau(times: np.ndarray) -> float:
 
 def require_trace(values: np.ndarray | None) -> np.ndarray:
     if values is None:
-        raise ValueError("RN streaming summary does not contain trace data")
+        raise ValueError("DMC streaming summary does not contain trace data")
     return np.asarray(values, dtype=float)
 
 
@@ -737,45 +726,43 @@ def optional_trace(values: np.ndarray | None) -> np.ndarray:
 
 def classify_case(
     *,
-    case_gate: bool,
+    validation_passed: bool,
     density_accounting_clean: bool,
     valid_finite_clean: bool,
-    rn_weight_controlled: bool,
+    population_weights_controlled: bool,
     diagnostics: dict[str, dict],
     final_classification: str,
 ) -> str:
-    if case_gate:
+    if validation_passed:
         if final_classification == TRIANGULATED_PRECISION_WARNING:
-            return "RN_TRAPPED_STATIONARITY_PRECISION_WARNING"
-        if final_classification in {"WEAK_TRAP_WARNING", MIXED_OBSERVABLE_WARNING}:
-            return "RN_TRAPPED_STATIONARITY_WARNING"
+            return TRIANGULATED_PRECISION_WARNING
+        if final_classification in {"spread_warning", MIXED_OBSERVABLE_WARNING}:
+            return final_classification
         if final_classification == MIXED_COORDINATE_DIAGNOSTIC:
-            return "RN_TRAPPED_ENERGY_CORRIDOR_GO"
-        if any(
-            diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY" for name in ("energy",)
-        ):
-            return "RN_TRAPPED_STATIONARITY_WARNING"
-        return "RN_TRAPPED_STATIONARITY_GO"
+            return MIXED_COORDINATE_DIAGNOSTIC
+        if any(diagnostics[name]["classification"] == CHAIN_SPREAD_WARNING for name in ("energy",)):
+            return CHAIN_SPREAD_WARNING
+        return "accepted"
     if not density_accounting_clean:
-        return "RN_TRAPPED_DENSITY_ACCOUNTING_NO_GO"
+        return "density_normalization_mismatch"
     if not valid_finite_clean:
-        return "RN_TRAPPED_VALID_FINITE_NO_GO"
-    if not rn_weight_controlled:
-        return "RN_TRAPPED_WEIGHT_CONTROL_NO_GO"
-    return "RN_TRAPPED_STATIONARITY_NO_GO"
+        return "nonfinite_samples"
+    if not population_weights_controlled:
+        return "weight_collapse"
+    return "trace_nonstationary"
 
 
 def classify_grid(rows: list[dict[str, Any]]) -> str:
-    if all(row["case_gate"] for row in rows):
-        if any(row["classification"].endswith("_WARNING") for row in rows):
-            return "RN_TRAPPED_STATIONARITY_GRID_WARNING"
-        return "RN_TRAPPED_STATIONARITY_GRID_GO"
-    return "RN_TRAPPED_STATIONARITY_GRID_NO_GO"
+    if all(row["validation_passed"] for row in rows):
+        if any(row["classification"] != "accepted" for row in rows):
+            return "accepted_with_warnings"
+        return "accepted"
+    return "grid_contains_unresolved_case"
 
 
 def blocked_spread_diagnostics(
     seeds: list[int],
-    seed_summaries: list[RNBlockStreamingSummary],
+    seed_summaries: list[DMCStreamingSummary],
 ) -> dict[str, dict[str, Any]]:
     metric_values = {
         "energy": [require_trace(summary.mixed_energy_trace) for summary in seed_summaries],
@@ -850,15 +837,17 @@ def blocked_metric_diagnostics(
         "blocked_zscore_max": float(blocked_z_max),
         "robust_zscore_max": float(max(finite_robust_z) if finite_robust_z else float("nan")),
         "blocked_zscore_threshold": blocked_z_threshold,
-        "blocked_zscore_gate": bool(plateau_all and blocked_z_max <= blocked_z_threshold),
+        "blocked_zscore_within_threshold": bool(
+            plateau_all and blocked_z_max <= blocked_z_threshold
+        ),
         "per_seed": rows,
     }
 
 
 def classify_blocked_case(
     *,
-    hygiene_gate: bool,
-    rn_weight_status: str,
+    base_numerics_valid: bool,
+    population_weight_status: str,
     energy: dict[str, Any],
     rms: dict[str, Any],
     r2: dict[str, Any],
@@ -866,12 +855,12 @@ def classify_blocked_case(
     stationarity_audit: dict[str, dict[str, Any]],
     correlated_errors: dict[str, dict[str, Any]],
 ) -> str:
-    if rn_weight_status == "RN_WEIGHT_NO_GO":
-        return "RN_WEIGHT_NO_GO"
-    if not hygiene_gate:
-        return "HYGIENE_NO_GO"
-    if hard_chain_no_go(diagnostics, stationarity_audit, metrics=("energy",)):
-        return "NO_GO_STATIONARITY"
+    if population_weight_status == "weight_collapse":
+        return "weight_collapse"
+    if not base_numerics_valid:
+        return "base_numerics_invalid"
+    if chain_has_failure(diagnostics, stationarity_audit, metrics=("energy",)):
+        return "trace_nonstationary"
 
     energy_problem = metric_precision_problem(energy, diagnostics["energy"])
     rms_problem = metric_precision_problem(rms, diagnostics["rms"])
@@ -884,15 +873,15 @@ def classify_blocked_case(
 
     if energy_problem and not energy_repairable:
         if not energy["plateau_all"]:
-            return "NO_GO_NO_BLOCKING_PLATEAU"
-        if not energy["blocked_zscore_gate"]:
-            return "SPREAD_VETO_NO_GO"
-        return "NO_GO_NO_BLOCKING_PLATEAU"
+            return "plateau_unresolved"
+        if not energy["blocked_zscore_within_threshold"]:
+            return "seed_disagreement"
+        return "plateau_unresolved"
 
     if energy_problem:
         return TRIANGULATED_PRECISION_WARNING
 
-    if mixed_coordinate_methodology_no_go(diagnostics, stationarity_audit):
+    if mixed_coordinate_chain_has_failure(diagnostics, stationarity_audit):
         return MIXED_COORDINATE_DIAGNOSTIC
     if rms_problem or r2_problem:
         coordinate_repairable = metric_precision_repairable(
@@ -904,14 +893,14 @@ def classify_blocked_case(
         )
         return MIXED_COORDINATE_DIAGNOSTIC if coordinate_repairable else MIXED_OBSERVABLE_WARNING
 
-    if any(diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY" for name in ("energy",)):
-        return "WEAK_TRAP_WARNING"
-    return "PASS_CANDIDATE"
+    if any(diagnostics[name]["classification"] == CHAIN_SPREAD_WARNING for name in ("energy",)):
+        return "spread_warning"
+    return "accepted"
 
 
 def metric_precision_problem(metric: dict[str, Any], diagnostics: dict[str, Any]) -> bool:
     del diagnostics
-    return bool(not metric["plateau_all"] or not metric["blocked_zscore_gate"])
+    return bool(not metric["plateau_all"] or not metric["blocked_zscore_within_threshold"])
 
 
 def metric_precision_repairable(problem: bool, correlated_error: dict[str, Any]) -> bool:
@@ -920,38 +909,42 @@ def metric_precision_repairable(problem: bool, correlated_error: dict[str, Any])
 
 def correlated_error_available(metric: dict[str, Any]) -> bool:
     return str(metric["status"]) in {
-        TRIANGULATED_ERROR_GO,
-        TRIANGULATED_ERROR_WARNING,
+        CORRELATED_ERROR_AGREEMENT,
+        CORRELATED_ERROR_DISAGREEMENT,
     } and np.isfinite(float(metric["case_correlated_stderr"]))
 
 
-def hard_chain_no_go(
+def chain_has_failure(
     diagnostics: dict[str, dict],
     stationarity_audit: dict[str, dict[str, Any]],
     *,
     metrics: tuple[str, ...] = ("energy", "rms", "r2"),
 ) -> bool:
-    if any(diagnostics[name]["classification"] in {"NO_GO_RHAT", "NO_GO_NEFF"} for name in metrics):
+    if any(
+        diagnostics[name]["classification"]
+        in {CHAIN_RHAT_ABOVE_LIMIT, CHAIN_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM}
+        for name in metrics
+    ):
         return True
     return any(
-        stationarity_audit[name]["reason"] not in {"GO", "SPREAD_WARNING"}
-        and diagnostics[name]["classification"] == "NO_GO_STATIONARITY"
+        stationarity_audit[name]["reason"] not in {"accepted", "spread_warning"}
+        and diagnostics[name]["classification"] == CHAIN_TRACE_NONSTATIONARY
         for name in metrics
     )
 
 
-def mixed_coordinate_methodology_no_go(
+def mixed_coordinate_chain_has_failure(
     diagnostics: dict[str, dict],
     stationarity_audit: dict[str, dict[str, Any]],
 ) -> bool:
     """Return whether diagnostic mixed coordinate traces failed their own checks.
 
-    Mixed coordinate observables do not authorize paper R2/RMS/density claims.
+    Mixed coordinate observables are not pure R2/RMS/density estimators.
     Their stationarity failures must stay visible, but they do not veto the
     Hamiltonian energy corridor.
     """
 
-    return hard_chain_no_go(diagnostics, stationarity_audit, metrics=("rms", "r2"))
+    return chain_has_failure(diagnostics, stationarity_audit, metrics=("rms", "r2"))
 
 
 def mixed_coordinate_diagnostic_status(
@@ -961,75 +954,75 @@ def mixed_coordinate_diagnostic_status(
     diagnostics: dict[str, dict],
     stationarity_audit: dict[str, dict[str, Any]],
 ) -> str:
-    """Classify mixed coordinate traces without feeding the energy gate."""
+    """Classify mixed coordinate traces without changing the energy result."""
 
-    if mixed_coordinate_methodology_no_go(diagnostics, stationarity_audit):
-        return "MIXED_COORDINATE_DIAGNOSTIC_STATIONARITY_WARNING"
+    if mixed_coordinate_chain_has_failure(diagnostics, stationarity_audit):
+        return "mixed_coordinate_trace_nonstationary"
     if metric_precision_problem(rms, diagnostics["rms"]) or metric_precision_problem(
         r2,
         diagnostics["r2"],
     ):
-        return "MIXED_COORDINATE_DIAGNOSTIC_PRECISION_WARNING"
-    if any(diagnostics[name]["classification"] == "WARNING_SPREAD_ONLY" for name in ("rms", "r2")):
-        return "MIXED_COORDINATE_DIAGNOSTIC_SPREAD_WARNING"
-    return "MIXED_COORDINATE_DIAGNOSTIC_GO"
+        return "mixed_coordinate_precision_warning"
+    if any(diagnostics[name]["classification"] == CHAIN_SPREAD_WARNING for name in ("rms", "r2")):
+        return "mixed_coordinate_spread_warning"
+    return "accepted"
 
 
-def methodology_gate_status(
+def method_status(
     *,
     density_accounting_clean: bool,
     valid_finite_clean: bool,
-    rn_weight_status: str,
+    population_weight_status: str,
     diagnostics: dict[str, dict],
     stationarity_audit: dict[str, dict[str, Any]],
 ) -> str:
     if not density_accounting_clean:
-        return "DENSITY_ACCOUNTING_NO_GO"
+        return "density_normalization_mismatch"
     if not valid_finite_clean:
-        return "HYGIENE_NO_GO"
-    if rn_weight_status == "RN_WEIGHT_NO_GO":
-        return "RN_WEIGHT_NO_GO"
-    if hard_chain_no_go(diagnostics, stationarity_audit, metrics=("energy",)):
-        return "STATIONARITY_NO_GO"
-    return "GO"
+        return "nonfinite_samples"
+    if population_weight_status == "weight_collapse":
+        return "weight_collapse"
+    if chain_has_failure(diagnostics, stationarity_audit, metrics=("energy",)):
+        return "trace_nonstationary"
+    return "accepted"
 
 
-def precision_gate_status(final_classification: str) -> str:
-    if final_classification == "PASS_CANDIDATE":
-        return "GO"
+def precision_status(final_classification: str) -> str:
+    if final_classification == "accepted":
+        return "accepted"
     if final_classification == TRIANGULATED_PRECISION_WARNING:
-        return "WARNING_BLOCKING_PLATEAU_ABSENT_TRIANGULATED_ERROR"
+        return TRIANGULATED_PRECISION_WARNING
     if final_classification == MIXED_COORDINATE_DIAGNOSTIC:
-        return "GO"
+        return "accepted"
     if final_classification == MIXED_OBSERVABLE_WARNING:
-        return "WARNING_MIXED_COORDINATE_OBSERVABLES"
-    if final_classification == "WEAK_TRAP_WARNING":
-        return "WARNING_SPREAD_ONLY"
-    return "NOT_EVALUATED_DUE_TO_METHODOLOGY_NO_GO"
+        return MIXED_OBSERVABLE_WARNING
+    if final_classification == "spread_warning":
+        return "spread_warning"
+    return "not_evaluated_due_to_invalid_numerics"
 
 
-def classify_rn_weight_status(
+def classify_population_weight_status(
     *,
     ess_fraction_min: float,
     log_weight_span_max: float,
     ess_warning_fraction: float,
-    ess_no_go_fraction: float,
+    ess_invalid_fraction: float,
     log_weight_span_warning: float,
 ) -> str:
-    if not np.isfinite(ess_fraction_min) or ess_fraction_min < ess_no_go_fraction:
-        return "RN_WEIGHT_NO_GO"
+    if not np.isfinite(ess_fraction_min) or ess_fraction_min < ess_invalid_fraction:
+        return "weight_collapse"
     if ess_fraction_min < ess_warning_fraction:
-        return "RN_WEIGHT_WARNING"
+        return "weight_dispersion_warning"
     if np.isfinite(log_weight_span_max) and log_weight_span_max > log_weight_span_warning:
-        return "RN_WEIGHT_WARNING"
-    return "RN_WEIGHT_GO"
+        return "weight_dispersion_warning"
+    return "accepted"
 
 
 def write_seed_trace_artifacts(
     output_dir: Any,
     case_id: str,
     seeds: list[int],
-    seed_summaries: list[RNBlockStreamingSummary],
+    seed_summaries: list[DMCStreamingSummary],
 ) -> list[str]:
     root = ensure_dir(output_dir) / "seed_traces" / case_id
     ensure_dir(root)
@@ -1047,7 +1040,7 @@ def write_seed_trace_artifacts(
     return paths
 
 
-def seed_trace_dict(summary: RNBlockStreamingSummary) -> dict[str, np.ndarray]:
+def seed_trace_dict(summary: DMCStreamingSummary) -> dict[str, np.ndarray]:
     trace_times = require_trace(summary.trace_times)
     return {
         "tau": trace_times,
@@ -1055,22 +1048,39 @@ def seed_trace_dict(summary: RNBlockStreamingSummary) -> dict[str, np.ndarray]:
         "rms_radius": require_trace(summary.rms_radius_trace),
         "r2_radius": require_trace(summary.r2_radius_trace),
         "local_energy_variance": require_trace(summary.local_energy_variance_trace),
+        "local_energy_median": require_trace(summary.local_energy_median_trace),
+        "local_energy_mad": require_trace(summary.local_energy_mad_trace),
+        "local_energy_p001": require_trace(summary.local_energy_p001_trace),
+        "local_energy_p01": require_trace(summary.local_energy_p01_trace),
+        "local_energy_p99": require_trace(summary.local_energy_p99_trace),
+        "local_energy_p999": require_trace(summary.local_energy_p999_trace),
         "log_weight_span": require_trace(summary.log_weight_span_trace),
         "ess_fraction": require_trace(summary.ess_fraction_trace),
         "invalid_proposal_fraction": require_trace(summary.invalid_proposal_fraction_trace),
         "hard_wall_kill_fraction": require_trace(summary.hard_wall_kill_fraction_trace),
         "local_acceptance_fraction": require_trace(summary.local_acceptance_fraction_trace),
         "metropolis_rejection_fraction": require_trace(summary.metropolis_rejection_fraction_trace),
+        "drift_norm_max": require_trace(summary.drift_norm_max_trace),
+        "configuration_esjd": require_trace(summary.configuration_esjd_trace),
+        "r2_esjd": require_trace(summary.r2_esjd_trace),
+        "weighted_free_gap_esjd": require_trace(summary.weighted_free_gap_esjd_trace),
+        "weighted_free_gap_mean": require_trace(summary.weighted_free_gap_mean_trace),
+        "free_gap_min": require_trace(summary.free_gap_min_trace),
+        "free_gap_p01": require_trace(summary.free_gap_p01_trace),
         "zero_weight_excluded_fraction": require_trace(summary.zero_weight_excluded_fraction_trace),
-        "rn_logk_mean": require_trace(summary.rn_logk_mean_trace),
-        "rn_logq_mean": require_trace(summary.rn_logq_mean_trace),
-        "rn_logw_increment_mean": require_trace(summary.rn_logw_increment_mean_trace),
-        "rn_logw_increment_variance": require_trace(summary.rn_logw_increment_variance_trace),
+        "scheduled_log_target_mean": require_trace(summary.scheduled_log_target_mean_trace),
+        "scheduled_log_proposal_mean": require_trace(summary.scheduled_log_proposal_mean_trace),
+        "scheduled_log_weight_increment_mean": require_trace(
+            summary.scheduled_log_weight_increment_mean_trace
+        ),
+        "scheduled_log_weight_increment_variance": require_trace(
+            summary.scheduled_log_weight_increment_variance_trace
+        ),
         "retained_fraction": require_trace(summary.retained_fraction_trace),
     }
 
 
-def breathing_trace_summary(summary: RNBlockStreamingSummary) -> dict[str, float]:
+def breathing_trace_summary(summary: DMCStreamingSummary) -> dict[str, float]:
     values = require_trace(summary.rms_radius_trace)
     first, last, z_value = first_last_quarter_summary(values)
     return {
@@ -1189,20 +1199,20 @@ def uncertainty_summary(
     conservative = finite_max([seed_stderr, blocking_stderr, correlated_stderr])
     spread_warning = int(diagnostics["spread_warning_count"]) > 0
     correlated_available = correlated_error_available(correlated_error)
-    status = "STANDARD"
+    status = "accepted"
     if not plateau_all and not correlated_available:
-        status = "NO_BLOCKING_PLATEAU_NO_CORRELATED_REPAIR"
+        status = "plateau_unresolved"
     elif correlated_available and (
         spread_warning
         or not plateau_all
         or blocking_stderr_exceeds_seed(blocking_stderr, seed_stderr)
         or blocking_stderr_exceeds_seed(correlated_stderr, seed_stderr)
     ):
-        status = "TRIANGULATED_PRECISION_WARNING"
+        status = TRIANGULATED_PRECISION_WARNING
     elif spread_warning or blocking_stderr_exceeds_seed(blocking_stderr, seed_stderr):
-        status = "INFLATED"
+        status = "conservative_error_inflated"
     if not np.isfinite(conservative):
-        status = "UNAVAILABLE"
+        status = "uncertainty_unavailable"
     return {
         "seed_stderr": float(seed_stderr),
         "blocking_stderr": float(blocking_stderr),
@@ -1237,15 +1247,15 @@ def max_spread_blocking_z(diagnostics: dict[str, dict]) -> float:
 
 def case_uncertainty_status(summaries: list[dict[str, Any]]) -> str:
     statuses = {str(summary["status"]) for summary in summaries}
-    if "UNAVAILABLE" in statuses:
-        return "UNAVAILABLE"
-    if "NO_BLOCKING_PLATEAU_NO_CORRELATED_REPAIR" in statuses:
-        return "NO_BLOCKING_PLATEAU_NO_CORRELATED_REPAIR"
-    if "TRIANGULATED_PRECISION_WARNING" in statuses:
-        return "TRIANGULATED_PRECISION_WARNING"
-    if "INFLATED" in statuses:
-        return "INFLATED"
-    return "STANDARD"
+    if "uncertainty_unavailable" in statuses:
+        return "uncertainty_unavailable"
+    if "plateau_unresolved" in statuses:
+        return "plateau_unresolved"
+    if TRIANGULATED_PRECISION_WARNING in statuses:
+        return TRIANGULATED_PRECISION_WARNING
+    if "conservative_error_inflated" in statuses:
+        return "conservative_error_inflated"
+    return "accepted"
 
 
 def blocking_stderr_exceeds_seed(blocking_stderr: float, seed_stderr: float) -> bool:
@@ -1279,7 +1289,7 @@ def robust_zscore(value: float, values: np.ndarray) -> float:
     return float(0.6745 * (value - median) / mad)
 
 
-def min_seed_metadata(seed_summaries: list[RNBlockStreamingSummary], key: str) -> float:
+def min_seed_metadata(seed_summaries: list[DMCStreamingSummary], key: str) -> float:
     values = [
         float(summary.metadata.get(key, float("nan")))
         for summary in seed_summaries
@@ -1288,7 +1298,7 @@ def min_seed_metadata(seed_summaries: list[RNBlockStreamingSummary], key: str) -
     return min(values) if values else float("nan")
 
 
-def max_seed_metadata(seed_summaries: list[RNBlockStreamingSummary], key: str) -> float:
+def max_seed_metadata(seed_summaries: list[DMCStreamingSummary], key: str) -> float:
     values = [
         float(summary.metadata.get(key, float("nan")))
         for summary in seed_summaries

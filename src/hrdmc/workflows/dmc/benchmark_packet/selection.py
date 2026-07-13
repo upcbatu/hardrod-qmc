@@ -2,33 +2,36 @@ from __future__ import annotations
 
 import numpy as np
 
-GO_ENERGY_STATIONARITY = {"GO", "WARNING_SPREAD_ONLY"}
+from hrdmc.analysis import CHAIN_ACCEPTED, CHAIN_SPREAD_WARNING
+from hrdmc.estimators.pure.forward_walking.results import PURE_STATUS_ACCEPTED
+
+ACCEPTED_ENERGY_STATIONARITY = {CHAIN_ACCEPTED, CHAIN_SPREAD_WARNING}
 
 
-def energy_claim_status(stationarity: dict) -> str:
+def energy_validation_status(stationarity: dict) -> str:
     if not bool(stationarity.get("density_accounting_clean", False)):
-        return "ENERGY_DENSITY_ACCOUNTING_NO_GO"
+        return "density_normalization_mismatch"
     if not bool(stationarity.get("valid_finite_clean", False)):
-        return "ENERGY_HYGIENE_NO_GO"
-    if stationarity.get("rn_weight_status") != "RN_WEIGHT_GO":
-        return "ENERGY_RN_WEIGHT_NO_GO"
-    if stationarity.get("stationarity_energy") not in GO_ENERGY_STATIONARITY:
-        return "ENERGY_STATIONARITY_NO_GO"
-    return "ENERGY_GO"
+        return "nonfinite_samples"
+    population_status = str(stationarity.get("population_weight_status", ""))
+    if population_status != "accepted":
+        return population_status or "weight_status_unavailable"
+    energy_stationarity = str(stationarity.get("stationarity_energy", ""))
+    if energy_stationarity not in ACCEPTED_ENERGY_STATIONARITY:
+        return energy_stationarity or "stationarity_unavailable"
+    return "accepted"
 
 
-def pure_fw_claim_status(pure_summary: dict) -> str:
-    if pure_summary.get("status") != "PURE_WALKING_GO":
-        return str(pure_summary.get("status", "PURE_WALKING_NO_GO"))
-    return "PURE_FW_GO"
+def pure_fw_validation_status(pure_summary: dict) -> str:
+    return str(pure_summary.get("status", "not_evaluated"))
 
 
-def benchmark_packet_status(*, energy_status: str, pure_status: str) -> str:
-    if energy_status != "ENERGY_GO":
+def benchmark_validation_status(*, energy_status: str, pure_status: str) -> str:
+    if energy_status != "accepted":
         return energy_status
-    if pure_status != "PURE_FW_GO":
+    if pure_status != PURE_STATUS_ACCEPTED:
         return pure_status
-    return "BENCHMARK_PACKET_GO"
+    return "accepted"
 
 
 def scalar_seed_mean(values: list[float]) -> float:

@@ -1,48 +1,51 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
 
 from hrdmc.estimators.pure.forward_walking import PureWalkingConfig
+from hrdmc.estimators.pure.forward_walking.results import (
+    PURE_STATUS_ACCEPTED,
+    PURE_STATUS_INSUFFICIENT_SAMPLES,
+    PURE_STATUS_NO_BLOCKS,
+    PURE_STATUS_PLATEAU_UNRESOLVED,
+    PURE_STATUS_SCHEMA_INVALID,
+)
 from hrdmc.io.progress import ProgressBar, QueuedProgress
 from hrdmc.runners import run_seed_batch
+from hrdmc.systems.harmonic_com_transition import harmonic_com_ground_variance
+from hrdmc.workflows.dmc.collective_rn import CollectiveRNControls
+from hrdmc.workflows.dmc.initial_conditions import InitializationControls
 from hrdmc.workflows.dmc.pure_walking.seed import run_pure_walking_seed
-from hrdmc.workflows.dmc.rn_block import (
-    DEFAULT_RN_GUIDE_FAMILY,
-    DEFAULT_RN_PROPOSAL_FAMILY,
-    DEFAULT_RN_TARGET_FAMILY,
-    RNCase,
-    RNCollectiveProposalControls,
-    RNRunControls,
+from hrdmc.workflows.dmc.trapped import (
+    DEFAULT_GUIDE_FAMILY,
+    DMCRunControls,
+    TrappedCase,
     controls_to_dict,
     make_grid,
     resolve_parallel_workers,
 )
-from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 
 
 def summarize_pure_walking_case(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seeds: list[int],
     *,
     pure_config: PureWalkingConfig,
     parallel_workers: int | None = None,
     progress: ProgressBar | None = None,
-    initialization: RNInitializationControls | None = None,
-    proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    initialization: InitializationControls | None = None,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
 ) -> dict[str, Any]:
     """Run a reproducible transported-FW case packet."""
 
-    initialization = RNInitializationControls() if initialization is None else initialization
-    proposal = RNCollectiveProposalControls() if proposal is None else proposal
-    proposal.validate()
+    initialization = InitializationControls() if initialization is None else initialization
     grid = make_grid(controls, case)
-    config = pure_config_with_density_edges_if_needed(pure_config, grid)
+    config = pure_config_for_case(pure_config, grid=grid, case=case)
     worker_count = resolve_parallel_workers(len(seeds), parallel_workers)
     seed_payloads, actual_workers = run_seed_batch(
         seeds,
@@ -57,10 +60,8 @@ def summarize_pure_walking_case(
             grid,
             progress_queue,
             initialization,
-            proposal,
-            proposal_family,
+            collective_rn,
             guide_family,
-            target_family,
         ),
         run_serial_seed=lambda seed: run_pure_walking_seed(
             case,
@@ -70,18 +71,15 @@ def summarize_pure_walking_case(
             density_grid=grid,
             progress=progress,
             initialization=initialization,
-            proposal=proposal,
-            proposal_family=proposal_family,
+            collective_rn=collective_rn,
             guide_family=guide_family,
-            target_family=target_family,
         ),
     )
     return {
-        "schema_version": "transported_pure_walking_case_v1",
+        "schema_version": "transported_pure_walking_case_v2",
         "case_id": case.case_id,
         "n_particles": case.n_particles,
         "rod_length": case.rod_length,
-        "omega": case.omega,
         **case.unit_metadata(),
         "controls": controls_to_dict(controls),
         "seeds": seeds,
@@ -92,10 +90,8 @@ def summarize_pure_walking_case(
         "init_width_log_sigma": initialization.init_width_log_sigma,
         "breathing_preburn_steps": initialization.breathing_preburn_steps,
         "breathing_preburn_log_step": initialization.breathing_preburn_log_step,
-        **proposal.to_metadata(),
-        "proposal_family": proposal_family,
+        "collective_rn_controls": (None if collective_rn is None else collective_rn.to_metadata()),
         "guide_family": guide_family,
-        "target_family": target_family,
         "pure_config": pure_config_metadata(config),
         "status": case_status(seed_payloads),
         "seed_results": seed_payloads,
@@ -103,17 +99,15 @@ def summarize_pure_walking_case(
 
 
 def _run_pure_walking_seed_worker(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seed: int,
     pure_config: PureWalkingConfig,
     density_grid: np.ndarray,
     progress_queue: Any | None,
-    initialization: RNInitializationControls,
-    proposal: RNCollectiveProposalControls,
-    proposal_family: str,
+    initialization: InitializationControls,
+    collective_rn: CollectiveRNControls | None,
     guide_family: str,
-    target_family: str,
 ) -> tuple[int, dict[str, Any]]:
     worker_progress = QueuedProgress(progress_queue) if progress_queue is not None else None
     try:
@@ -125,10 +119,8 @@ def _run_pure_walking_seed_worker(
             density_grid=density_grid,
             progress=worker_progress,
             initialization=initialization,
-            proposal=proposal,
-            proposal_family=proposal_family,
+            collective_rn=collective_rn,
             guide_family=guide_family,
-            target_family=target_family,
         )
     finally:
         if worker_progress is not None:
@@ -138,14 +130,14 @@ def _run_pure_walking_seed_worker(
 def case_status(seed_payloads: list[dict[str, Any]]) -> str:
     statuses = {str(payload["status"]) for payload in seed_payloads}
     for status in (
-        "PURE_WALKING_SCHEMA_NO_GO",
-        "PURE_WALKING_NO_BLOCKS_NO_GO",
-        "PURE_WALKING_INSUFFICIENT_SAMPLES_NO_GO",
-        "PURE_WALKING_PLATEAU_NO_GO",
+        PURE_STATUS_SCHEMA_INVALID,
+        PURE_STATUS_NO_BLOCKS,
+        PURE_STATUS_INSUFFICIENT_SAMPLES,
+        PURE_STATUS_PLATEAU_UNRESOLVED,
     ):
         if status in statuses:
             return status
-    return "PURE_WALKING_GO" if statuses == {"PURE_WALKING_GO"} else "PURE_WALKING_NO_GO"
+    return PURE_STATUS_ACCEPTED if statuses == {PURE_STATUS_ACCEPTED} else "seed_disagreement"
 
 
 def pure_config_metadata(config: PureWalkingConfig) -> dict[str, Any]:
@@ -157,8 +149,11 @@ def pure_config_metadata(config: PureWalkingConfig) -> dict[str, Any]:
         "lag_unit": config.lag_unit,
         "observables": list(config.observables),
         "observable_source": config.observable_source,
+        "r2_rb_com_variance": config.r2_rb_com_variance,
         "min_block_count": config.min_block_count,
         "min_walker_weight_ess": config.min_walker_weight_ess,
+        "min_source_ancestor_ess": config.min_source_ancestor_ess,
+        "max_source_family_fraction": config.max_source_family_fraction,
         "block_size_steps": config.block_size_steps,
         "collection_stride_steps": config.collection_stride_steps,
         "density_collection_stride_steps": config.density_collection_stride_steps,
@@ -169,48 +164,35 @@ def pure_config_metadata(config: PureWalkingConfig) -> dict[str, Any]:
         "plateau_abs_tolerance": config.plateau_abs_tolerance,
         "plateau_window_lag_count": config.plateau_window_lag_count,
         "density_plateau_window_lag_count": config.density_plateau_window_lag_count,
-        "density_plateau_relative_l2_tolerance": (
-            config.density_plateau_relative_l2_tolerance
-        ),
+        "density_plateau_relative_l2_tolerance": (config.density_plateau_relative_l2_tolerance),
         "transport_invariant_tests_passed": list(config.transport_invariant_tests_passed),
     }
 
 
-def pure_config_with_density_edges_if_needed(
+def pure_config_for_case(
     config: PureWalkingConfig,
+    *,
     grid: np.ndarray,
+    case: TrappedCase,
 ) -> PureWalkingConfig:
-    if "density" not in config.observables or config.density_bin_edges is not None:
-        return config
-    if grid.ndim != 1 or grid.size < 2:
-        raise ValueError("density grid must contain at least two centers")
-    dx = float(grid[1] - grid[0])
-    edges = np.concatenate(
-        ([grid[0] - 0.5 * dx], 0.5 * (grid[:-1] + grid[1:]), [grid[-1] + 0.5 * dx])
-    )
-    return PureWalkingConfig(
-        lag_steps=config.lag_steps,
-        lag_unit=config.lag_unit,
-        observables=config.observables,
-        observable_source=config.observable_source,
-        density_bin_edges=edges,
-        pair_bin_edges=config.pair_bin_edges,
-        structure_k_values=config.structure_k_values,
-        min_block_count=config.min_block_count,
-        min_walker_weight_ess=config.min_walker_weight_ess,
-        block_size_steps=config.block_size_steps,
-        collection_stride_steps=config.collection_stride_steps,
-        transport_mode=config.transport_mode,
-        collection_mode=config.collection_mode,
-        center=config.center,
-        plateau_sigma_threshold=config.plateau_sigma_threshold,
-        plateau_abs_tolerance=config.plateau_abs_tolerance,
-        plateau_window_lag_count=config.plateau_window_lag_count,
-        density_lag_steps=config.density_lag_steps,
-        density_collection_stride_steps=config.density_collection_stride_steps,
-        density_plateau_window_lag_count=config.density_plateau_window_lag_count,
-        density_plateau_relative_l2_tolerance=config.density_plateau_relative_l2_tolerance,
-        schema_atol=config.schema_atol,
-        schema_rtol=config.schema_rtol,
-        transport_invariant_tests_passed=config.transport_invariant_tests_passed,
-    )
+    resolved = config
+    if "density" in resolved.observables and resolved.density_bin_edges is None:
+        if grid.ndim != 1 or grid.size < 2:
+            raise ValueError("density grid must contain at least two centers")
+        dx = float(grid[1] - grid[0])
+        edges = np.concatenate(
+            ([grid[0] - 0.5 * dx], 0.5 * (grid[:-1] + grid[1:]), [grid[-1] + 0.5 * dx])
+        )
+        resolved = replace(resolved, density_bin_edges=edges)
+    if resolved.observable_source == "r2_rb":
+        expected_variance = harmonic_com_ground_variance(case.n_particles, case.omega)
+        if resolved.r2_rb_com_variance is not None and not np.isclose(
+            resolved.r2_rb_com_variance,
+            expected_variance,
+            rtol=0.0,
+            atol=1.0e-12,
+        ):
+            raise ValueError("r2_rb_com_variance does not match the trapped COM ground state")
+        resolved = replace(resolved, r2_rb_com_variance=expected_variance)
+    resolved.validate()
+    return resolved

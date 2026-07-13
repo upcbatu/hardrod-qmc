@@ -1,130 +1,137 @@
 from __future__ import annotations
 
 import csv
-import math
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from hrdmc.analysis import relative_density_l2_error
-from hrdmc.estimators.mixed import estimate_weighted_observables
-from hrdmc.io.artifacts import (
+from hrdmc.artifacts import (
     build_run_provenance,
     config_fingerprint,
     ensure_dir,
     write_json,
     write_run_manifest,
 )
+from hrdmc.estimators.mixed import estimate_weighted_observables
 from hrdmc.io.checkpoint import read_checkpoint, write_checkpoint
 from hrdmc.io.progress import (
     ProgressBar,
     QueuedProgress,
     progress_bar,
 )
-from hrdmc.monte_carlo.dmc.rn_block import (
-    RNBlockDMCConfig,
-    RNBlockStreamingSummary,
-    RNTransportObserver,
-    run_rn_block_dmc,
-    run_rn_block_dmc_streaming,
+from hrdmc.monte_carlo.dmc.local import (
+    DMCConfig,
+    DMCStreamingSummary,
+    DMCTransportObserver,
+    run_dmc,
+    run_dmc_streaming,
 )
 from hrdmc.runners import run_seed_batch
 from hrdmc.systems import (
-    HarmonicMehlerKernel,
+    BASE_TRAP_QUADRATIC_COUPLING,
     HarmonicTrap,
-    OpenHardRodTrapGapHProductTargetKernel,
-    OpenHardRodTrapGapHTransformProposalKernel,
-    OpenHardRodTrapPrimitiveKernel,
     OpenLineHardRodSystem,
-    OpenN2HardRodTrapExactKernel,
 )
 from hrdmc.theory import lda_density_profile, lda_rms_radius, lda_total_energy
 from hrdmc.theory.units import HO_TRAP_OMEGA, harmonic_oscillator_unit_metadata
 from hrdmc.wavefunctions.guides import (
+    ContactCorrectedReducedTGHardRodGuide,
+    FixedGuideQuadraticResponse,
     GapHCorrectedHardRodGuide,
     ReducedTGHardRodGuide,
 )
-from hrdmc.workflows.dmc.rn_block_initial_conditions import (
-    RNInitializationControls,
+from hrdmc.workflows.dmc.collective_rn import (
+    CollectiveRNControls,
+    build_collective_rn_extension,
+)
+from hrdmc.workflows.dmc.initial_conditions import (
+    InitializationControls,
     initial_walkers,
     prepare_initial_walkers,
 )
 
 HO_CASE_RE = re.compile(r"^N(?P<n>\d+)_A(?P<A>[0-9.]+)$")
 MAX_AUTO_WORKERS = 6
-RN_GRID_SCHEMA_VERSION = "rn_block_grid_v1"
-RN_SINGLE_CASE_SCHEMA_VERSION = "rn_block_single_case_v1"
-RN_PROPOSAL_FAMILIES = ("harmonic-mehler", "gap-h-transform")
-RN_GUIDE_FAMILIES = ("auto", "reduced-tg", "gap-h-corrected")
-RN_TARGET_FAMILIES = ("primitive", "gap-h-product", "n2-exact-relative")
-DEFAULT_RN_PROPOSAL_FAMILY = "gap-h-transform"
-DEFAULT_RN_GUIDE_FAMILY = "auto"
-DEFAULT_RN_TARGET_FAMILY = "primitive"
-DEFAULT_COMPONENT_LOG_SCALES = (-0.015, -0.010, -0.004, 0.0, 0.004, 0.010, 0.015)
-DEFAULT_COMPONENT_PROBABILITIES = (0.03, 0.10, 0.22, 0.30, 0.22, 0.10, 0.03)
+TRAPPED_GRID_SCHEMA_VERSION = "dmc_grid_v1"
+TRAPPED_SINGLE_CASE_SCHEMA_VERSION = "dmc_single_case_v1"
+GUIDE_FAMILIES = (
+    "reduced-tg",
+    "contact-corrected-reduced-tg",
+    "gap-h-corrected",
+)
+DEFAULT_GUIDE_FAMILY = "reduced-tg"
 
 
 @dataclass(frozen=True)
-class RNCase:
+class TrappedCase:
     n_particles: int
     rod_length: float
-    omega: float = HO_TRAP_OMEGA
 
     def __post_init__(self) -> None:
         if self.n_particles < 2:
             raise ValueError("n_particles must be at least 2")
         if self.rod_length < 0.0:
             raise ValueError("rod_length must be non-negative")
-        if self.omega <= 0.0 or not math.isfinite(self.omega):
-            raise ValueError("omega must be finite and positive")
 
     @property
     def case_id(self) -> str:
-        if self.is_harmonic_oscillator_case:
-            return f"N{self.n_particles}_A{self.rod_length:g}"
-        return f"N{self.n_particles}_a{self.rod_length:g}_omega{self.omega:g}"
+        return f"N{self.n_particles}_A{self.rod_length:g}"
 
     @property
-    def is_harmonic_oscillator_case(self) -> bool:
-        return math.isclose(self.omega, HO_TRAP_OMEGA, rel_tol=0.0, abs_tol=1e-12)
+    def omega(self) -> float:
+        """Trap frequency after oscillator-unit nondimensionalization."""
+
+        return HO_TRAP_OMEGA
 
     @property
     def rod_length_ho(self) -> float:
-        if not self.is_harmonic_oscillator_case:
-            raise ValueError("rod_length_ho is defined only for harmonic-oscillator cases")
         return self.rod_length
 
     def unit_metadata(self) -> dict[str, Any]:
         metadata: dict[str, Any] = {
             **harmonic_oscillator_unit_metadata(),
-            "case_parameterization": (
-                "harmonic_oscillator_units"
-                if self.is_harmonic_oscillator_case
-                else "nondefault_trap_frequency"
-            ),
-            "rod_length_ho": self.rod_length if self.is_harmonic_oscillator_case else float("nan"),
-            "trap_omega": self.omega,
+            "case_parameterization": "harmonic_oscillator_units",
+            "rod_length_ho": self.rod_length,
         }
         return metadata
 
 
 @dataclass(frozen=True)
-class RNRunControls:
+class DMCRunControls:
     dt: float
     walkers: int
-    tau_block: float
-    rn_cadence_tau: float
     burn_tau: float
     production_tau: float
     store_every: int
     grid_extent: float
     n_bins: int
+    ess_resample_fraction: float = 0.35
     local_step_method: str = "metropolis"
-    collective_rn_enabled: bool = True
     relative_alpha: float | None = None
+    contact_beta: float | None = None
+    response_lambda: float | None = None
+
+    def __post_init__(self) -> None:
+        if not np.isfinite(self.dt) or self.dt <= 0.0:
+            raise ValueError("dt must be finite and positive")
+        if self.walkers <= 0:
+            raise ValueError("walkers must be positive")
+        if self.burn_tau < 0.0 or self.production_tau <= 0.0:
+            raise ValueError("burn_tau must be non-negative and production_tau positive")
+        if self.store_every <= 0:
+            raise ValueError("store_every must be positive")
+        if not np.isfinite(self.grid_extent) or self.grid_extent <= 0.0:
+            raise ValueError("grid_extent must be finite and positive")
+        if self.n_bins < 2:
+            raise ValueError("n_bins must be at least two")
+        if not 0.0 <= self.ess_resample_fraction <= 1.0:
+            raise ValueError("ess_resample_fraction must lie in [0, 1]")
+        if self.local_step_method not in {"euler", "metropolis"}:
+            raise ValueError("local_step_method must be 'euler' or 'metropolis'")
 
     @property
     def burn_in_steps(self) -> int:
@@ -135,38 +142,12 @@ class RNRunControls:
         return max(1, int(round(self.production_tau / self.dt)))
 
 
-@dataclass(frozen=True)
-class RNCollectiveProposalControls:
-    component_log_scales: tuple[float, ...] = DEFAULT_COMPONENT_LOG_SCALES
-    component_probabilities: tuple[float, ...] = DEFAULT_COMPONENT_PROBABILITIES
-
-    def validate(self) -> None:
-        if not self.component_log_scales:
-            raise ValueError("component_log_scales must not be empty")
-        if len(self.component_log_scales) != len(self.component_probabilities):
-            raise ValueError("component_log_scales and component_probabilities length mismatch")
-        if any(not np.isfinite(value) for value in self.component_log_scales):
-            raise ValueError("component_log_scales must be finite")
-        probabilities = np.asarray(self.component_probabilities, dtype=float)
-        if np.any(probabilities < 0.0) or not np.all(np.isfinite(probabilities)):
-            raise ValueError("component_probabilities must be finite and non-negative")
-        if not np.isclose(float(np.sum(probabilities)), 1.0):
-            raise ValueError("component_probabilities must sum to one")
-
-    def to_metadata(self) -> dict[str, list[float]]:
-        return {
-            "component_log_scales": list(self.component_log_scales),
-            "component_probabilities": list(self.component_probabilities),
-        }
-
-
-def parse_case(case_id: str) -> RNCase:
+def parse_case(case_id: str) -> TrappedCase:
     ho_match = HO_CASE_RE.match(case_id)
     if ho_match is not None:
-        return RNCase(
+        return TrappedCase(
             n_particles=int(ho_match.group("n")),
             rod_length=float(ho_match.group("A")),
-            omega=HO_TRAP_OMEGA,
         )
     raise ValueError(
         f"invalid case id: {case_id}. Use N*_A* harmonic-oscillator units, e.g. N8_A0.2"
@@ -207,76 +188,70 @@ def resolve_parallel_workers(
     return min(seed_count, requested_workers)
 
 
-def build_case_objects(
-    case: RNCase,
+def build_guide(
+    case: TrappedCase,
+    system: OpenLineHardRodSystem,
+    trap: HarmonicTrap,
     *,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
     relative_alpha: float | None = None,
-) -> tuple[
-    OpenLineHardRodSystem,
-    HarmonicTrap,
-    ReducedTGHardRodGuide | GapHCorrectedHardRodGuide,
-    OpenHardRodTrapPrimitiveKernel
-    | OpenHardRodTrapGapHProductTargetKernel
-    | OpenN2HardRodTrapExactKernel,
-    HarmonicMehlerKernel | OpenHardRodTrapGapHTransformProposalKernel,
-]:
-    if proposal_family not in RN_PROPOSAL_FAMILIES:
-        raise ValueError(f"unknown RN proposal family: {proposal_family}")
-    if guide_family not in RN_GUIDE_FAMILIES:
-        raise ValueError(f"unknown RN guide family: {guide_family}")
-    if target_family not in RN_TARGET_FAMILIES:
-        raise ValueError(f"unknown RN target family: {target_family}")
-    system, trap = build_case_geometry(case)
-    resolved_guide_family = guide_family
-    if guide_family == "auto":
-        resolved_guide_family = (
-            "gap-h-corrected" if proposal_family == "gap-h-transform" else "reduced-tg"
-        )
-    guide = (
-        GapHCorrectedHardRodGuide(
+    contact_beta: float | None = None,
+    response_lambda: float | None = None,
+) -> (
+    ReducedTGHardRodGuide
+    | ContactCorrectedReducedTGHardRodGuide
+    | GapHCorrectedHardRodGuide
+    | FixedGuideQuadraticResponse
+):
+    """Build only the importance-sampling guide for a trapped DMC run."""
+
+    if guide_family not in GUIDE_FAMILIES:
+        raise ValueError(f"unknown guide family: {guide_family}")
+    if guide_family == "gap-h-corrected":
+        if relative_alpha is not None or contact_beta is not None:
+            raise ValueError("gap-h-corrected owns its shape; omit relative_alpha and contact_beta")
+        guide = GapHCorrectedHardRodGuide(
             system=system,
             trap=trap,
             alpha=case.omega,
         )
-        if resolved_guide_family == "gap-h-corrected"
-        else ReducedTGHardRodGuide(
+    elif guide_family == "contact-corrected-reduced-tg":
+        if contact_beta is None:
+            raise ValueError("contact-corrected-reduced-tg requires an explicit contact_beta")
+        guide = ContactCorrectedReducedTGHardRodGuide(
+            system=system,
+            trap=trap,
+            alpha=case.omega,
+            relative_alpha=relative_alpha,
+            contact_beta=contact_beta,
+        )
+    else:
+        if contact_beta is not None:
+            raise ValueError("contact_beta requires guide_family='contact-corrected-reduced-tg'")
+        guide = ReducedTGHardRodGuide(
             system=system,
             trap=trap,
             alpha=case.omega,
             relative_alpha=relative_alpha,
         )
-    )
-    proposal_kernel = (
-        HarmonicMehlerKernel(trap=trap)
-        if proposal_family == "harmonic-mehler"
-        else OpenHardRodTrapGapHTransformProposalKernel(system=system, trap=trap)
-    )
-    if target_family == "n2-exact-relative":
-        target_kernel = OpenN2HardRodTrapExactKernel(system=system, trap=trap)
-    elif target_family == "gap-h-product":
-        target_kernel = OpenHardRodTrapGapHProductTargetKernel(system=system, trap=trap)
-    else:
-        target_kernel = OpenHardRodTrapPrimitiveKernel(system=system, trap=trap)
-    return (
-        system,
-        trap,
-        guide,
-        target_kernel,
-        proposal_kernel,
-    )
+    if response_lambda is not None:
+        guide = FixedGuideQuadraticResponse(
+            base_guide=guide,
+            lambda_value=response_lambda,
+            lambda0=BASE_TRAP_QUADRATIC_COUPLING,
+            center=system.center,
+        )
+    return guide
 
 
-def build_case_geometry(case: RNCase) -> tuple[OpenLineHardRodSystem, HarmonicTrap]:
+def build_case_geometry(case: TrappedCase) -> tuple[OpenLineHardRodSystem, HarmonicTrap]:
     return (
         OpenLineHardRodSystem(n_particles=case.n_particles, rod_length=case.rod_length),
         HarmonicTrap(omega=case.omega),
     )
 
 
-def make_grid(controls: RNRunControls, case: RNCase | None = None) -> np.ndarray:
+def make_grid(controls: DMCRunControls, case: TrappedCase | None = None) -> np.ndarray:
     extent = controls.grid_extent
     if case is None:
         return np.linspace(-extent, extent, controls.n_bins)
@@ -308,7 +283,7 @@ def make_grid(controls: RNRunControls, case: RNCase | None = None) -> np.ndarray
     raise ValueError("failed to build a grid containing the LDA density cloud")
 
 
-def lda_target_rms(case: RNCase, controls: RNRunControls, grid: np.ndarray) -> float:
+def lda_target_rms(case: TrappedCase, controls: DMCRunControls, grid: np.ndarray) -> float:
     system, trap = build_case_geometry(case)
     lda = lda_density_profile(
         grid,
@@ -320,8 +295,8 @@ def lda_target_rms(case: RNCase, controls: RNRunControls, grid: np.ndarray) -> f
 
 
 def run_streaming_seed(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seed: int,
     *,
     density_grid: np.ndarray | None = None,
@@ -329,26 +304,36 @@ def run_streaming_seed(
     checkpoint_dir: Path | None = None,
     checkpoint_every_steps: int | None = None,
     resume: bool = False,
-    initialization: RNInitializationControls | None = None,
-    proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
-    transport_observer: RNTransportObserver | None = None,
-    transport_com_variance: float | None = None,
-) -> RNBlockStreamingSummary:
+    initialization: InitializationControls | None = None,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
+    transport_observer: DMCTransportObserver | None = None,
+) -> DMCStreamingSummary:
+    if controls.response_lambda is not None and collective_rn is not None:
+        raise ValueError("quadratic energy-response sampling requires collective RN to be disabled")
     rng = np.random.default_rng(seed)
-    system, _trap, guide, target_kernel, proposal_kernel = build_case_objects(
+    system, trap = build_case_geometry(case)
+    guide = build_guide(
         case,
-        proposal_family=proposal_family,
+        system,
+        trap,
         guide_family=guide_family,
-        target_family=target_family,
         relative_alpha=controls.relative_alpha,
+        contact_beta=controls.contact_beta,
+        response_lambda=controls.response_lambda,
+    )
+    scheduled_move = (
+        None
+        if collective_rn is None
+        else build_collective_rn_extension(
+            system=system,
+            trap=trap,
+            controls=collective_rn,
+            dt=controls.dt,
+        )
     )
     grid = make_grid(controls, case) if density_grid is None else density_grid
-    initialization = RNInitializationControls() if initialization is None else initialization
-    proposal = RNCollectiveProposalControls() if proposal is None else proposal
-    proposal.validate()
+    initialization = InitializationControls() if initialization is None else initialization
     target_initial_rms = (
         lda_target_rms(case, controls, grid)
         if initialization.mode in {"lda-rms-lattice", "lda-rms-logspread"}
@@ -365,21 +350,16 @@ def run_streaming_seed(
     checkpoint_path = (
         checkpoint_dir / f"{case.case_id}_seed{seed}.npz" if checkpoint_dir is not None else None
     )
-    summary = run_rn_block_dmc_streaming(
+    summary = run_dmc_streaming(
         initial_walkers=initial.positions,
         guide=guide,
         system=system,
-        target_kernel=target_kernel,
-        proposal_kernel=proposal_kernel,
         density_grid=grid,
-        config=RNBlockDMCConfig(
-            tau_block=controls.tau_block,
-            rn_cadence_tau=controls.rn_cadence_tau,
-            collective_rn_enabled=controls.collective_rn_enabled,
-            component_log_scales=proposal.component_log_scales,
-            component_probabilities=proposal.component_probabilities,
+        config=DMCConfig(
+            ess_resample_fraction=controls.ess_resample_fraction,
             local_step_method=controls.local_step_method,
         ),
+        scheduled_move=scheduled_move,
         rng=rng,
         dt=controls.dt,
         burn_in_steps=controls.burn_in_steps,
@@ -389,16 +369,33 @@ def run_streaming_seed(
         checkpoint_path=checkpoint_path,
         checkpoint_every_steps=checkpoint_every_steps,
         resume=resume,
+        checkpoint_identity={
+            "case_id": case.case_id,
+            "seed": int(seed),
+            "guide_family": guide_family,
+            "guide_parameters": {
+                "relative_alpha": controls.relative_alpha,
+                "contact_beta": controls.contact_beta,
+                "response_lambda": controls.response_lambda,
+            },
+            "initialization": asdict(initialization),
+        },
         transport_observer=transport_observer,
-        transport_com_variance=transport_com_variance,
     )
     summary.metadata.update(initial.metadata)
-    summary.metadata.update(proposal.to_metadata())
+    if collective_rn is not None:
+        summary.metadata["collective_rn"] = collective_rn.to_metadata()
     summary.metadata.update(case.unit_metadata())
-    summary.metadata["proposal_family"] = proposal_family
     summary.metadata["guide_family"] = guide_family
-    summary.metadata["target_family"] = target_family
     summary.metadata["resolved_guide_family"] = _guide_family_name(guide)
+    summary.metadata["local_step_method"] = controls.local_step_method
+    if controls.relative_alpha is not None:
+        summary.metadata["relative_alpha"] = controls.relative_alpha
+    if controls.contact_beta is not None:
+        summary.metadata["contact_beta"] = controls.contact_beta
+    if controls.response_lambda is not None:
+        summary.metadata["response_lambda"] = controls.response_lambda
+        summary.metadata["response_lambda0"] = BASE_TRAP_QUADRATIC_COUPLING
     initial_rms_value = initial.metadata["initial_rms_mean"]
     if not isinstance(initial_rms_value, int | float):
         raise RuntimeError("initial_rms_mean metadata must be numeric")
@@ -410,37 +407,47 @@ def run_streaming_seed(
 
 
 def validate_streaming_against_raw(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seed: int,
     *,
     progress: ProgressBar | None = None,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
 ) -> dict[str, Any]:
-    system, _trap, guide, target_kernel, proposal_kernel = build_case_objects(
+    system, trap = build_case_geometry(case)
+    guide = build_guide(
         case,
-        proposal_family=proposal_family,
+        system,
+        trap,
         guide_family=guide_family,
-        target_family=target_family,
         relative_alpha=controls.relative_alpha,
+        contact_beta=controls.contact_beta,
+        response_lambda=controls.response_lambda,
+    )
+    scheduled_move = (
+        None
+        if collective_rn is None
+        else build_collective_rn_extension(
+            system=system,
+            trap=trap,
+            controls=collective_rn,
+            dt=controls.dt,
+        )
     )
     grid = make_grid(controls, case)
     raw_rng = np.random.default_rng(seed)
     raw_initial = initial_walkers(system, controls.walkers, raw_rng)
-    raw = run_rn_block_dmc(
+    config = DMCConfig(
+        ess_resample_fraction=controls.ess_resample_fraction,
+        local_step_method=controls.local_step_method,
+    )
+    raw = run_dmc(
         initial_walkers=raw_initial,
         guide=guide,
         system=system,
-        target_kernel=target_kernel,
-        proposal_kernel=proposal_kernel,
-        config=RNBlockDMCConfig(
-            tau_block=controls.tau_block,
-            rn_cadence_tau=controls.rn_cadence_tau,
-            component_log_scales=DEFAULT_COMPONENT_LOG_SCALES,
-            component_probabilities=DEFAULT_COMPONENT_PROBABILITIES,
-        ),
+        config=config,
+        scheduled_move=scheduled_move,
         rng=raw_rng,
         dt=controls.dt,
         burn_in_steps=controls.burn_in_steps,
@@ -450,19 +457,13 @@ def validate_streaming_against_raw(
     )
     streaming_rng = np.random.default_rng(seed)
     streaming_initial = initial_walkers(system, controls.walkers, streaming_rng)
-    streaming = run_rn_block_dmc_streaming(
+    streaming = run_dmc_streaming(
         initial_walkers=streaming_initial,
         guide=guide,
         system=system,
-        target_kernel=target_kernel,
-        proposal_kernel=proposal_kernel,
         density_grid=grid,
-        config=RNBlockDMCConfig(
-            tau_block=controls.tau_block,
-            rn_cadence_tau=controls.rn_cadence_tau,
-            component_log_scales=DEFAULT_COMPONENT_LOG_SCALES,
-            component_probabilities=DEFAULT_COMPONENT_PROBABILITIES,
-        ),
+        config=config,
+        scheduled_move=scheduled_move,
         rng=streaming_rng,
         dt=controls.dt,
         burn_in_steps=controls.burn_in_steps,
@@ -497,16 +498,15 @@ def validate_streaming_against_raw(
         "raw_sample_count": int(raw.snapshots.shape[0]),
         "raw_guide_batch_backend": raw.metadata["guide_batch_backend"],
         "streaming_guide_batch_backend": streaming.metadata["guide_batch_backend"],
-        "proposal_family": proposal_family,
         "guide_family": guide_family,
-        "target_family": target_family,
+        "collective_rn_enabled": collective_rn is not None,
         "resolved_guide_family": _guide_family_name(guide),
     }
 
 
 def summarize_case(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seeds: list[int],
     *,
     parallel_workers: int | None = None,
@@ -514,9 +514,8 @@ def summarize_case(
     checkpoint_dir: Path | None = None,
     checkpoint_every_steps: int | None = None,
     resume_seed_checkpoints: bool = False,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
 ) -> dict[str, Any]:
     grid = make_grid(controls, case)
     worker_count = resolve_parallel_workers(len(seeds), parallel_workers)
@@ -530,19 +529,21 @@ def summarize_case(
         checkpoint_dir=checkpoint_dir,
         checkpoint_every_steps=checkpoint_every_steps,
         resume_seed_checkpoints=resume_seed_checkpoints,
-        proposal_family=proposal_family,
+        collective_rn=collective_rn,
         guide_family=guide_family,
-        target_family=target_family,
     )
     density = np.mean([summary.density for summary in seed_summaries], axis=0)
     energy_values = np.asarray([summary.mixed_energy for summary in seed_summaries], dtype=float)
     rms_values = np.asarray([summary.rms_radius for summary in seed_summaries], dtype=float)
-    system, trap, _guide, _target, _proposal = build_case_objects(
+    system, trap = build_case_geometry(case)
+    guide = build_guide(
         case,
-        proposal_family=proposal_family,
+        system,
+        trap,
         guide_family=guide_family,
-        target_family=target_family,
         relative_alpha=controls.relative_alpha,
+        contact_beta=controls.contact_beta,
+        response_lambda=controls.response_lambda,
     )
     lda = lda_density_profile(
         grid,
@@ -554,7 +555,6 @@ def summarize_case(
         "case_id": case.case_id,
         "n_particles": case.n_particles,
         "rod_length": case.rod_length,
-        "omega": case.omega,
         **case.unit_metadata(),
         "seeds": seeds,
         "controls": controls_to_dict(controls),
@@ -576,10 +576,10 @@ def summarize_case(
         "seed_count": len(seeds),
         "parallel_workers": actual_worker_count,
         "parallel_workers_requested": worker_count,
-        "proposal_family": proposal_family,
+        "collective_rn_enabled": collective_rn is not None,
+        "collective_rn_controls": (None if collective_rn is None else collective_rn.to_metadata()),
         "guide_family": guide_family,
-        "target_family": target_family,
-        "resolved_guide_family": _guide_family_name(_guide),
+        "resolved_guide_family": _guide_family_name(guide),
         "guide_batch_backend": ",".join(
             sorted({str(summary.metadata["guide_batch_backend"]) for summary in seed_summaries})
         ),
@@ -606,7 +606,7 @@ def summarize_case(
                 "guide_batch_backend": summary.metadata["guide_batch_backend"],
                 "target_backend": summary.metadata.get("target_backend", ""),
                 "proposal_backend": summary.metadata.get("proposal_backend", ""),
-                "target_family": summary.metadata.get("target_family", target_family),
+                "collective_rn": summary.metadata.get("collective_rn"),
             }
             for seed, summary in zip(seeds, seed_summaries, strict=True)
         ],
@@ -614,8 +614,8 @@ def summarize_case(
 
 
 def _run_seed_summaries(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seeds: list[int],
     density_grid: np.ndarray,
     *,
@@ -624,10 +624,9 @@ def _run_seed_summaries(
     checkpoint_dir: Path | None,
     checkpoint_every_steps: int | None,
     resume_seed_checkpoints: bool,
-    proposal_family: str,
+    collective_rn: CollectiveRNControls | None,
     guide_family: str,
-    target_family: str,
-) -> tuple[list[RNBlockStreamingSummary], int]:
+) -> tuple[list[DMCStreamingSummary], int]:
     return run_seed_batch(
         seeds,
         worker_count=worker_count,
@@ -642,9 +641,8 @@ def _run_seed_summaries(
             checkpoint_dir,
             checkpoint_every_steps,
             resume_seed_checkpoints,
-            proposal_family,
+            collective_rn,
             guide_family,
-            target_family,
         ),
         run_serial_seed=lambda seed: run_streaming_seed(
             case,
@@ -655,26 +653,24 @@ def _run_seed_summaries(
             checkpoint_dir=checkpoint_dir,
             checkpoint_every_steps=checkpoint_every_steps,
             resume=resume_seed_checkpoints,
-            proposal_family=proposal_family,
+            collective_rn=collective_rn,
             guide_family=guide_family,
-            target_family=target_family,
         ),
     )
 
 
 def _run_seed_worker(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seed: int,
     density_grid: np.ndarray,
     progress_queue: Any | None = None,
     checkpoint_dir: Path | None = None,
     checkpoint_every_steps: int | None = None,
     resume_seed_checkpoints: bool = False,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
-) -> tuple[int, RNBlockStreamingSummary]:
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
+) -> tuple[int, DMCStreamingSummary]:
     worker_progress = QueuedProgress(progress_queue) if progress_queue is not None else None
     try:
         return seed, run_streaming_seed(
@@ -686,22 +682,18 @@ def _run_seed_worker(
             checkpoint_dir=checkpoint_dir,
             checkpoint_every_steps=checkpoint_every_steps,
             resume=resume_seed_checkpoints,
-            proposal_family=proposal_family,
+            collective_rn=collective_rn,
             guide_family=guide_family,
-            target_family=target_family,
         )
     finally:
         if worker_progress is not None:
             worker_progress.flush()
 
 
-def controls_to_dict(controls: RNRunControls) -> dict[str, float | int | str | bool]:
+def controls_to_dict(controls: DMCRunControls) -> dict[str, float | int | str | bool]:
     values: dict[str, float | int | str | bool] = {
         "dt": controls.dt,
         "walkers": controls.walkers,
-        "tau_block": controls.tau_block,
-        "rn_cadence_tau": controls.rn_cadence_tau,
-        "collective_rn_enabled": controls.collective_rn_enabled,
         "burn_tau": controls.burn_tau,
         "production_tau": controls.production_tau,
         "burn_in_steps": controls.burn_in_steps,
@@ -711,12 +703,22 @@ def controls_to_dict(controls: RNRunControls) -> dict[str, float | int | str | b
         "n_bins": controls.n_bins,
         "local_step_method": controls.local_step_method,
     }
+    if not np.isclose(controls.ess_resample_fraction, 0.35):
+        values["ess_resample_fraction"] = controls.ess_resample_fraction
     if controls.relative_alpha is not None:
         values["relative_alpha"] = controls.relative_alpha
+    if controls.contact_beta is not None:
+        values["contact_beta"] = controls.contact_beta
+    if controls.response_lambda is not None:
+        values["response_lambda"] = controls.response_lambda
     return values
 
 
 def _guide_family_name(guide: object) -> str:
+    if isinstance(guide, FixedGuideQuadraticResponse):
+        return f"quadratic-response({_guide_family_name(guide.base_guide)})"
+    if isinstance(guide, ContactCorrectedReducedTGHardRodGuide):
+        return "contact-corrected-reduced-tg"
     if isinstance(guide, GapHCorrectedHardRodGuide):
         return "gap-h-corrected"
     if isinstance(guide, ReducedTGHardRodGuide):
@@ -724,12 +726,13 @@ def _guide_family_name(guide: object) -> str:
     return type(guide).__name__
 
 
-def rn_run_config(
+def dmc_run_config(
     *,
     run_kind: str,
     cases: list[str],
     seeds: list[int],
-    controls: RNRunControls,
+    controls: DMCRunControls,
+    collective_rn: CollectiveRNControls | None = None,
     parallel_workers: int | None,
     checkpoint_every_steps: int | None = None,
 ) -> dict[str, Any]:
@@ -738,6 +741,7 @@ def rn_run_config(
         "cases": cases,
         "seeds": seeds,
         "controls": controls_to_dict(controls),
+        "collective_rn": None if collective_rn is None else collective_rn.to_metadata(),
         "parallel_workers": parallel_workers,
         "checkpoint_every_steps": checkpoint_every_steps,
     }
@@ -757,7 +761,6 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> Path | Non
         "seed_count",
         "case_parameterization",
         "rod_length_ho",
-        "trap_omega",
         "mixed_energy",
         "mixed_energy_seed_stderr",
         "rms_radius",
@@ -769,9 +772,8 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> Path | Non
         "lda_rms_radius",
         "rms_dmc_minus_lda",
         "lost_out_of_grid_sample_count_total",
-        "proposal_family",
+        "collective_rn_enabled",
         "guide_family",
-        "target_family",
         "resolved_guide_family",
         "guide_batch_backend",
         "target_backend",
@@ -786,7 +788,7 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> Path | Non
     return path
 
 
-def write_rn_run_artifacts(
+def write_dmc_run_artifacts(
     output_dir: Path,
     *,
     payload: dict[str, Any],
@@ -868,8 +870,8 @@ def _stderr(values: np.ndarray) -> float:
     return float(np.std(values, ddof=1) / np.sqrt(values.size))
 
 
-def rn_total_steps(
-    controls: RNRunControls,
+def dmc_total_steps(
+    controls: DMCRunControls,
     *,
     seed_count: int,
     raw_validation: bool = False,
@@ -878,16 +880,16 @@ def rn_total_steps(
     return multiplier * seed_count * (controls.burn_in_steps + controls.production_steps)
 
 
-def rn_progress_bar(
+def dmc_progress_bar(
     *,
-    controls: RNRunControls,
+    controls: DMCRunControls,
     seed_count: int,
     label: str,
     enabled: bool,
     raw_validation: bool = False,
 ):
     return progress_bar(
-        total=rn_total_steps(controls, seed_count=seed_count, raw_validation=raw_validation),
+        total=dmc_total_steps(controls, seed_count=seed_count, raw_validation=raw_validation),
         label=label,
         enabled=enabled,
     )

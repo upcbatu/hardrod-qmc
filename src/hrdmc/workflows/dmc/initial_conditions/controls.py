@@ -6,7 +6,7 @@ INITIALIZATION_MODES = ("tight-lattice", "lda-rms-lattice", "lda-rms-logspread")
 
 
 @dataclass(frozen=True)
-class RNInitializationControls:
+class InitializationControls:
     mode: str = "tight-lattice"
     init_width_log_sigma: float = 0.10
     breathing_preburn_steps: int = 0

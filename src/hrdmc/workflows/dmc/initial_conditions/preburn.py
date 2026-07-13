@@ -6,7 +6,7 @@ import numpy as np
 
 from hrdmc.systems.open_line import OpenLineHardRodSystem
 from hrdmc.wavefunctions.api import DMCGuide
-from hrdmc.workflows.dmc.rn_block_initial_conditions.geometry import (
+from hrdmc.workflows.dmc.initial_conditions.geometry import (
     array_min_or_none,
     hard_core_preserving_breathing_scale,
     rms_radius_rows,
@@ -70,9 +70,7 @@ def breathing_preburn_walkers(
     return positions, {
         "breathing_preburn_steps": int(steps),
         "breathing_preburn_log_step": float(log_step),
-        "breathing_preburn_acceptance_rate": float(accepted / attempted)
-        if attempted
-        else None,
+        "breathing_preburn_acceptance_rate": float(accepted / attempted) if attempted else None,
         "breathing_preburn_jacobian_dimension": dimension,
         "preburn_rms_mean": float(np.mean(rms)),
         "preburn_rms_std": float(np.std(rms, ddof=1)) if rms.size > 1 else 0.0,

@@ -7,35 +7,70 @@ from typing import Any
 
 import numpy as np
 
-from hrdmc.io.artifacts import ensure_dir
+from hrdmc.artifacts import build_run_provenance, ensure_dir, write_json, write_run_manifest
 
 
-def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> None:
+def write_stationarity_grid_artifacts(
+    output_dir: Path,
+    *,
+    payload: dict[str, Any],
+    rows: list[dict[str, Any]],
+    config: dict[str, Any],
+    plots: bool,
+    command: list[str] | None,
+) -> dict[str, Path]:
+    """Persist one stationarity grid and bind its outputs in a run manifest."""
+
+    root = ensure_dir(output_dir)
+    summary_path = root / "summary.json"
+    write_json(summary_path, payload)
+    case_table_path = write_case_table(root, rows)
+    plot_paths: list[str] = []
+    if plots:
+        plot_paths = write_plots(root, rows)
+        payload["plots"] = plot_paths
+        write_json(summary_path, payload)
+    manifest_artifacts = [summary_path, case_table_path]
+    manifest_artifacts.extend(root / path for path in plot_paths)
+    manifest_path = write_run_manifest(
+        root,
+        run_name="dmc_trapped_stationarity_grid",
+        config=config,
+        artifacts=manifest_artifacts,
+        schema_version=str(payload["schema_version"]),
+        provenance=build_run_provenance(command),
+        status=str(payload["status"]),
+    )
+    return {
+        "summary": summary_path,
+        "case_table": case_table_path,
+        "run_manifest": manifest_path,
+    }
+
+
+def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> Path:
     fields = [
         "case_id",
         "case_parameterization",
         "rod_length_ho",
-        "trap_omega",
-        "case_gate",
-        "old_case_gate",
-        "hygiene_gate",
+        "validation_passed",
+        "base_numerics_valid",
         "classification",
         "final_classification",
-        "gate_split_methodology",
-        "gate_split_precision",
-        "gate_split_combined",
-        "energy_estimator_scope",
-        "mixed_coordinate_observable_scope",
+        "method_status",
+        "precision_status",
+        "diagnostic_status",
+        "energy_estimator",
+        "mixed_coordinate_observable_status",
         "mixed_coordinate_diagnostic_status",
-        "paper_r2_estimator_status",
-        "paper_rms_estimator_status",
-        "paper_density_estimator_status",
-        "paper_pair_structure_estimator_status",
+        "pure_r2_estimator_status",
+        "pure_rms_estimator_status",
+        "pure_density_estimator_status",
+        "pure_pair_structure_estimator_status",
         "seed_count",
         "parallel_workers",
-        "proposal_family",
+        "collective_rn_enabled",
         "guide_family",
-        "target_family",
         "resolved_guide_family",
         "mixed_energy",
         "mixed_energy_seed_stderr",
@@ -79,7 +114,7 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> None:
         "density_integral",
         "density_accounting_clean",
         "valid_finite_clean",
-        "rn_weight_controlled",
+        "population_weights_controlled",
         "rhat_energy",
         "rhat_rms",
         "rhat_r2",
@@ -117,7 +152,10 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> None:
         "mixed_coordinate_spread_warning_count",
         "ess_fraction_min",
         "log_weight_span_max",
-        "rn_weight_status",
+        "population_weight_status",
+        "population_weight_ess_warning_fraction",
+        "population_weight_ess_invalid_fraction",
+        "population_weight_log_weight_span_warning",
         "lost_out_of_grid_sample_count_total",
         "guide_batch_backend",
         "target_backend",
@@ -133,6 +171,7 @@ def write_case_table(output_dir: Path, rows: list[dict[str, Any]]) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({field: row.get(field, "") for field in fields})
+    return output_path
 
 
 def write_plots(output_dir: Path, rows: list[dict[str, Any]]) -> list[str]:

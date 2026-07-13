@@ -11,24 +11,21 @@ from hrdmc.estimators.pure.forward_walking import (
     TransportedAuxiliaryForwardWalking,
 )
 from hrdmc.io.progress import ProgressBar
-from hrdmc.monte_carlo.dmc.rn_block import RNBlockStreamingSummary
-from hrdmc.systems.harmonic_com_transition import harmonic_com_ground_variance
-from hrdmc.workflows.dmc.rn_block import (
-    DEFAULT_RN_GUIDE_FAMILY,
-    DEFAULT_RN_PROPOSAL_FAMILY,
-    DEFAULT_RN_TARGET_FAMILY,
-    RNCase,
-    RNCollectiveProposalControls,
-    RNRunControls,
+from hrdmc.monte_carlo.dmc.local import DMCStreamingSummary
+from hrdmc.workflows.dmc.collective_rn import CollectiveRNControls
+from hrdmc.workflows.dmc.initial_conditions import InitializationControls
+from hrdmc.workflows.dmc.trapped import (
+    DEFAULT_GUIDE_FAMILY,
+    DMCRunControls,
+    TrappedCase,
     run_streaming_seed,
 )
-from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
 
 
 @dataclass(frozen=True)
 class PureWalkingSeedRun:
     seed: int
-    rn_summary: RNBlockStreamingSummary
+    dmc_summary: DMCStreamingSummary
     pure_result: PureWalkingResult
     schema_reference: str
 
@@ -36,27 +33,25 @@ class PureWalkingSeedRun:
         return {
             "seed": self.seed,
             "status": self.pure_result.status,
-            "rn_summary": compact_rn_seed_summary(self.rn_summary),
+            "dmc_summary": compact_dmc_seed_summary(self.dmc_summary),
             "pure_walking": self.pure_result.to_summary_dict(),
             "schema_reference": self.schema_reference,
         }
 
 
 def run_pure_walking_seed(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seed: int,
     *,
     pure_config: PureWalkingConfig,
     density_grid: np.ndarray | None = None,
     progress: ProgressBar | None = None,
-    initialization: RNInitializationControls | None = None,
-    proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    initialization: InitializationControls | None = None,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
 ) -> dict[str, Any]:
-    """Run one RN-DMC seed while consuming transport events with pure FW."""
+    """Run one DMC seed while consuming transport events with pure FW."""
 
     return run_pure_walking_seed_run(
         case,
@@ -66,28 +61,24 @@ def run_pure_walking_seed(
         density_grid=density_grid,
         progress=progress,
         initialization=initialization,
-        proposal=proposal,
-        proposal_family=proposal_family,
+        collective_rn=collective_rn,
         guide_family=guide_family,
-        target_family=target_family,
     ).to_payload()
 
 
 def run_pure_walking_seed_run(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seed: int,
     *,
     pure_config: PureWalkingConfig,
     density_grid: np.ndarray | None = None,
     progress: ProgressBar | None = None,
-    initialization: RNInitializationControls | None = None,
-    proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    initialization: InitializationControls | None = None,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
 ) -> PureWalkingSeedRun:
-    """Run one RN-DMC seed and keep both RN summary and FW result."""
+    """Run one DMC seed and keep both the DMC summary and FW result."""
 
     observer = TransportedAuxiliaryForwardWalking(pure_config)
     summary = run_streaming_seed(
@@ -97,12 +88,9 @@ def run_pure_walking_seed_run(
         density_grid=density_grid,
         progress=progress,
         initialization=initialization,
-        proposal=proposal,
-        proposal_family=proposal_family,
+        collective_rn=collective_rn,
         guide_family=guide_family,
-        target_family=target_family,
         transport_observer=observer,
-        transport_com_variance=_transport_com_variance(case, pure_config),
     )
     mixed_r2_reference = summary.r2_radius if controls.store_every == 1 else None
     mixed_rms_reference = summary.rms_radius if controls.store_every == 1 else None
@@ -112,17 +100,17 @@ def run_pure_walking_seed_run(
     )
     return PureWalkingSeedRun(
         seed=seed,
-        rn_summary=summary,
+        dmc_summary=summary,
         pure_result=pure_result,
         schema_reference=(
-            "rn_summary_store_every_1"
+            "dmc_summary_store_every_1"
             if controls.store_every == 1
-            else "internal_fw_event_stream; rn_summary cadence differs"
+            else "internal_fw_event_stream; dmc_summary cadence differs"
         ),
     )
 
 
-def compact_rn_seed_summary(summary: RNBlockStreamingSummary) -> dict[str, Any]:
+def compact_dmc_seed_summary(summary: DMCStreamingSummary) -> dict[str, Any]:
     return {
         "mixed_energy": summary.mixed_energy,
         "r2_radius": summary.r2_radius,
@@ -132,7 +120,7 @@ def compact_rn_seed_summary(summary: RNBlockStreamingSummary) -> dict[str, Any]:
         "metadata": {
             "stored_batch_count": summary.stored_batch_count,
             "sample_count": summary.sample_count,
-            "rn_event_count": summary.metadata.get("rn_event_count"),
+            "scheduled_move_count": summary.metadata.get("scheduled_move_count"),
             "local_step_count": summary.metadata.get("local_step_count"),
             "killed_count": summary.metadata.get("killed_count"),
             "resample_count": summary.metadata.get("resample_count"),
@@ -142,12 +130,24 @@ def compact_rn_seed_summary(summary: RNBlockStreamingSummary) -> dict[str, Any]:
             "local_acceptance_fraction_mean": summary.metadata.get(
                 "local_acceptance_fraction_mean"
             ),
-            "invalid_proposal_fraction_max": summary.metadata.get(
-                "invalid_proposal_fraction_max"
-            ),
+            "invalid_proposal_fraction_max": summary.metadata.get("invalid_proposal_fraction_max"),
             "metropolis_rejection_fraction_max": summary.metadata.get(
                 "metropolis_rejection_fraction_max"
             ),
+            "local_energy_median_mean": summary.metadata.get("local_energy_median_mean"),
+            "local_energy_mad_mean": summary.metadata.get("local_energy_mad_mean"),
+            "local_energy_p001_min": summary.metadata.get("local_energy_p001_min"),
+            "local_energy_p01_min": summary.metadata.get("local_energy_p01_min"),
+            "local_energy_p99_max": summary.metadata.get("local_energy_p99_max"),
+            "local_energy_p999_max": summary.metadata.get("local_energy_p999_max"),
+            "drift_norm_max": summary.metadata.get("drift_norm_max"),
+            "configuration_esjd_mean": summary.metadata.get("configuration_esjd_mean"),
+            "r2_esjd_mean": summary.metadata.get("r2_esjd_mean"),
+            "weighted_free_gap_esjd_mean": summary.metadata.get("weighted_free_gap_esjd_mean"),
+            "weighted_free_gap_mean_min": summary.metadata.get("weighted_free_gap_mean_min"),
+            "weighted_free_gap_mean_max": summary.metadata.get("weighted_free_gap_mean_max"),
+            "free_gap_min": summary.metadata.get("free_gap_min"),
+            "free_gap_p01_min": summary.metadata.get("free_gap_p01_min"),
             "guide_batch_backend": summary.metadata.get("guide_batch_backend"),
             "target_backend": summary.metadata.get("target_backend"),
             "proposal_backend": summary.metadata.get("proposal_backend"),
@@ -155,9 +155,3 @@ def compact_rn_seed_summary(summary: RNBlockStreamingSummary) -> dict[str, Any]:
             "target_family": summary.metadata.get("target_family"),
         },
     }
-
-
-def _transport_com_variance(case: RNCase, config: PureWalkingConfig) -> float | None:
-    if config.observable_source != "r2_rb":
-        return None
-    return harmonic_com_ground_variance(case.n_particles, case.omega)

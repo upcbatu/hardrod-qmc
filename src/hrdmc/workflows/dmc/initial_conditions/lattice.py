@@ -5,8 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from hrdmc.systems.open_line import OpenLineHardRodSystem, lattice_spacing_for_target_rms
-from hrdmc.workflows.dmc.rn_block_initial_conditions.controls import INITIALIZATION_MODES
-from hrdmc.workflows.dmc.rn_block_initial_conditions.geometry import (
+from hrdmc.workflows.dmc.initial_conditions.controls import INITIALIZATION_MODES
+from hrdmc.workflows.dmc.initial_conditions.geometry import (
     array_min_or_none,
     rms_radius_rows,
 )

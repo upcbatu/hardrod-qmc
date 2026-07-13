@@ -4,7 +4,86 @@ import csv
 from pathlib import Path
 from typing import Any, cast
 
-from hrdmc.io.artifacts import ensure_dir
+from hrdmc.artifacts import (
+    build_run_provenance,
+    ensure_dir,
+    write_json,
+    write_run_manifest,
+)
+from hrdmc.workflows.dmc.collective_rn import CollectiveRNControls
+from hrdmc.workflows.dmc.initial_conditions import InitializationControls
+from hrdmc.workflows.dmc.trapped import DMCRunControls, controls_to_dict
+
+
+def write_benchmark_packet_artifacts(
+    output_dir: Path,
+    *,
+    payload: dict[str, Any],
+    case_id: str,
+    seeds: list[int],
+    controls: DMCRunControls,
+    parallel_workers: int | None,
+    initialization: InitializationControls,
+    collective_rn: CollectiveRNControls | None,
+    guide_family: str,
+    guide_parameter_source: str,
+    guide_parameter_source_sha256: str | None,
+    guide_parameter_source_manifest_sha256: str | None,
+    guide_parameter_source_identity_fingerprint: str | None,
+    plot_paths: list[str],
+    plot_formats: tuple[str, ...],
+    command: list[str] | None,
+) -> dict[str, Path]:
+    """Persist one benchmark packet and bind every output in its run manifest."""
+
+    summary_path = ensure_dir(output_dir) / "summary.json"
+    write_json(summary_path, payload)
+    artifacts = {
+        "summary": summary_path,
+        "seed_table": write_benchmark_packet_seed_table(
+            output_dir,
+            payload["seed_results"],
+        ),
+        "packet_table": write_benchmark_packet_table(output_dir, payload),
+        "fw_plateau_table": write_benchmark_packet_fw_plateau_table(output_dir, payload),
+        "energy_stationarity_table": write_benchmark_packet_energy_stationarity_table(
+            output_dir,
+            payload,
+        ),
+        "density_fw_table": write_benchmark_packet_density_fw_table(output_dir, payload),
+    }
+    manifest_artifacts = [*artifacts.values()]
+    manifest_artifacts.extend(output_dir / path for path in plot_paths)
+    artifacts["run_manifest"] = write_run_manifest(
+        output_dir,
+        run_name="dmc_benchmark_packet",
+        config={
+            "case": case_id,
+            "seeds": seeds,
+            "controls": controls_to_dict(controls),
+            "parallel_workers": parallel_workers,
+            "collective_rn": (None if collective_rn is None else collective_rn.to_metadata()),
+            "initialization_mode": initialization.mode,
+            "init_width_log_sigma": initialization.init_width_log_sigma,
+            "relative_alpha": controls.relative_alpha,
+            "breathing_preburn_steps": initialization.breathing_preburn_steps,
+            "breathing_preburn_log_step": initialization.breathing_preburn_log_step,
+            "guide_family": guide_family,
+            "guide_parameter_source": guide_parameter_source,
+            "guide_parameter_source_sha256": guide_parameter_source_sha256,
+            "guide_parameter_source_manifest_sha256": guide_parameter_source_manifest_sha256,
+            "guide_parameter_source_identity_fingerprint": (
+                guide_parameter_source_identity_fingerprint
+            ),
+            "pure_config": payload["pure_config"],
+            "plot_formats": list(plot_formats),
+        },
+        artifacts=manifest_artifacts,
+        schema_version=str(payload["schema_version"]),
+        provenance=build_run_provenance(command),
+        status=str(payload["status"]),
+    )
+    return artifacts
 
 
 def write_benchmark_packet_seed_table(
@@ -14,19 +93,35 @@ def write_benchmark_packet_seed_table(
     fields = [
         "seed",
         "status",
-        "rn_mixed_energy",
-        "rn_r2_radius",
-        "rn_rms_radius",
+        "dmc_mixed_energy",
+        "dmc_r2_radius",
+        "dmc_rms_radius",
         "r2_schema_status",
         "r2_plateau_status",
         "r2_plateau_value",
-        "paper_rms_radius",
+        "rms_radius",
         "local_step_method",
         "local_acceptance_fraction_mean",
         "invalid_proposal_fraction_max",
         "metropolis_rejection_fraction_max",
+        "local_energy_median_mean",
+        "local_energy_mad_mean",
+        "local_energy_p001_min",
+        "local_energy_p01_min",
+        "local_energy_p99_max",
+        "local_energy_p999_max",
+        "drift_norm_max",
+        "configuration_esjd_mean",
+        "r2_esjd_mean",
+        "weighted_free_gap_esjd_mean",
+        "free_gap_min",
+        "free_gap_p01_min",
         "lag_max_block_count",
         "lag_max_weight_ess_min",
+        "r2_genealogy_status",
+        "lag_max_source_ancestor_ess_min",
+        "lag_max_unique_source_ancestor_min",
+        "lag_max_source_family_fraction_max",
     ]
     path = ensure_dir(output_dir) / "seed_table.csv"
     with path.open("w", newline="") as file:
@@ -39,7 +134,7 @@ def write_benchmark_packet_seed_table(
 
 def write_benchmark_packet_table(output_dir: Path, payload: dict[str, Any]) -> Path:
     path = ensure_dir(output_dir) / "packet_table.csv"
-    paper = payload["paper_values"]
+    estimates = payload["estimates"]
     pure = payload.get("pure_walking", {})
     aggregate_r2 = pure.get("r2_aggregate_plateau_diagnostics", {})
     if not isinstance(aggregate_r2, dict):
@@ -47,29 +142,28 @@ def write_benchmark_packet_table(output_dir: Path, payload: dict[str, Any]) -> P
     row = {
         "case_id": payload["case_id"],
         "status": payload["status"],
-        "energy_status": payload["energy_claim_status"],
-        "pure_fw_status": payload["pure_fw_claim_status"],
-        "proposal_family": payload.get("proposal_family", ""),
+        "energy_status": payload["energy_validation_status"],
+        "pure_fw_status": payload["pure_fw_validation_status"],
+        "collective_rn_enabled": payload.get("collective_rn_controls") is not None,
         "guide_family": payload.get("guide_family", ""),
-        "target_family": payload.get("target_family", ""),
-        "energy": paper["energy"]["value"],
-        "energy_stderr": paper["energy"]["stderr"],
-        "energy_delta_vs_lda": paper["energy"]["delta_vs_lda"],
-        "pure_r2": paper["r2"]["value"],
-        "pure_r2_stderr": paper["r2"]["stderr"],
-        "pure_r2_delta_vs_lda": paper["r2"]["delta_vs_lda"],
-        "paper_rms_radius": paper["rms"]["value"],
-        "paper_rms_radius_stderr": paper["rms"]["stderr"],
-        "paper_rms_delta_vs_lda": paper["rms"]["delta_vs_lda"],
-        "density_status": paper["density"]["status"],
-        "pair_distance_density_status": paper["pair_distance_density"]["status"],
-        "structure_factor_status": paper["structure_factor"]["status"],
-        "mixed_density_l2_diagnostic": paper["density"]["mixed_diagnostic_density_l2"],
+        "energy": estimates["energy"]["value"],
+        "energy_stderr": estimates["energy"]["stderr"],
+        "energy_delta_vs_lda": estimates["energy"]["delta_vs_lda"],
+        "pure_r2": estimates["r2"]["value"],
+        "pure_r2_stderr": estimates["r2"]["stderr"],
+        "pure_r2_delta_vs_lda": estimates["r2"]["delta_vs_lda"],
+        "rms_radius": estimates["rms"]["value"],
+        "rms_radius_stderr": estimates["rms"]["stderr"],
+        "rms_delta_vs_lda": estimates["rms"]["delta_vs_lda"],
+        "density_status": estimates["density"]["status"],
+        "pair_distance_density_status": estimates["pair_distance_density"]["status"],
+        "structure_factor_status": estimates["structure_factor"]["status"],
+        "mixed_density_l2_diagnostic": estimates["density"]["mixed_diagnostic_density_l2"],
         "r2_aggregate_plateau_status": pure.get("r2_aggregate_plateau_status", ""),
         "r2_aggregate_slope_sigma_ratio": _slope_sigma_ratio(aggregate_r2),
         "r2_aggregate_window_sigma_ratio": _window_sigma_ratio(aggregate_r2),
-        "r2_seed_plateau_pass_count": pure.get("r2_seed_plateau_pass_count", ""),
-        "r2_seed_plateau_warning_count": pure.get("r2_seed_plateau_warning_count", ""),
+        "r2_seed_plateau_resolved_count": pure.get("r2_seed_plateau_resolved_count", ""),
+        "r2_seed_plateau_unresolved_count": pure.get("r2_seed_plateau_unresolved_count", ""),
     }
     with path.open("w", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=list(row))
@@ -96,6 +190,10 @@ def write_benchmark_packet_fw_plateau_table(output_dir: Path, payload: dict[str,
         "window_lags",
         "lag_max_block_count",
         "lag_max_weight_ess_min",
+        "genealogy_status",
+        "lag_max_source_ancestor_ess_min",
+        "lag_max_unique_source_ancestor_min",
+        "lag_max_source_family_fraction_max",
     ]
     path = ensure_dir(output_dir) / "fw_plateau_table.csv"
     with path.open("w", newline="") as file:
@@ -162,6 +260,10 @@ def write_benchmark_packet_density_fw_table(output_dir: Path, payload: dict[str,
         "window_lags",
         "lag_max_block_count",
         "lag_max_weight_ess_min",
+        "genealogy_status",
+        "lag_max_source_ancestor_ess_min",
+        "lag_max_unique_source_ancestor_min",
+        "lag_max_source_family_fraction_max",
     ]
     path = ensure_dir(output_dir) / "density_fw_table.csv"
     with path.open("w", newline="") as file:
@@ -175,35 +277,63 @@ def write_benchmark_packet_density_fw_table(output_dir: Path, payload: dict[str,
 
 def _seed_table_row(payload: dict[str, Any]) -> dict[str, Any]:
     r2 = payload["pure_walking"]["observable_results"].get("r2", {})
-    rn = payload["rn_summary"]
+    dmc = payload["dmc_summary"]
     lag_steps = r2.get("lag_steps", [])
     lag_max = lag_steps[-1] if lag_steps else ""
     return {
         "seed": payload["seed"],
         "status": payload["status"],
-        "rn_mixed_energy": rn["mixed_energy"],
-        "rn_r2_radius": rn["r2_radius"],
-        "rn_rms_radius": rn["rms_radius"],
+        "dmc_mixed_energy": dmc["mixed_energy"],
+        "dmc_r2_radius": dmc["r2_radius"],
+        "dmc_rms_radius": dmc["rms_radius"],
         "r2_schema_status": r2.get("schema_status", ""),
         "r2_plateau_status": r2.get("plateau_status", ""),
         "r2_plateau_value": r2.get("plateau_value", ""),
-        "paper_rms_radius": r2.get("paper_rms_radius", ""),
-        "local_step_method": rn["metadata"].get("local_step_method", ""),
-        "local_acceptance_fraction_mean": rn["metadata"].get(
+        "rms_radius": r2.get("rms_radius", ""),
+        "local_step_method": dmc["metadata"].get("local_step_method", ""),
+        "local_acceptance_fraction_mean": dmc["metadata"].get(
             "local_acceptance_fraction_mean",
             "",
         ),
-        "invalid_proposal_fraction_max": rn["metadata"].get(
+        "invalid_proposal_fraction_max": dmc["metadata"].get(
             "invalid_proposal_fraction_max",
             "",
         ),
-        "metropolis_rejection_fraction_max": rn["metadata"].get(
+        "metropolis_rejection_fraction_max": dmc["metadata"].get(
             "metropolis_rejection_fraction_max",
             "",
         ),
+        "local_energy_median_mean": dmc["metadata"].get("local_energy_median_mean", ""),
+        "local_energy_mad_mean": dmc["metadata"].get("local_energy_mad_mean", ""),
+        "local_energy_p001_min": dmc["metadata"].get("local_energy_p001_min", ""),
+        "local_energy_p01_min": dmc["metadata"].get("local_energy_p01_min", ""),
+        "local_energy_p99_max": dmc["metadata"].get("local_energy_p99_max", ""),
+        "local_energy_p999_max": dmc["metadata"].get("local_energy_p999_max", ""),
+        "drift_norm_max": dmc["metadata"].get("drift_norm_max", ""),
+        "configuration_esjd_mean": dmc["metadata"].get("configuration_esjd_mean", ""),
+        "r2_esjd_mean": dmc["metadata"].get("r2_esjd_mean", ""),
+        "weighted_free_gap_esjd_mean": dmc["metadata"].get(
+            "weighted_free_gap_esjd_mean",
+            "",
+        ),
+        "free_gap_min": dmc["metadata"].get("free_gap_min", ""),
+        "free_gap_p01_min": dmc["metadata"].get("free_gap_p01_min", ""),
         "lag_max_block_count": _lag_dict_get(r2.get("block_count_by_lag", {}), lag_max),
         "lag_max_weight_ess_min": _lag_dict_get(
             r2.get("block_weight_ess_min_by_lag", {}),
+            lag_max,
+        ),
+        "r2_genealogy_status": r2.get("genealogy_status", ""),
+        "lag_max_source_ancestor_ess_min": _lag_dict_get(
+            r2.get("block_source_ancestor_ess_min_by_lag", {}),
+            lag_max,
+        ),
+        "lag_max_unique_source_ancestor_min": _lag_dict_get(
+            r2.get("block_unique_source_ancestor_min_by_lag", {}),
+            lag_max,
+        ),
+        "lag_max_source_family_fraction_max": _lag_dict_get(
+            r2.get("block_max_source_family_fraction_by_lag", {}),
             lag_max,
         ),
     }
@@ -247,6 +377,19 @@ def _seed_r2_plateau_row(payload: dict[str, Any]) -> dict[str, Any]:
             r2.get("block_weight_ess_min_by_lag", {}),
             lag_max,
         ),
+        "genealogy_status": r2.get("genealogy_status", ""),
+        "lag_max_source_ancestor_ess_min": _lag_dict_get(
+            r2.get("block_source_ancestor_ess_min_by_lag", {}),
+            lag_max,
+        ),
+        "lag_max_unique_source_ancestor_min": _lag_dict_get(
+            r2.get("block_unique_source_ancestor_min_by_lag", {}),
+            lag_max,
+        ),
+        "lag_max_source_family_fraction_max": _lag_dict_get(
+            r2.get("block_max_source_family_fraction_by_lag", {}),
+            lag_max,
+        ),
     }
 
 
@@ -269,8 +412,8 @@ def _aggregate_energy_stationarity_row(stationarity: dict[str, Any]) -> dict[str
         "point_count": "",
         "block_count": "",
         "stationarity_clean": stationarity.get("stationarity_energy", "")
-        in {"GO", "WARNING_SPREAD_ONLY"},
-        "spread_warning": stationarity.get("stationarity_reason_energy", "") == "SPREAD_WARNING",
+        in {"accepted", "spread_warning"},
+        "spread_warning": stationarity.get("stationarity_reason_energy", "") == "spread_warning",
         "spread_veto": "",
         "rhat": stationarity.get("rhat_energy", ""),
         "neff_min": stationarity.get("neff_energy", ""),
@@ -345,7 +488,7 @@ def _seed_energy_stationarity_rows(stationarity: dict[str, Any]) -> list[dict[st
 
 
 def _aggregate_density_row(payload: dict[str, Any]) -> dict[str, Any]:
-    density = payload.get("paper_values", {}).get("density", {})
+    density = payload.get("estimates", {}).get("density", {})
     return {
         "row_type": "aggregate",
         "seed": "all",
@@ -363,6 +506,10 @@ def _aggregate_density_row(payload: dict[str, Any]) -> dict[str, Any]:
         "window_lags": "",
         "lag_max_block_count": "",
         "lag_max_weight_ess_min": "",
+        "genealogy_status": "",
+        "lag_max_source_ancestor_ess_min": "",
+        "lag_max_unique_source_ancestor_min": "",
+        "lag_max_source_family_fraction_max": "",
     }
 
 
@@ -381,6 +528,19 @@ def _seed_density_fw_row(payload: dict[str, Any]) -> dict[str, Any]:
         "lag_max_block_count": _lag_dict_get(density.get("block_count_by_lag", {}), lag_max),
         "lag_max_weight_ess_min": _lag_dict_get(
             density.get("block_weight_ess_min_by_lag", {}),
+            lag_max,
+        ),
+        "genealogy_status": density.get("genealogy_status", ""),
+        "lag_max_source_ancestor_ess_min": _lag_dict_get(
+            density.get("block_source_ancestor_ess_min_by_lag", {}),
+            lag_max,
+        ),
+        "lag_max_unique_source_ancestor_min": _lag_dict_get(
+            density.get("block_unique_source_ancestor_min_by_lag", {}),
+            lag_max,
+        ),
+        "lag_max_source_family_fraction_max": _lag_dict_get(
+            density.get("block_max_source_family_fraction_by_lag", {}),
             lag_max,
         ),
     }

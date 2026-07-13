@@ -4,45 +4,56 @@ from typing import Any
 
 import numpy as np
 
+from hrdmc.artifacts import ensure_dir, write_json_atomic
 from hrdmc.estimators.pure.forward_walking import PureWalkingConfig
 from hrdmc.estimators.pure.forward_walking.diagnostics import plateau_summary
-from hrdmc.estimators.pure.forward_walking.results import LagValue
-from hrdmc.io.artifacts import ensure_dir, write_json_atomic
+from hrdmc.estimators.pure.forward_walking.results import (
+    PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
+    PLATEAU_INSUFFICIENT_BLOCKS,
+    PLATEAU_NO_BLOCKS,
+    PLATEAU_RESOLVED,
+    PLATEAU_UNRESOLVED,
+    PURE_STATUS_ACCEPTED,
+    PURE_STATUS_INSUFFICIENT_SAMPLES,
+    PURE_STATUS_NO_BLOCKS,
+    PURE_STATUS_PLATEAU_UNRESOLVED,
+    PURE_STATUS_SCHEMA_INVALID,
+    SCHEMA_VALID,
+    LagValue,
+)
 from hrdmc.io.progress import ProgressBar, QueuedProgress
 from hrdmc.runners import run_seed_batch
 from hrdmc.workflows.dmc.benchmark_packet.selection import (
-    benchmark_packet_status,
-    energy_claim_status,
-    pure_fw_claim_status,
+    benchmark_validation_status,
+    energy_validation_status,
+    pure_fw_validation_status,
     scalar_seed_mean,
     scalar_seed_stderr,
 )
+from hrdmc.workflows.dmc.collective_rn import CollectiveRNControls
+from hrdmc.workflows.dmc.initial_conditions import InitializationControls
 from hrdmc.workflows.dmc.pure_walking.case import (
+    pure_config_for_case,
     pure_config_metadata,
-    pure_config_with_density_edges_if_needed,
 )
 from hrdmc.workflows.dmc.pure_walking.seed import (
     PureWalkingSeedRun,
     run_pure_walking_seed_run,
 )
-from hrdmc.workflows.dmc.rn_block import (
-    DEFAULT_RN_GUIDE_FAMILY,
-    DEFAULT_RN_PROPOSAL_FAMILY,
-    DEFAULT_RN_TARGET_FAMILY,
-    RNCase,
-    RNCollectiveProposalControls,
-    RNRunControls,
+from hrdmc.workflows.dmc.stationarity import summarize_stationarity_from_seed_summaries
+from hrdmc.workflows.dmc.trapped import (
+    DEFAULT_GUIDE_FAMILY,
+    DMCRunControls,
+    TrappedCase,
     controls_to_dict,
     make_grid,
     resolve_parallel_workers,
 )
-from hrdmc.workflows.dmc.rn_block_initial_conditions import RNInitializationControls
-from hrdmc.workflows.dmc.rn_block_stationarity import summarize_stationarity_from_seed_summaries
 
 
 def summarize_benchmark_packet_case(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seeds: list[int],
     *,
     pure_config: PureWalkingConfig,
@@ -50,21 +61,17 @@ def summarize_benchmark_packet_case(
     progress: ProgressBar | None = None,
     trace_output_dir: Any | None = None,
     ess_warning_fraction: float = 0.20,
-    ess_no_go_fraction: float = 0.10,
+    ess_invalid_fraction: float = 0.10,
     log_weight_span_warning: float = 50.0,
-    initialization: RNInitializationControls | None = None,
-    proposal: RNCollectiveProposalControls | None = None,
-    proposal_family: str = DEFAULT_RN_PROPOSAL_FAMILY,
-    guide_family: str = DEFAULT_RN_GUIDE_FAMILY,
-    target_family: str = DEFAULT_RN_TARGET_FAMILY,
+    initialization: InitializationControls | None = None,
+    collective_rn: CollectiveRNControls | None = None,
+    guide_family: str = DEFAULT_GUIDE_FAMILY,
 ) -> dict[str, Any]:
     """Run one DMC packet, optionally with collective RN transport, and derive FW."""
 
-    initialization = RNInitializationControls() if initialization is None else initialization
-    proposal = RNCollectiveProposalControls() if proposal is None else proposal
-    proposal.validate()
+    initialization = InitializationControls() if initialization is None else initialization
     grid = make_grid(controls, case)
-    config = pure_config_with_density_edges_if_needed(pure_config, grid)
+    config = pure_config_for_case(pure_config, grid=grid, case=case)
     worker_count = resolve_parallel_workers(len(seeds), parallel_workers)
     seed_runs, actual_workers = run_seed_batch(
         seeds,
@@ -79,10 +86,8 @@ def summarize_benchmark_packet_case(
             grid,
             progress_queue,
             initialization,
-            proposal,
-            proposal_family,
+            collective_rn,
             guide_family,
-            target_family,
         ),
         run_serial_seed=lambda seed: run_pure_walking_seed_run(
             case,
@@ -92,10 +97,8 @@ def summarize_benchmark_packet_case(
             density_grid=grid,
             progress=progress,
             initialization=initialization,
-            proposal=proposal,
-            proposal_family=proposal_family,
+            collective_rn=collective_rn,
             guide_family=guide_family,
-            target_family=target_family,
         ),
     )
     seed_payloads = [run.to_payload() for run in seed_runs]
@@ -106,31 +109,30 @@ def summarize_benchmark_packet_case(
         controls,
         seeds,
         grid,
-        [run.rn_summary for run in seed_runs],
+        [run.dmc_summary for run in seed_runs],
         actual_workers,
         requested_worker_count=worker_count,
         trace_output_dir=trace_output_dir,
         ess_warning_fraction=ess_warning_fraction,
-        ess_no_go_fraction=ess_no_go_fraction,
+        ess_invalid_fraction=ess_invalid_fraction,
         log_weight_span_warning=log_weight_span_warning,
         initialization=initialization,
-        proposal=proposal,
-        proposal_family=proposal_family,
+        collective_rn=collective_rn,
         guide_family=guide_family,
-        target_family=target_family,
     )
     pure_summary = summarize_pure_seed_payloads(seed_payloads, config=config)
-    energy_status = energy_claim_status(stationarity)
-    pure_status = pure_fw_claim_status(pure_summary)
-    status = benchmark_packet_status(energy_status=energy_status, pure_status=pure_status)
-    calculation_name = "RN-DMC" if controls.collective_rn_enabled else "DMC"
+    energy_status = energy_validation_status(stationarity)
+    pure_status = pure_fw_validation_status(pure_summary)
+    status = benchmark_validation_status(energy_status=energy_status, pure_status=pure_status)
+    calculation_name = (
+        "DMC with scheduled collective RN moves" if collective_rn is not None else "DMC"
+    )
     return {
-        "schema_version": "rn_block_benchmark_packet_v1",
+        "schema_version": "dmc_benchmark_packet_v2",
         "status": status,
         "case_id": case.case_id,
         "n_particles": case.n_particles,
         "rod_length": case.rod_length,
-        "omega": case.omega,
         **case.unit_metadata(),
         "controls": controls_to_dict(controls),
         "seeds": seeds,
@@ -141,14 +143,12 @@ def summarize_benchmark_packet_case(
         "init_width_log_sigma": initialization.init_width_log_sigma,
         "breathing_preburn_steps": initialization.breathing_preburn_steps,
         "breathing_preburn_log_step": initialization.breathing_preburn_log_step,
-        **proposal.to_metadata(),
-        "proposal_family": proposal_family,
+        "collective_rn_controls": (None if collective_rn is None else collective_rn.to_metadata()),
         "guide_family": guide_family,
-        "target_family": target_family,
         "pure_config": pure_config_metadata(config),
-        "energy_claim_status": energy_status,
-        "pure_fw_claim_status": pure_status,
-        "paper_values": paper_values(
+        "energy_validation_status": energy_status,
+        "pure_fw_validation_status": pure_status,
+        "estimates": estimates(
             stationarity,
             pure_summary,
             calculation_name=calculation_name,
@@ -156,12 +156,10 @@ def summarize_benchmark_packet_case(
         "stationarity": stationarity,
         "pure_walking": pure_summary,
         "seed_results": seed_payloads,
-        "claim_boundary": (
-            f"Single {calculation_name} packet: energy from the mixed local-energy "
-            "estimator; coordinate and density/pair/structure values only from "
-            "transported auxiliary forward walking in this packet. "
-            "Hellmann-Feynman energy response remains a separate cross-check workflow."
-        ),
+        "method": {
+            "energy": f"{calculation_name} mixed local energy",
+            "coordinate_observables": "transported auxiliary forward walking",
+        },
     }
 
 
@@ -179,33 +177,40 @@ def summarize_pure_seed_payloads(
     rms_values: list[float] = []
     schema_statuses: list[str] = []
     plateau_statuses: list[str] = []
+    genealogy_statuses: list[str] = []
+    seed_pure_statuses: list[str] = []
     for payload in seed_payloads:
         r2 = payload["pure_walking"]["observable_results"].get("r2", {})
+        seed_pure_statuses.append(str(payload["pure_walking"].get("status", "")))
         schema_statuses.append(str(r2.get("schema_status", "")))
         plateau_statuses.append(str(r2.get("plateau_status", "")))
+        genealogy_statuses.append(str(r2.get("genealogy_status", "")))
         r2_values.append(float(r2.get("plateau_value", float("nan"))))
         r2_stderr_values.append(float(r2.get("plateau_stderr", float("nan"))))
-        rms_values.append(float(r2.get("paper_rms_radius", float("nan"))))
+        rms_values.append(float(r2.get("rms_radius", float("nan"))))
     aggregate = aggregate_r2_plateau_summary(seed_payloads, config=config)
     aggregate_value = float(aggregate.get("plateau_value", float("nan")))
     aggregate_stderr = float(aggregate.get("plateau_stderr", float("nan")))
     seed_r2_stderr = scalar_seed_stderr(r2_values)
     pure_r2 = aggregate_value if np.isfinite(aggregate_value) else scalar_seed_mean(r2_values)
     pure_r2_stderr = _max_finite(aggregate_stderr, seed_r2_stderr)
-    paper_rms = float(np.sqrt(pure_r2)) if np.isfinite(pure_r2) and pure_r2 >= 0.0 else float("nan")
-    paper_rms_stderr = (
-        float(0.5 * pure_r2_stderr / paper_rms)
-        if np.isfinite(pure_r2_stderr) and np.isfinite(paper_rms) and paper_rms > 0.0
+    rms_radius = (
+        float(np.sqrt(pure_r2)) if np.isfinite(pure_r2) and pure_r2 >= 0.0 else float("nan")
+    )
+    rms_radius_stderr = (
+        float(0.5 * pure_r2_stderr / rms_radius)
+        if np.isfinite(pure_r2_stderr) and np.isfinite(rms_radius) and rms_radius > 0.0
         else float("nan")
     )
     status = pure_case_status_from_aggregate(
         schema_statuses=schema_statuses,
+        seed_pure_statuses=seed_pure_statuses,
         aggregate_status=str(aggregate.get("plateau_status", "")),
     )
     if "r2" in observables:
         observables["r2"] = {
             **observables["r2"],
-            "status": "PURE_FW_GO" if status == "PURE_WALKING_GO" else "PURE_FW_NO_GO",
+            "status": status,
             "decision_level": "seed_aggregated",
             "aggregate_plateau_status": aggregate.get("plateau_status"),
             "aggregate_plateau_value": aggregate.get("plateau_value"),
@@ -218,9 +223,10 @@ def summarize_pure_seed_payloads(
         "observables": observables,
         "r2_schema_statuses": schema_statuses,
         "r2_plateau_statuses": plateau_statuses,
-        "r2_seed_plateau_pass_count": plateau_statuses.count("PLATEAU_FOUND"),
-        "r2_seed_plateau_warning_count": sum(
-            status == "NO_LAG_PLATEAU" for status in plateau_statuses
+        "r2_genealogy_statuses": genealogy_statuses,
+        "r2_seed_plateau_resolved_count": plateau_statuses.count(PLATEAU_RESOLVED),
+        "r2_seed_plateau_unresolved_count": sum(
+            status == PLATEAU_UNRESOLVED for status in plateau_statuses
         ),
         "r2_aggregate_plateau_status": aggregate.get("plateau_status"),
         "r2_aggregate_plateau_value": aggregate.get("plateau_value"),
@@ -231,15 +237,15 @@ def summarize_pure_seed_payloads(
         "pure_r2_seed_stderr": seed_r2_stderr,
         "pure_r2_aggregate_plateau_stderr": aggregate_stderr,
         "pure_r2_mean_internal_stderr": scalar_seed_mean(r2_stderr_values),
-        "paper_rms_radius": paper_rms,
-        "paper_rms_radius_stderr": paper_rms_stderr,
-        "paper_rms_radius_seed_stderr": (
-            float(0.5 * seed_r2_stderr / paper_rms)
-            if np.isfinite(seed_r2_stderr) and np.isfinite(paper_rms) and paper_rms > 0.0
+        "rms_radius": rms_radius,
+        "rms_radius_stderr": rms_radius_stderr,
+        "rms_radius_seed_stderr": (
+            float(0.5 * seed_r2_stderr / rms_radius)
+            if np.isfinite(seed_r2_stderr) and np.isfinite(rms_radius) and rms_radius > 0.0
             else float("nan")
         ),
         "mean_seed_rms_diagnostic": scalar_seed_mean(rms_values),
-        "rms_semantics": "paper_rms_radius=sqrt(seed-aggregated pure_r2)",
+        "rms_semantics": "rms_radius=sqrt(seed-aggregated pure_r2)",
     }
 
 
@@ -250,7 +256,7 @@ def aggregate_r2_plateau_summary(
 ) -> dict[str, Any]:
     if not seed_payloads:
         return {
-            "plateau_status": "NO_BLOCKS",
+            "plateau_status": PLATEAU_NO_BLOCKS,
             "plateau_value": float("nan"),
             "plateau_stderr": float("nan"),
             "plateau_diagnostics": {"reason": "no_seed_payloads"},
@@ -329,17 +335,23 @@ def aggregate_r2_plateau_summary(
 def pure_case_status_from_aggregate(
     *,
     schema_statuses: list[str],
+    seed_pure_statuses: list[str],
     aggregate_status: str,
 ) -> str:
-    if any(status != "SCHEMA_GO" for status in schema_statuses):
-        return "PURE_WALKING_SCHEMA_NO_GO"
-    if aggregate_status == "PLATEAU_FOUND":
-        return "PURE_WALKING_GO"
-    if aggregate_status == "NO_BLOCKS":
-        return "PURE_WALKING_NO_BLOCKS_NO_GO"
-    if aggregate_status in {"INSUFFICIENT_BLOCKS", "INSUFFICIENT_WEIGHT_ESS"}:
-        return "PURE_WALKING_INSUFFICIENT_SAMPLES_NO_GO"
-    return "PURE_WALKING_PLATEAU_NO_GO"
+    if any(status != SCHEMA_VALID for status in schema_statuses):
+        return PURE_STATUS_SCHEMA_INVALID
+    if PURE_STATUS_INSUFFICIENT_SAMPLES in seed_pure_statuses:
+        return PURE_STATUS_INSUFFICIENT_SAMPLES
+    if aggregate_status == PLATEAU_RESOLVED:
+        return PURE_STATUS_ACCEPTED
+    if aggregate_status == PLATEAU_NO_BLOCKS:
+        return PURE_STATUS_NO_BLOCKS
+    if aggregate_status in {
+        PLATEAU_INSUFFICIENT_BLOCKS,
+        PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
+    }:
+        return PURE_STATUS_INSUFFICIENT_SAMPLES
+    return PURE_STATUS_PLATEAU_UNRESOLVED
 
 
 def _r2_plateau_config_from_seed_result(r2: dict[str, Any]) -> PureWalkingConfig:
@@ -349,6 +361,8 @@ def _r2_plateau_config_from_seed_result(r2: dict[str, Any]) -> PureWalkingConfig
         observables=("r2",),
         min_block_count=int(metadata.get("min_block_count", 30)),
         min_walker_weight_ess=float(metadata.get("min_walker_weight_ess", 30.0)),
+        min_source_ancestor_ess=float(metadata.get("min_source_ancestor_ess", 1.0)),
+        max_source_family_fraction=float(metadata.get("max_source_family_fraction", 1.0)),
         plateau_sigma_threshold=float(metadata.get("plateau_sigma_threshold", 1.0)),
         plateau_abs_tolerance=float(metadata.get("plateau_abs_tolerance", 0.0)),
         plateau_window_lag_count=int(metadata.get("plateau_window_lag_count", 4)),
@@ -406,10 +420,10 @@ def summarize_pure_observable(
     )
     metadata = results[0].get("metadata", {})
     summary: dict[str, Any] = {
-        "status": "PURE_FW_GO"
-        if all(result.get("plateau_status") == "PLATEAU_FOUND" for result in results)
-        and all(result.get("schema_status") == "SCHEMA_GO" for result in results)
-        else "PURE_FW_NO_GO",
+        "status": PURE_STATUS_ACCEPTED
+        if all(result.get("plateau_status") == PLATEAU_RESOLVED for result in results)
+        and all(result.get("schema_status") == SCHEMA_VALID for result in results)
+        else PURE_STATUS_PLATEAU_UNRESOLVED,
         "plateau_statuses": [result.get("plateau_status") for result in results],
         "schema_statuses": [result.get("schema_status") for result in results],
         "plateau_diagnostics_by_seed": [
@@ -431,7 +445,7 @@ def summarize_pure_observable(
     return summary
 
 
-def paper_values(
+def estimates(
     stationarity: dict[str, Any],
     pure_summary: dict[str, Any],
     *,
@@ -439,14 +453,14 @@ def paper_values(
 ) -> dict[str, Any]:
     lda_rms = float(stationarity.get("lda_rms_radius", float("nan")))
     pure_r2 = float(pure_summary.get("pure_r2", float("nan")))
-    pure_rms = float(pure_summary.get("paper_rms_radius", float("nan")))
+    pure_rms = float(pure_summary.get("rms_radius", float("nan")))
     observables = pure_summary.get("observables", {})
     return {
         "energy": {
             "value": stationarity.get("mixed_energy"),
             "stderr": stationarity.get("mixed_energy_conservative_stderr"),
             "estimator": f"{calculation_name} mixed local energy",
-            "status": energy_claim_status(stationarity),
+            "status": energy_validation_status(stationarity),
             "lda_value": stationarity.get("lda_total_energy"),
             "delta_vs_lda": stationarity.get("energy_dmc_minus_lda"),
         },
@@ -454,16 +468,16 @@ def paper_values(
             "value": pure_r2,
             "stderr": pure_summary.get("pure_r2_stderr"),
             "estimator": "transported auxiliary forward walking",
-            "status": pure_fw_claim_status(pure_summary),
+            "status": pure_fw_validation_status(pure_summary),
             "mixed_diagnostic": stationarity.get("r2_radius"),
             "lda_value": lda_rms * lda_rms if np.isfinite(lda_rms) else float("nan"),
             "delta_vs_lda": pure_r2 - lda_rms * lda_rms if np.isfinite(lda_rms) else float("nan"),
         },
         "rms": {
             "value": pure_rms,
-            "stderr": pure_summary.get("paper_rms_radius_stderr"),
+            "stderr": pure_summary.get("rms_radius_stderr"),
             "estimator": "transported auxiliary forward walking",
-            "status": pure_fw_claim_status(pure_summary),
+            "status": pure_fw_validation_status(pure_summary),
             "mixed_diagnostic": stationarity.get("rms_radius"),
             "lda_value": lda_rms,
             "delta_vs_lda": pure_rms - lda_rms if np.isfinite(lda_rms) else float("nan"),
@@ -509,8 +523,8 @@ def _result_value(value: np.ndarray) -> float | list[float]:
 
 def _observable_status(observables: dict[str, Any], name: str) -> str:
     if name not in observables:
-        return "NOT_EVALUATED_TRANSPORTED_FW_REQUIRED"
-    return str(observables[name].get("status", "PURE_FW_NO_GO"))
+        return "not_evaluated_transported_fw_required"
+    return str(observables[name].get("status", "not_evaluated"))
 
 
 def write_seed_payload_checkpoints(
@@ -528,17 +542,15 @@ def write_seed_payload_checkpoints(
 
 
 def _run_benchmark_seed_worker(
-    case: RNCase,
-    controls: RNRunControls,
+    case: TrappedCase,
+    controls: DMCRunControls,
     seed: int,
     pure_config: PureWalkingConfig,
     density_grid: np.ndarray,
     progress_queue: Any | None,
-    initialization: RNInitializationControls,
-    proposal: RNCollectiveProposalControls,
-    proposal_family: str,
+    initialization: InitializationControls,
+    collective_rn: CollectiveRNControls | None,
     guide_family: str,
-    target_family: str,
 ) -> tuple[int, PureWalkingSeedRun]:
     worker_progress = QueuedProgress(progress_queue) if progress_queue is not None else None
     try:
@@ -550,10 +562,8 @@ def _run_benchmark_seed_worker(
             density_grid=density_grid,
             progress=worker_progress,
             initialization=initialization,
-            proposal=proposal,
-            proposal_family=proposal_family,
+            collective_rn=collective_rn,
             guide_family=guide_family,
-            target_family=target_family,
         )
     finally:
         if worker_progress is not None:
