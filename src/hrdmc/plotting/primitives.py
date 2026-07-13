@@ -47,8 +47,9 @@ def threshold_lollipop(
 ) -> None:
     x = np.arange(values.size)
     colors = [
-        tokens.METHODOLOGY_GO if ((value <= threshold) if pass_below else (value >= threshold))
-        else tokens.METHODOLOGY_NO_GO
+        tokens.ACCEPTED
+        if ((value <= threshold) if pass_below else (value >= threshold))
+        else tokens.REJECTED
         for value in values
     ]
     ax.axhline(threshold, color=tokens.INK, linestyle=(0, (4, 2)), linewidth=1.1)

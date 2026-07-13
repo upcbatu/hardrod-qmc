@@ -14,7 +14,7 @@ def draw_density_panel(
     *,
     residual_ax: Any | None = None,  # noqa: ANN401
 ) -> None:
-    density = payload.get("paper_values", {}).get("density", {})
+    density = payload.get("estimates", {}).get("density", {})
     x = array_or_none(density.get("x"))
     value = array_or_none(density.get("value"))
     if x is None or value is None:

@@ -38,9 +38,7 @@ def _draw_running_means(
     if not isinstance(paths, list):
         return False
     trace_paths = [
-        Path(path)
-        for path in paths
-        if isinstance(path, str) and path.endswith("_trace.csv")
+        Path(path) for path in paths if isinstance(path, str) and path.endswith("_trace.csv")
     ]
     if not trace_paths:
         return False

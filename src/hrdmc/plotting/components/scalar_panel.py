@@ -5,8 +5,8 @@ from typing import Any
 import numpy as np
 
 from hrdmc.plotting import tokens
-from hrdmc.plotting.components.tier_badge import (
-    draw_tier_badge,
+from hrdmc.plotting.components.status_badge import (
+    draw_status_badge,
     methodology_label,
     precision_label,
 )
@@ -61,7 +61,7 @@ def draw_scalar_panel(
         fontsize=8,
         color=tokens.INK_SOFT,
     )
-    draw_tier_badge(
+    draw_status_badge(
         ax,
         methodology=methodology_label(status, observable=observable),
         precision=precision_label(precision_status),
@@ -74,7 +74,7 @@ def _draw_unavailable(ax: Any, title: str, status: str) -> None:  # noqa: ANN401
     ax.text(
         0.5,
         0.5,
-        status or "REGIME_NOT_SUPPORTED",
+        status or "not_evaluated",
         transform=ax.transAxes,
         ha="center",
         va="center",

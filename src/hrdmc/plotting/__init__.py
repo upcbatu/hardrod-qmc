@@ -14,10 +14,12 @@ def __getattr__(name: str) -> Any:  # noqa: ANN401
         )
 
         return write_benchmark_packet_comparison_plots
-    if name == "write_claim_matrix_plot":
-        from hrdmc.plotting.figures.claim_matrix import write_claim_matrix_plot
+    if name == "write_validation_matrix_plot":
+        from hrdmc.plotting.figures.validation_matrix import (
+            write_validation_matrix_plot,
+        )
 
-        return write_claim_matrix_plot
+        return write_validation_matrix_plot
     if name == "write_exact_tg_trap_plots":
         from hrdmc.plotting.figures.exact_tg_trap import write_exact_tg_trap_plots
 

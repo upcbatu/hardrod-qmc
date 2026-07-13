@@ -37,7 +37,7 @@ def draw_fw_lag_panel(ax: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
     if np.isfinite(plateau):
         ax.axhline(
             plateau,
-            color=tokens.METHODOLOGY_GO,
+            color=tokens.ACCEPTED,
             linestyle=(0, (4, 2)),
             linewidth=1.2,
             label="plateau",

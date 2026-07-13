@@ -6,7 +6,7 @@ from hrdmc.plotting.components.energy_stationarity_panel import (
 )
 from hrdmc.plotting.components.fw_lag_panel import draw_fw_lag_panel
 from hrdmc.plotting.components.scalar_panel import draw_scalar_panel
-from hrdmc.plotting.components.tier_badge import draw_tier_badge
+from hrdmc.plotting.components.status_badge import draw_status_badge
 
 __all__ = [
     "draw_case_header",
@@ -15,5 +15,5 @@ __all__ = [
     "draw_energy_stationarity_panel",
     "draw_fw_lag_panel",
     "draw_scalar_panel",
-    "draw_tier_badge",
+    "draw_status_badge",
 ]

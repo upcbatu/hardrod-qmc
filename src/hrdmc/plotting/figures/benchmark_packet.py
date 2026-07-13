@@ -29,7 +29,7 @@ def write_benchmark_packet_plots(
     paths: list[Path] = []
     paths.extend(_write_scalar_comparison(plt, plot_dir, payload, formats=formats))
     paths.extend(_write_density_comparison(plt, plot_dir, payload, formats=formats))
-    paths.extend(_write_gate_diagnostics(plt, plot_dir, payload, formats=formats))
+    paths.extend(_write_numerical_diagnostics(plt, plot_dir, payload, formats=formats))
     paths.extend(_write_energy_stationarity_diagnostics(plt, plot_dir, payload, formats=formats))
     paths.extend(_write_fw_lag_diagnostics(plt, plot_dir, payload, formats=formats))
     paths.extend(_write_optional_vector_observables(plt, plot_dir, payload, formats=formats))
@@ -44,11 +44,16 @@ def _write_scalar_comparison(
     *,
     formats: tuple[str, ...],
 ) -> list[Path]:
-    paper = payload.get("paper_values", {})
+    estimates = payload.get("estimates", {})
     rows = [
-        ("Energy", r"$E$", "energy", paper.get("energy", {})),
-        (r"$R^2$", r"$R^2$", "r2", paper.get("r2", {})),
-        (r"$R_\mathrm{rms}$", r"$R_\mathrm{rms}$", "rms", paper.get("rms", {})),
+        ("Energy", r"$E$", "energy", estimates.get("energy", {})),
+        (r"$R^2$", r"$R^2$", "r2", estimates.get("r2", {})),
+        (
+            r"$R_\mathrm{rms}$",
+            r"$R_\mathrm{rms}$",
+            "rms",
+            estimates.get("rms", {}),
+        ),
     ]
     fig, axes = plt.subplots(1, 3, figsize=(10.8, 3.8))
     draw_case_header(fig, payload)
@@ -62,7 +67,7 @@ def _write_scalar_comparison(
             observable=observable,
             precision_status=precision_status,
         )
-    paths = save_figure(fig, plot_dir / "paper_scalar_comparison", formats)
+    paths = save_figure(fig, plot_dir / "scalar_comparison", formats)
     plt.close(fig)
     return paths
 
@@ -89,7 +94,7 @@ def _write_density_comparison(
     return paths
 
 
-def _write_gate_diagnostics(
+def _write_numerical_diagnostics(
     plt: Any,  # noqa: ANN401
     plot_dir: Path,
     payload: dict[str, Any],
@@ -99,7 +104,7 @@ def _write_gate_diagnostics(
     fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.9))
     draw_case_header(fig, payload)
     draw_chain_panel(axes[0], axes[1], payload)
-    paths = save_figure(fig, plot_dir / "gate_diagnostics", formats)
+    paths = save_figure(fig, plot_dir / "numerical_diagnostics", formats)
     plt.close(fig)
     return paths
 
@@ -147,14 +152,14 @@ def _write_optional_vector_observables(
     *,
     formats: tuple[str, ...],
 ) -> list[Path]:
-    paper = payload.get("paper_values", {})
+    estimates = payload.get("estimates", {})
     paths: list[Path] = []
     paths.extend(
         _write_xy_figure(
             plt,
             plot_dir,
             payload,
-            paper.get("pair_distance_density", {}),
+            estimates.get("pair_distance_density", {}),
             x_key="x",
             x_label="pair distance",
             y_label="pair-distance density",
@@ -168,7 +173,7 @@ def _write_optional_vector_observables(
             plt,
             plot_dir,
             payload,
-            paper.get("structure_factor", {}),
+            estimates.get("structure_factor", {}),
             x_key="k_values",
             x_label=r"$k$",
             y_label=r"$S(k)$",
@@ -221,13 +226,13 @@ def _write_one_page_packet(
     *,
     formats: tuple[str, ...],
 ) -> list[Path]:
-    paper = payload.get("paper_values", {})
+    estimates = payload.get("estimates", {})
     fig = plt.figure(figsize=(8.27, 11.69))
     draw_case_header(fig, payload)
     spec = fig.add_gridspec(
-        5,
+        4,
         3,
-        height_ratios=(0.95, 1.5, 1.1, 1.25, 0.14),
+        height_ratios=(0.95, 1.5, 1.1, 1.25),
         hspace=0.45,
         wspace=0.34,
     )
@@ -236,7 +241,7 @@ def _write_one_page_packet(
         scalar_axes[0],
         title="Energy",
         ylabel=r"$E$",
-        data=paper.get("energy", {}),
+        data=estimates.get("energy", {}),
         observable="energy",
         precision_status=_precision_status(payload),
     )
@@ -244,7 +249,7 @@ def _write_one_page_packet(
         scalar_axes[1],
         title=r"$R^2$",
         ylabel=r"$R^2$",
-        data=paper.get("r2", {}),
+        data=estimates.get("r2", {}),
         observable="r2",
         precision_status=_precision_status(payload),
     )
@@ -252,7 +257,7 @@ def _write_one_page_packet(
         scalar_axes[2],
         title=r"$R_\mathrm{rms}$",
         ylabel=r"$R_\mathrm{rms}$",
-        data=paper.get("rms", {}),
+        data=estimates.get("rms", {}),
         observable="rms",
         precision_status=_precision_status(payload),
     )
@@ -269,14 +274,6 @@ def _write_one_page_packet(
     )
     draw_chain_panel(fig.add_subplot(spec[2, :2]), fig.add_subplot(spec[2, 2]), payload)
     draw_fw_lag_panel(fig.add_subplot(spec[3, :]), payload)
-    fig.text(
-        0.01,
-        0.01,
-        str(payload.get("claim_boundary", ""))[:260],
-        ha="left",
-        va="bottom",
-        fontsize=7,
-    )
     paths = save_figure(fig, plot_dir / "benchmark_packet_one_page", formats)
     plt.close(fig)
     return paths
@@ -284,9 +281,4 @@ def _write_one_page_packet(
 
 def _precision_status(payload: dict[str, Any]) -> str:
     stationarity = payload.get("stationarity", {})
-    return str(
-        stationarity.get(
-            "gate_split_precision",
-            payload.get("pure_fw_claim_status", ""),
-        )
-    )
+    return str(stationarity.get("precision_status", payload.get("status", "")))

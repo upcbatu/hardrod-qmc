@@ -110,9 +110,7 @@ def _write_energy_block_residuals(
         production_tau = _finite_float(payload.get("controls", {}).get("production_tau"))
         seeds = stationarity.get("seeds", [])
         chain_rows = (
-            stationarity.get("diagnostics", {})
-            .get("energy", {})
-            .get("chain_diagnostics", [])
+            stationarity.get("diagnostics", {}).get("energy", {}).get("chain_diagnostics", [])
         )
         case_rows: list[tuple[str, np.ndarray, np.ndarray, bool]] = []
         for index, row in enumerate(chain_rows if isinstance(chain_rows, list) else []):
@@ -134,10 +132,7 @@ def _write_energy_block_residuals(
         rows_by_packet.append(case_rows)
     if not all_residuals:
         return []
-    limit = (
-        max(abs(float(np.min(all_residuals))), abs(float(np.max(all_residuals))), 0.001)
-        * 1.12
-    )
+    limit = max(abs(float(np.min(all_residuals))), abs(float(np.max(all_residuals))), 0.001) * 1.12
     fig, axes = plt.subplots(
         1,
         len(packet_entries),
@@ -248,7 +243,7 @@ def _write_fw_r2_lag_ladder(
         if np.isfinite(plateau_value):
             ax.axhline(
                 plateau_value,
-                color=tokens.METHODOLOGY_GO,
+                color=tokens.ACCEPTED,
                 linestyle=(0, (4, 2)),
                 linewidth=1.1,
                 label="plateau",
@@ -283,7 +278,7 @@ def _write_density_comparison(
     all_x: list[float] = []
     all_y: list[float] = []
     for _, _, payload in packet_entries:
-        density = payload.get("paper_values", {}).get("density", {})
+        density = payload.get("estimates", {}).get("density", {})
         x = np.asarray(density.get("x", []), dtype=float)
         value = np.asarray(density.get("value", []), dtype=float)
         mixed_x = np.asarray(density.get("mixed_diagnostic_x", []), dtype=float)

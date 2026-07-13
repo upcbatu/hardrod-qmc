@@ -9,13 +9,13 @@ from hrdmc.plotting import tokens
 from hrdmc.plotting.style import load_pyplot, save_figure
 
 
-def write_claim_matrix_plot(
+def write_validation_matrix_plot(
     output_dir: str | Path,
     rows: list[dict[str, Any]],
     *,
     formats: tuple[str, ...] = ("png", "pdf"),
 ) -> list[str]:
-    """Render an observable-by-case claim matrix from assembled case rows."""
+    """Render an observable-by-case validation matrix from assembled case rows."""
 
     output = Path(output_dir)
     plot_dir = output / "plots"
@@ -34,7 +34,7 @@ def write_claim_matrix_plot(
             label_row.append(_short_status(status))
         labels.append(label_row)
     fig, ax = plt.subplots(figsize=(max(6.0, 1.0 * len(cases)), 3.8))
-    image = ax.imshow(matrix, vmin=0.0, vmax=2.0, cmap=_claim_cmap(plt))
+    image = ax.imshow(matrix, vmin=0.0, vmax=2.0, cmap=_validation_cmap(plt))
     ax.set_xticks(np.arange(len(cases)))
     ax.set_xticklabels(cases, rotation=35, ha="right")
     ax.set_yticks(np.arange(len(observables)))
@@ -42,35 +42,37 @@ def write_claim_matrix_plot(
     for i in range(len(observables)):
         for j in range(len(cases)):
             ax.text(j, i, labels[i][j], ha="center", va="center", fontsize=7)
-    ax.set_title("Claim matrix")
+    ax.set_title("Numerical status matrix")
     fig.colorbar(image, ax=ax, fraction=0.04, pad=0.02)
-    paths = save_figure(fig, plot_dir / "claim_matrix", formats)
+    paths = save_figure(fig, plot_dir / "validation_matrix", formats)
     plt.close(fig)
     return [str(path.relative_to(output)) for path in paths]
 
 
 def _status_score(status: str) -> float:
-    if "GO" in status and "NO_GO" not in status:
+    normalized = status.lower()
+    if normalized == "accepted":
         return 2.0
-    if "WARNING" in status or "BIAS" in status:
+    if any(token in normalized for token in ("warning", "unresolved", "insufficient")):
         return 1.0
     return 0.0
 
 
 def _short_status(status: str) -> str:
-    if "GO" in status and "NO_GO" not in status:
-        return "GO"
-    if "WARNING" in status:
+    normalized = status.lower()
+    if normalized == "accepted":
+        return "ACCEPT"
+    if any(token in normalized for token in ("warning", "unresolved", "insufficient")):
         return "WARN"
-    if "NOT_EVALUATED" in status:
+    if "not_evaluated" in normalized or "unavailable" in normalized:
         return "N/A"
-    return "NO-GO"
+    return "REJECT"
 
 
-def _claim_cmap(plt: Any) -> Any:  # noqa: ANN401
+def _validation_cmap(plt: Any) -> Any:  # noqa: ANN401
     from matplotlib.colors import LinearSegmentedColormap
 
     return LinearSegmentedColormap.from_list(
-        "hrdmc_claim",
-        [tokens.METHODOLOGY_NO_GO, tokens.PRECISION_WARN, tokens.METHODOLOGY_GO],
+        "hrdmc_validation",
+        [tokens.REJECTED, tokens.PRECISION_WARN, tokens.ACCEPTED],
     )
