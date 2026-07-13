@@ -1,28 +1,26 @@
-# RN Transport Event Contract
+# DMC Transport Event Contract
 
-This document defines the public seam between the RN-block DMC engine and
-transported auxiliary-variable forward-walking estimators. The engine
-emits algorithmic transport events. Estimator formulas consume the events in
-`estimators/`; experiments only orchestrate.
+This document defines the public seam between the local DMC engine and
+transported auxiliary forward-walking estimators. The engine emits algorithmic
+transport events; estimator formulas consume them under `estimators/`; command
+line experiments only orchestrate the workflow. The same event contract applies
+when an optional scheduled collective RN move is enabled.
 
 ## Scope
 
-The transport stream is for pure-coordinate estimator development. RN dynamics,
-resampling, diagnostic status, local-energy evaluation, and the numba guide
-backend stay owned by the DMC engine.
-
-Raw descendant-count forward walking is a genealogy-collapse diagnostic. Paper
-coordinate claims use the transported auxiliary estimator with its own
-checks.
+The DMC engine owns state evolution, branching weights, resampling, and parent
+indices. Forward walking owns auxiliary-variable transport, lag aggregation,
+genealogy diagnostics, plateau checks, and coordinate-observable assembly.
+Raw descendant counts are retained only as a genealogy diagnostic.
 
 ## Event Fields
 
-Each `RNTransportEvent` contains:
+Each `DMCTransportEvent` contains:
 
 ```text
 step_id
 production_step_id
-block_id
+scheduled_move_count
 positions
 local_energy_per_walker
 r2_rb_per_walker
@@ -34,127 +32,98 @@ weight_gauge_shift
 convention
 ```
 
-`local_energy_per_walker` is included for future energy control variates.
-`positions` and `local_energy_per_walker` are the post-step population after
-optional resampling for that DMC step. `log_weights_pre_resample` is the
-gauge-shifted weight vector immediately before the optional resampling
-operation. `log_weights_post_resample` defines the normalized estimator weights
-for the emitted positions; it is zero after resampling and nonzero during
-weighted no-resample windows.
+`positions` and `local_energy_per_walker` describe the post-step population
+after optional resampling. `production_step_id` is `None` during burn-in.
+`scheduled_move_count` is metadata and does not change parent-map scope.
 
-`r2_rb_per_walker` is the optional engine-side COM Rao-Blackwell R2 payload.
-When the analytic COM variance is unavailable, this field is `None`.
-When present, the convention is:
+`log_weights_pre_resample` is the gauge-shifted vector immediately before the
+optional resampling operation. `log_weights_post_resample` defines normalized
+estimator weights for the emitted positions; it is zero after resampling and
+can be nonzero during weighted no-resample windows.
+
+`r2_rb_per_walker` is the optional engine-side center-of-mass Rao-Blackwell
+payload. When present,
 
 ```text
 r_i = x_i - center - mean_j(x_j - center)
 r2_rb = mean_i r_i^2 + Var(COM)
 ```
 
-The estimator chooses raw R2 or RB R2 while preserving the COM convention.
+The estimator chooses raw or Rao-Blackwellized \(R^2\) while preserving the
+stated center-of-mass convention.
 
-## Branching And Weight Convention
+## Branching and Parent Convention
 
-The current transport convention is:
+The current convention is:
 
 ```text
 weight_convention = post_step_normalized_log_weights
 parent_convention = post_resample_parent_indices
 gauge_convention  = log_weights_pre_resample_are_recentered_max_subtracted
-```
-
-The engine emits one event per DMC step when a transport observer is attached.
-The parent map scope is one DMC step:
-
-```text
 snapshot_alignment = on_every_dmc_step
-parent_map_scope   = single_dmc_step
+parent_map_scope    = single_dmc_step
 ```
 
-If future artifacts store only fixed-step snapshots, the engine emits a
-composed parent map from one stored snapshot to the next. Estimators do not
-reconstruct intermediate resampling bookkeeping from hidden engine details.
+The engine emits one event per DMC step when an observer is attached. The parent
+map must therefore be consumed at every event. A scheduled collective move is
+still followed by the same step-level branching/resampling event and does not
+create a hidden parent-map boundary.
 
-Global log-weight gauge shifts cancel in normalized estimator averages and act
-as bookkeeping gauges. Transported auxiliary variables are averaged with the
-normalized `log_weights_post_resample` values at block completion.
+Global log-weight gauge shifts cancel in normalized averages. Lag zero is the
+identity anchor: it is assembled from each step's instantaneous normalized
+weighted observable. Longer lags transport the auxiliary variable through the
+recorded parent indices and use the final post-step weights.
 
-Lag zero is the identity anchor: it is assembled as the block average of each
-DMC step's instantaneous normalized weighted observable. Longer lags use the
-transported auxiliary value and the final post-step normalized weights.
+## Collection Modes
 
-## Collection Mode
-
-The current estimator contract reserves:
-
-```text
-collection_mode = single_point
-```
-
-For any requested lag greater than zero, `single_point` mode requires
-`block_size_steps = 1`. Multi-step collection with lagged outputs is reserved
-for `sliding_window`; otherwise early samples in the collection block would
-have a longer forward length than later samples.
-
-Future sliding-window collection can use the same output schema:
-
-```text
-collection_mode = sliding_window
-```
+The current single-point mode requires `block_size_steps = 1` whenever a
+positive lag is requested. This gives every contribution the same forward
+length. Sliding-window collection uses overlapping auxiliaries and the same
+event contract.
 
 ## Required Invariants
 
-Pure-estimator artifacts report the transport invariant checks used for that
-run:
+Forward-walking artifacts record the transport checks used for the run:
 
 ```text
-transport_invariant_tests_passed = [
-  "lag0_identity",
-  "deterministic_parent_map",
-  "weight_gauge_shift_cancellation",
-  "composed_parent_map_associativity"
-]
+lag0_identity
+deterministic_parent_map
+weight_gauge_shift_cancellation
+composed_parent_map_associativity
 ```
 
-For paper-coordinate claims, the transported auxiliary estimator additionally
-needs plateau, sufficient block count, sufficient walker-weight ESS,
-density-accounting when density is requested, and population checks.
+Reported lagged results additionally need finite block statistics, sufficient
+walker-weight support, sufficient independent source-family support, and
+density accounting when density is requested.
 
-## R2/RMS Semantics
+## R2 and RMS Semantics
 
-R2 is the primary transported observable. The paper RMS radius is:
+\(R^2\) is the primary transported observable. The derived RMS radius is
 
 ```text
-paper_rms_radius = sqrt(aggregated_pure_r2)
+rms_radius = sqrt(aggregated_pure_r2)
 ```
 
-The mean of per-configuration square roots, if ever emitted, is named
-`mean_instantaneous_rms`; the paper RMS radius remains
-`sqrt(aggregated_pure_r2)`.
+Its serialized uncertainty is `rms_radius_stderr`. A mean of
+per-configuration square roots, if emitted for diagnostics, is a different
+quantity and must be named separately.
 
 ## Estimator Surface
 
-The public estimator implementation is split by responsibility:
+The implementation lives under:
 
 ```text
 src/hrdmc/estimators/pure/forward_walking/
-  assembly.py
-  config.py
-  contributions.py
-  diagnostics.py
-  results.py
-  transported.py
 ```
 
-It supports transported auxiliary FW for:
+It supports transported auxiliary forward walking for:
 
 ```text
-r2 / paper RMS
-density                  # bin density; integral gives particle count
-pair_distance_density    # bin density; integral gives pair count
+r2 and rms_radius
+density                  # integral gives particle count
+pair_distance_density    # integral gives pair count
 structure_factor
 ```
 
-Raw descendant counting remains a genealogy diagnostic only. Periodic-ring
-`g(r)` normalization is not reused for trapped open-line pair distances unless
-the geometry and normalization contract explicitly support it.
+Periodic-ring `g(r)` normalization is not reused for trapped open-line pair
+distances unless the geometry and normalization explicitly match.

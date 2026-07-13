@@ -2,124 +2,82 @@
 
 Active thesis title: **Microscopic description of trapped hard rods**.
 
-This repository is currently at an **RN-DMC candidate package stage**.
-The `src/hrdmc` package exposes the original VMC scaffold, a generic DMC
-contract package, and an RN-corrected
-collective-block DMC candidate.
+The repository implements a local importance-sampled DMC workflow for trapped
+one-dimensional hard rods. Local drift-diffusion is the default trajectory.
+Collective Radon-Nikodym-corrected moves are available as an optional scheduled
+extension and are disabled unless explicitly requested.
 
 ## Implemented
 
-- homogeneous one-dimensional hard-rod geometry on a periodic ring;
-  files: `src/hrdmc/systems/hard_rods.py`
-- reduced-coordinate hard-rod length identity;
-  files: `src/hrdmc/systems/reduced.py`
-- homogeneous hard-rod EOS, finite ring energy, chemical potential, chemical-potential inversion, and LDA support;
-  files: `src/hrdmc/theory/`
-- trapped harmonic-oscillator units for trapped cases:
-  canonical trapped case ids use \(A=a/a_{\mathrm{ho}}\), for example
-  `N8_A0.2`; the default trapped Hamiltonian stores
-  \(q=x/a_{\mathrm{ho}}\) and \(\widetilde E=E/(\hbar\omega)\), so there is
-  no hidden trap-frequency conversion inside a case id;
-  files: `src/hrdmc/theory/units.py`, `src/hrdmc/workflows/dmc/rn_block.py`
-- Jastrow-based trial-wavefunction implementation for the ring scaffold;
-  files: `src/hrdmc/wavefunctions/trials/jastrow.py`
-- initial homogeneous VMC workflow;
-  files: `src/hrdmc/monte_carlo/vmc.py`
-- homogeneous ring validation benchmark over particle numbers and packing fractions;
-  files: `experiments/anchors/homogeneous_ring.py`
-- homogeneous finite-`a` exact ring validation grid including `N = 64`;
-  files: `experiments/anchors/homogeneous_ring_exact_grid.py`
-- local-energy validation for the all-pair reduced hard-rod trial;
-  files: `src/hrdmc/wavefunctions/trials/jastrow.py`, `src/hrdmc/estimators/local_energy.py`
-- observable implementations for `g(r)`, `S(k)`, and periodic density `n(x)`;
-  files: `src/hrdmc/estimators/`
-- open-line trapped hard-rod geometry, harmonic trap potential, and trapped diagnostic trial state;
-  files: `src/hrdmc/systems/open_line.py`, `src/hrdmc/systems/external_potential.py`, `src/hrdmc/wavefunctions/trials/trapped.py`
-- non-periodic density estimation plus raw and relative density L2 comparison;
-  files: `src/hrdmc/estimators/observables/density.py`, `src/hrdmc/analysis/metrics.py`
-- trapped VMC diagnostic scripts were used during development but are no longer
-  part of the public experiment surface.
-- blocking analysis and bias/MSE utilities;
-  files: `src/hrdmc/analysis/blocking.py`, `src/hrdmc/analysis/metrics.py`
-- an RN-corrected collective-block DMC candidate with injected system,
-  guide, target-kernel, and proposal-kernel owners;
-  files: `src/hrdmc/monte_carlo/dmc/rn_block/`
-- streaming RN-block summary mode for mean, radius, and density accumulation
-  without retaining raw snapshots;
-  files: `src/hrdmc/monte_carlo/dmc/rn_block/engine.py`,
-  `src/hrdmc/analysis/streaming.py`
-- RN-block development runners for diagnostic, streaming equivalence, single-case,
-  raw grid, eta planning, and diagnostic-audit sweeps were used during development
-  but are no longer part of the public experiment surface.
-- generic seed-batch execution, worker-to-parent progress propagation, and
-  canonical artifact routing are owned outside experiment scripts;
-  files: `src/hrdmc/runners/`, `src/hrdmc/artifacts/`
-- RN-block workflow composition is owned by package workflow modules rather
-  than command-line experiment scripts;
-  files: `src/hrdmc/workflows/dmc/`
-- trapped finite-`a` RN-DMC stationarity grid with R-hat, effective-sample,
-  accounting, and unresolved/warning diagnostics;
-  files: `experiments/dmc/rn_block/trapped_stationarity_grid.py`,
-  `src/hrdmc/analysis/chain_diagnostics.py`
-- exact trapped Tonks-Girardeau harmonic validation for RN-block DMC in the
-  zero-rod-length limit;
-  files: `experiments/anchors/exact_tg_trap.py`
-- canonical exact validation packet for trapped TG RN-DMC anchors and
-  homogeneous finite-`a` exact ring anchors;
-  files: `experiments/anchors/exact_validation_packet.py`
-- compact RN-DMC candidate tables and a result manifest;
-  files: `docs/tables/`, `tests/fixtures/rn_results_manifest.json`
+- periodic and open-line one-dimensional hard-rod geometry;
+- reduced-coordinate hard-rod identities and hard-core validity checks;
+- harmonic-oscillator units for trapped cases, with canonical case identifiers
+  such as `N10_A1` where \(A=a/a_{\rm ho}\);
+- homogeneous hard-rod EOS, finite-ring energy, chemical-potential inversion,
+  and excluded-volume LDA support under `src/hrdmc/theory/`;
+- exact and deterministic anchor workflows under `experiments/anchors/`;
+- a Metropolis VMC baseline under `src/hrdmc/monte_carlo/vmc.py`;
+- the default DMC engine under `src/hrdmc/monte_carlo/dmc/local/`, including
+  drift-diffusion, branching, population control, streaming summaries,
+  checkpoints, telemetry, and transport events;
+- the optional collective move and its explicit target-to-proposal correction
+  under `src/hrdmc/monte_carlo/dmc/collective_rn/`;
+- DMC workflow composition under `src/hrdmc/workflows/dmc/` and thin user
+  commands under `experiments/dmc/local/`;
+- mixed local-energy estimates and transported forward-walking estimators for
+  \(R^2\), RMS radius, density, pair-distance density, and structure factor;
+- an independent Hellmann-Feynman energy-response route for trap \(R^2\) and
+  RMS radius;
+- blocking, autocorrelation, chain-agreement, population, mobility, and
+  genealogy diagnostics;
+- non-periodic density estimation and QMC-versus-LDA comparison metrics;
+- canonical artifact routing plus JSON, CSV, NPZ, and plotting support.
 
-## Not Yet Implemented
+Benchmark packets expose observable data under `estimates`. Forward-walking
+\(R^2\) summaries expose the derived radius as `rms_radius` and its uncertainty
+as `rms_radius_stderr`.
 
-- final trapped hard-rod DMC/FW versus LDA failure-map release workflow with closed
-  \(N=4,8,16,32\) production matrix and fixed-physical-FW timestep ladder;
-  expected area: `src/hrdmc/analysis/`, `experiments/`, and archived results
-- release-grade citation metadata and archived result bundle;
-  expected area: repository root plus external archive at release time
+## Active Commands
 
-The current DMC layer is a contract package plus a candidate RN-block
-implementation. The compact RN-DMC tables are validation summaries rather than
-final release artifacts.
+```bash
+make validate-ring
+make validate-ring-grid
+make validate-dmc-exact
+make validate-dmc-trapped-stationarity
+```
+
+The trapped stationarity command runs local DMC by default. Its CLI documents
+the explicit option for enabling collective RN transport when that comparison
+is scientifically relevant.
 
 ## Validation Status
 
-The current tests cover ring/open-line geometry, harmonic trap values,
-estimator output shapes, theory formulas, LDA normalization, and analysis
-utilities.
-files: `tests/`
+Deterministic validation covers hard-rod geometry, harmonic trapping, guide and
+local-energy formulas, DMC transitions and accounting, estimator invariants,
+theory formulas, LDA normalization, analysis utilities, and workflow contracts.
 
-The homogeneous validation benchmark checks the exact all-pair trial local energy against finite-`N` ring references and can be run with `make validate-ring`.
-files: `experiments/anchors/homogeneous_ring.py`
+The main numerical anchors are:
 
-The extended homogeneous exact ring grid checks the same finite-`N` hard-rod
-identity across a wider `N` and packing-fraction grid, including `N = 64`, and
-can be run with `make validate-ring-grid`.
-files: `experiments/anchors/homogeneous_ring_exact_grid.py`
+- exact homogeneous finite-ring hard-rod energies;
+- the trapped Tonks-Girardeau harmonic limit at \(A=0\);
+- a deterministic finite-\(A\), \(N=2\) relative-coordinate reference;
+- timestep, population, stationarity, and estimator checks for finite-\(A\)
+  trapped rows.
 
-The RN-DMC exact trapped validation checks the zero-length hard-core
-Tonks-Girardeau harmonic limit against \(E_0=N^2\omega/2\) and can be
-run with `make validate-rn-exact`.
-files: `experiments/anchors/exact_tg_trap.py`
+Passing an exact limiting case validates that limit and the associated
+conventions. A finite-\(A\), many-body result is reported only with its own
+timestep, population, stationarity, and observable-specific estimator evidence.
 
-The trapped RN-DMC stationarity grid checks finite-`a` trapped runs for
-R-hat, effective independent samples, stationarity, density accounting, and
-finite/valid sample accounting. It can be run with
-`make validate-rn-trapped-stationarity`. Its output is a statistical-control
-diagnostic for the trapped DMC workflow.
-files: `experiments/dmc/rn_block/trapped_stationarity_grid.py`
+## Remaining Work
 
-Blocking-plateau absence is now classified as a precision warning when the
-hard numerical checks pass and Sokal/Geyer/flat-top-HAC correlated-error
-estimates provide a conservative finite error bar. See
-`docs/dmc/method.md`.
+- finish the high-\(A\) guide and population calibration before the final long
+  matrix;
+- complete the selected timestep and walker-population checks for every final
+  parameter row;
+- archive the final result bundle with configuration, seed-level summaries,
+  diagnostics, and code revision;
+- produce the final DMC/forward-walking versus LDA figures and thesis tables.
 
-Development-only signal runners are kept out of the public `experiments/` tree
-so it stays release-facing.
-
-Benchmark interpretation and remaining validation checks are maintained in `docs/validation/README.md`.
-
-RN-DMC method notes are maintained in `docs/dmc/`. Compact
-candidate-result tables are maintained in `docs/tables/`.
-
-Final DMC release status still needs long-run examples and release metadata.
+Report tables are generated from manifest-verified run artifacts. Historical
+collective-run CSV snapshots are not a current local-DMC result source and are
+not tracked as thesis evidence.

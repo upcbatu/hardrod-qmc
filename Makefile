@@ -1,8 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: test check lint typecheck unit validate-ring validate-ring-grid validate-rn-exact validate-rn-trapped-stationarity clean
-
-test: lint unit
+.PHONY: check lint typecheck validate-ring validate-ring-grid validate-dmc-exact validate-dmc-trapped-stationarity clean
 
 check: lint typecheck
 
@@ -12,20 +10,17 @@ lint:
 typecheck:
 	PYTHONPATH=src $(PYTHON) -m pyright
 
-unit:
-	PYTHONPATH=src $(PYTHON) -m pytest
-
 validate-ring:
 	PYTHONPATH=src $(PYTHON) experiments/anchors/homogeneous_ring.py
 
 validate-ring-grid:
 	PYTHONPATH=src $(PYTHON) experiments/anchors/homogeneous_ring_exact_grid.py
 
-validate-rn-exact:
+validate-dmc-exact:
 	PYTHONPATH=src $(PYTHON) experiments/anchors/exact_tg_trap.py
 
-validate-rn-trapped-stationarity:
-	PYTHONPATH=src $(PYTHON) experiments/dmc/rn_block/trapped_stationarity_grid.py
+validate-dmc-trapped-stationarity:
+	PYTHONPATH=src $(PYTHON) experiments/dmc/local/trapped_stationarity_grid.py
 
 clean:
 	rm -rf .pytest_cache .ruff_cache

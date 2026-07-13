@@ -50,13 +50,13 @@ This module owns:
 Engines depend on the protocol, not on concrete guide classes or kernel
 modules.
 
-Proposal densities, RN log weights, population control, coordinate observable
-reducers, and numerical-check logic are owned by their respective DMC,
-estimator, and analysis layers.
+Proposal densities, optional collective-move correction weights, population
+control, coordinate observable reducers, and numerical-check logic are owned by
+their respective DMC, estimator, and analysis layers.
 
 For production DMC, a guide controls the importance-sampling drift,
-local-energy variance, and practical projection quality. The RN-DMC release
-path exposes a guide protocol with:
+local-energy variance, and practical projection quality. The DMC engine consumes
+a guide protocol with:
 
 ```text
 log_value
@@ -78,28 +78,34 @@ This module owns:
 - walker/result contracts;
 - population-control support;
 
-DMC is the target production method, but the architecture separates generated
-results from benchmark-tier interpretation. Trapped results carry an explicit
-tier: VMC diagnostic, DMC candidate, or external/group reference if available.
+DMC is the target production method, but numerical interpretation remains
+separate from sample generation. Trapped results record the method, estimator,
+and validation status needed to interpret each observable.
 
 The generic DMC contract remains a shared support layer inside the `dmc/`
-package. Specific DMC engines live in subpackages, including the RN-corrected
-collective-block engine candidate:
+package. The default importance-sampled engine lives at:
 
 ```text
-src/hrdmc/monte_carlo/dmc/rn_block/
+src/hrdmc/monte_carlo/dmc/local/
 ```
 
-The RN-block subpackage owns algorithmic proposal parameters. The
-system/Hamiltonian layer owns the physical system and target short-time
+It owns local drift-diffusion, branching, population control, checkpoints,
+streaming summaries, and DMC transport events. Optional collective proposals
+and their change-of-measure correction live separately at:
+
+```text
+src/hrdmc/monte_carlo/dmc/collective_rn/
+```
+
+The system/Hamiltonian layer owns the physical system and any target short-time
 transition density:
 
 ```text
 K_sys(x_new | x_old, tau)
 ```
 
-The guide owns trial-wavefunction derivatives and local energy. RN-block owns
-only the collective proposal:
+The guide owns trial-wavefunction derivatives and local energy. The optional
+collective extension owns its proposal:
 
 ```text
 Q_theta(x_new | x_old)
@@ -111,8 +117,7 @@ and the ratio bookkeeping:
 log K_sys - log Q_theta
 ```
 
-This prevents the collective block code from silently duplicating system
-physics and playing a separate dynamics game.
+This keeps optional collective transport from duplicating Hamiltonian physics.
 
 Monte Carlo engines call guide and transition interfaces only. Optional numba
 availability and guide/proposal formulas remain outside the engine logic.
@@ -207,8 +212,8 @@ This module owns seed-batch dispatch, bounded parallel-worker integration,
 worker-to-parent progress propagation, and serial fallback when multiprocessing
 is unavailable.
 
-It does not own physics systems, DMC algorithms, observables, or paper
-classification rules.
+It does not own physics systems, DMC algorithms, observables, or scientific
+validation decisions.
 
 ### `workflows/`
 
@@ -243,12 +248,12 @@ Experiments are grouped by domain:
 
 ```text
 experiments/anchors/
-experiments/dmc/rn_block/
+experiments/dmc/local/
 ```
 
-Only release-facing anchor and RN-block DMC entrypoints belong here. Private
-diagnostic probes, tuning scans, and abandoned signal scripts are intentionally
-kept out of the public experiment surface.
+This directory contains thin anchor and local DMC entrypoints. Local DMC is the
+default; collective RN transport is enabled only by an explicit runner option.
+Temporary probes and obsolete tuning scripts are not kept as user commands.
 
 Reusable runner engines, method workflows, statistics logic, and scientific
 equations belong to the package owners above.
@@ -260,14 +265,6 @@ generate figures only.
 
 Plotting renders outputs from experiments and analysis without owning physics
 or comparison logic.
-
-### `tests/`
-
-Purpose:
-verify implemented behavior.
-
-Tests cover owner contracts, numerical formulas, shape conventions, and
-regression behavior.
 
 ### `data/`
 
@@ -328,14 +325,14 @@ At present, the repository contains:
 - observable estimators for `g(r)`, `S(k)`, and ring-based `n(x)`;
 - blocking and support metric utilities;
 - an initial homogeneous VMC diagnostic experiment;
-- a DMC contract package plus an RN-block candidate implementation.
+- a local importance-sampled DMC engine plus an optional collective RN
+  scheduled-move extension.
 
-The trapped system now has an initial VMC diagnostic path. Benchmark-tier
-expansion, systematic failure-map workflows, and release-grade RN-DMC examples
-remain pending.
+The trapped system also has a VMC diagnostic path. Systematic failure-map runs
+and the remaining high-\(A\) numerical validation are ongoing.
 
-Release material includes compact examples, validation fixtures, archived run
-artifacts, and one canonical method document. Exploratory notebooks, progress
+Repository material includes compact examples, validation fixtures, historical
+summary tables, and one DMC method document. Exploratory notebooks, progress
 logs, and full raw run bundles remain outside the package API.
 
 ## 4. Summary

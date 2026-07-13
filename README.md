@@ -15,7 +15,7 @@ Trapped-system runs use harmonic-oscillator units directly:
 - energy stored by the code: \(\widetilde E=E/(\hbar\Omega)\)
 - energy unit: \(\hbar\Omega\)
 - time unit: \(1/\Omega\)
-- default dimensionless trap frequency in code variables: \(1\)
+- fixed dimensionless trap frequency in code variables: \(1\)
 
 After nondimensionalization, trapped hard-rod cases are specified by the
 particle number \(N\) and the dimensionless rod length \(A=a/a_{\rm ho}\).
@@ -35,7 +35,7 @@ particle number \(N\) and the dimensionless rod length \(A=a/a_{\rm ho}\).
 - [docs/05_TIMELINE_AND_NAVIGATION.md](docs/05_TIMELINE_AND_NAVIGATION.md)
   Tentative calendar and navigation note.
 - [docs/dmc/method.md](docs/dmc/method.md)
-  Canonical RN-DMC method, diagnostic-status, and claim-boundary note.
+  Local DMC method, optional collective RN extension, and numerical checks.
 - [docs/validation/README.md](docs/validation/README.md)
   Validation notes for benchmark status, interpretation, and remaining checks.
 
@@ -50,12 +50,11 @@ src/hrdmc/theory/         homogeneous EOS, chemical potential, LDA
 src/hrdmc/analysis/       errors, uncertainty, and failure maps
 src/hrdmc/runners/        generic seed-batch execution and progress plumbing
 src/hrdmc/workflows/      method workflow composition above engines
-src/hrdmc/artifacts/      canonical result routing
-src/hrdmc/io/             JSON / NPZ outputs
+src/hrdmc/artifacts/      result routing, serialization, manifests, provenance
+src/hrdmc/io/             bounded terminal output, progress, run checkpoints
 src/hrdmc/plotting/       figures
 experiments/anchors/      exact and analytic anchor entrypoints
-experiments/dmc/rn_block/ RN-block DMC release entrypoints
-tests/                    regression tests
+experiments/dmc/local/    local DMC experiment entrypoints
 data/                     external/reference inputs, usually untracked
 results/                  generated experiment outputs, usually untracked
 notebooks/                inspection and figure drafting
@@ -68,7 +67,6 @@ Install development tooling with `python3 -m pip install -e ".[dev]"`.
 - `make lint` runs `ruff check`.
 - `make typecheck` runs `pyright` with the repository `pyproject.toml` settings.
 - `make check` runs both lint and type checks.
-- `make test` runs lint and unit tests.
 
 ## Current status
 
@@ -79,12 +77,14 @@ Install development tooling with `python3 -m pip install -e ".[dev]"`.
 - VMC remains available in the package as scaffold code, but development VMC
   experiment scripts are no longer part of the public experiment surface
 - observable estimators for local energy, `g(r)`, `S(k)`, and ring-based `n(x)` exist
-- the DMC layer now has a generic contract package and an RN-block
-  candidate implementation under `src/hrdmc/monte_carlo/dmc/rn_block/`
-- the active trapped-system progress report uses the RN-block workflow under
-  `experiments/dmc/rn_block/` plus transported forward walking under
-  `src/hrdmc/estimators/pure/forward_walking/`; this workflow supersedes the
-  older bootstrap DMC notes
-- compact validation tables, RN diagnostic runners, and release-quality
-  documentation are now present; release metadata and archived result bundles
-  are still pending
+- the default DMC implementation is the importance-sampled local engine under
+  `src/hrdmc/monte_carlo/dmc/local/`
+- collective Radon-Nikodym-corrected moves are an optional scheduled extension
+  under `src/hrdmc/monte_carlo/dmc/collective_rn/`; they are disabled unless a
+  runner explicitly enables them
+- trapped-system runners live under `experiments/dmc/local/` and can combine
+  local DMC with transported forward walking under
+  `src/hrdmc/estimators/pure/forward_walking/`
+- table-generation policy and method documentation are included; validation
+  tables and long-run result bundles remain manifest-traceable generated
+  artifacts rather than tracked source files

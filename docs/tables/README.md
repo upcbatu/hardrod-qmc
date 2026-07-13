@@ -1,32 +1,10 @@
-# RN-DMC Tables
+# Generated DMC Tables
 
-This directory contains compact summaries for the RN-corrected
-collective-block DMC candidate.
+Current commands write CSV tables beside their JSON summaries under `results/`.
+This directory intentionally contains no frozen production rows: a table used
+in the thesis must remain traceable to its run manifest, configuration
+fingerprint, and source summaries.
 
-These files are compact summaries rather than raw run bundles. Full trace JSON,
-per-seed audits, progress logs, and large reproducibility payloads belong in
-separate run artifacts for thesis or paper use.
-
-The trapped rows in the current CSV snapshots predate the harmonic-oscillator
-case-id migration and use legacy `N*_a*_omega*` labels. New trapped production
-runs use canonical `N*_A*` case ids, where \(A=a/a_{\mathrm{ho}}\).
-
-## Files
-
-- `rn_validation_summary.csv`: homogeneous hard-rod validation against exact
-  finite-ring references.
-- `rn_grid_summary.csv`: compact trapped DMC-versus-LDA candidate table,
-  including six-case and frontier rows.
-- `rn_seed_robustness_summary.csv`: seed-stress summaries for the weak `N = 4`
-  trap cases.
-
-## Claim Boundary
-
-The tables support this label:
-
-```text
-RN-corrected collective-block DMC engine, validated candidate.
-```
-
-Final paper artifact bundles additionally need versioned code, raw
-reproducibility artifacts, citation metadata, and an archived dataset.
+Use the commands under `experiments/dmc/local/` to generate stationarity,
+forward-walking, density, and energy-response tables in harmonic-oscillator
+units. Trapped case identifiers use `N*_A*`, where \(A=a/a_{\rm ho}\).

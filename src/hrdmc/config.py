@@ -31,7 +31,7 @@ class HardRodSystemConfig:
 
 @dataclass(frozen=True)
 class VMCConfig:
-    """Configuration for the first Metropolis/VMC smoke tests."""
+    """Configuration for the initial Metropolis/VMC validation runs."""
 
     n_steps: int = 20_000
     burn_in: int = 2_000

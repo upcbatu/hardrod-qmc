@@ -1,9 +1,9 @@
-# RN-Block DMC Method And Numerical Checks
+# Trapped Hard-Rod DMC Method and Numerical Checks
 
-This document is the professor-facing description of the trapped hard-rod
-RN-block DMC corridor implemented in `src/hrdmc`. It explains what the method
-does, what the output means, and which claims are allowed. The formula audit and
-source bibliography remain in
+This document describes the trapped hard-rod DMC implementation in
+`src/hrdmc`: the default local trajectory, the optional collective
+Radon-Nikodym extension, the estimators, and the numerical evidence attached to
+reported results. Formula ownership and literature references are mapped in
 [../03_EQUATION_SOURCE_MAP.md](../03_EQUATION_SOURCE_MAP.md).
 
 ## Physical Problem
@@ -14,208 +14,163 @@ trap,
 $$
 H =
 -\frac12\sum_i \partial_{x_i}^2
-+ \frac12\omega^2\sum_i (x_i-x_0)^2
++ \frac12\omega^2\sum_i(x_i-x_0)^2
 + V_{\mathrm{HR}},
 $$
 
-with open-line hard-core constraints
+with ordered hard-core constraints
 
 $$
 x_{i+1}-x_i \ge a.
 $$
 
-The trapped code stores the dimensionless variables
-\(q=x/a_{\rm ho}\) and \(\widetilde E=E/(\hbar\omega)\), with
-\(a_{\rm ho}=\sqrt{\hbar/(m\omega)}\). Substitution gives
-\(\partial_x=a_{\rm ho}^{-1}\partial_q\) and the prefactors reduce to
-\[
-  \frac{\hbar}{m\omega a_{\rm ho}^2}=1,
-  \qquad
-  \frac{m\omega a_{\rm ho}^2}{\hbar}=1.
-\]
-This gives the dimensionless oscillator
-\(-\frac12\partial_q^2+\frac12 q^2\). The hard-core boundary becomes
-\(q_{i+1}-q_i\ge A=a/a_{\rm ho}\). The scan coordinates are therefore \(N\)
-and \(A\). Changing the physical trap frequency at fixed rod diameter changes
-the dimensionless value \(A\), because \(a_{\rm ho}\) changes. The hard-rod geometry is owned by `systems/`; guide and
-local-energy formulas are owned by `wavefunctions/`; DMC propagation is owned
-by `monte_carlo/dmc/`; statistical interpretation is owned by `analysis/`.
+The trapped code uses \(q=x/a_{\rm ho}\),
+\(\widetilde E=E/(\hbar\omega)\), and
+\(A=a/a_{\rm ho}\), where
+\(a_{\rm ho}=\sqrt{\hbar/(m\omega)}\). The dimensionless Hamiltonian is
+\(-\frac12\sum_i\partial_{q_i}^2+\frac12\sum_iq_i^2\) inside the hard-rod
+domain. Production scans are therefore indexed by \(N\) and \(A\).
 
-## Why RN-Block DMC
+## Default Local DMC Trajectory
 
-Pure local drift-diffusion moves equilibrate the trapped cloud width slowly.
-RN-block DMC keeps the standard full-coordinate DMC walker state but separates
-the proposal used to move walkers from the target kernel used in the
-Radon-Nikodym correction. Here "target kernel" means the transition kernel in
-the change-of-measure correction, while the physical Hamiltonian remains the
-trapped hard-rod Hamiltonian above. For finite-\(a\), \(N>2\) trapped runs, the
-current gap-\(h\)-product target is a candidate numerical kernel construction
-rather than an exact many-body propagator; exact anchors, timestep checks,
-RN-weight diagnostics, stationarity checks, and pure-estimator checks quantify
-its reliability.
+The default implementation is
+`src/hrdmc/monte_carlo/dmc/local/`. It does not construct or require a
+collective proposal.
 
-For a local DMC step,
+For the default Metropolis-corrected drift-diffusion step (MALA), a walker at
+\(X\) proposes
 
 $$
-x' = x + \Delta t\,F(x) + \sqrt{\Delta t}\,\eta,
-\qquad
-F=\nabla \log\Psi_T.
+X' = X + \Delta\tau\,\nabla\log\Psi_T(X)
++ \sqrt{\Delta\tau}\,\eta,
+\qquad \eta\sim\mathcal N(0,I).
 $$
 
-The local energy weight contribution is
+The Metropolis acceptance probability includes both the guide-amplitude ratio
+and the forward/reverse Gaussian proposal densities. Invalid hard-rod proposals
+and Metropolis rejections leave the previous valid walker in place. The engine
+records acceptance, invalid-proposal, Metropolis-rejection, drift, and mobility
+telemetry.
+
+After the local move, branching adds
 
 $$
 \Delta\log w_E =
--\Delta t
+-\Delta\tau
 \left[
-\frac{E_L(x')+E_L(x)}{2}-E_{\mathrm{ref}}
+\frac{E_L(X)+E_L(X')}{2}-E_{\rm ref}
 \right].
 $$
 
-For an RN collective block with implemented proposal density \(Q(x'\mid x)\)
-and target kernel \(K(x'\mid x)\),
+Weights are recentered for numerical stability. The population is resampled
+when its weight effective sample size crosses the configured fraction of the
+walker count. Resampling indices and pre/post-resampling weights are retained
+in the transport event needed by forward walking.
+
+## Optional Collective RN Move
+
+`src/hrdmc/monte_carlo/dmc/collective_rn/` implements a scheduled collective
+proposal. It is disabled by default and is injected into the local engine only
+when a workflow explicitly requests it.
+
+For collective proposal density \(Q(Y\mid X)\) and selected target transition
+density \(K(Y\mid X)\), the additional log-weight increment is
 
 $$
-\Delta\log w_{\mathrm{RN}}
-=
-\log K(x'\mid x)-\log Q(x'\mid x).
+\Delta\log w_{\rm RN}
+= \log K(Y\mid X)-\log Q(Y\mid X).
 $$
 
-When the guide ratio is part of the importance-sampled convention, the logged
-increment also includes
+When the importance-sampled convention includes the guide ratio, the increment
+also contains
 
 $$
-\log\Psi_T(x')-\log\Psi_T(x).
+\log\Psi_T(Y)-\log\Psi_T(X).
 $$
 
-This is a change-of-measure correction for the sampled move. It changes the
-statistical weight of the proposal path; it does not change the physical
-Hamiltonian. RN-assisted rows are compared against local-DMC baselines and
-cadence checks.
+This is a change-of-measure correction for that scheduled proposal. It does not
+replace the Hamiltonian or redefine the local DMC trajectory. Runs using the
+extension report its cadence, proposal/target metadata, event count, and
+weight-increment diagnostics separately from the local-step telemetry.
 
-## Current Candidate Corridor
+## Guide Function
 
-The active trapped-system report uses:
-
-```text
-proposal = gap-h-transform
-target   = gap-h-product
-guide    = reduced-TG
-system   = open-line trapped hard rods
-```
-
-For \(N=2\), the COM plus one-gap target is checked against a deterministic
-finite-\(a\) reference. For \(N>2\), the same family is a candidate
-RN-assisted workflow compared against the local-DMC baseline and
-cadence/timestep checks. Initialization and preburn reduce transient breathing
-mismatch before production. They are not production estimators and do not
-change the numerical decision logic.
+The guide owns `log_value`, `grad_log_value`, `lap_log_value`, `local_energy`,
+and validity checks. It changes importance-sampling efficiency and local-energy
+fluctuations but not the target Hamiltonian. Guide parameters must therefore be
+recorded, and a changed guide requires renewed timestep, population, and
+stationarity checks in the affected parameter region.
 
 ## Observables
 
-The RN-DMC engine directly reports the mixed Hamiltonian energy. This is the
-primary energy corridor.
+The mixed local-energy estimator provides the DMC energy. Coordinate
+observables require additional care because the mixed distribution contains the
+guide:
 
-Coordinate observables are different:
+- \(R^2\) is the mean squared cloud radius;
+- `rms_radius` is \(\sqrt{R^2}\), formed after aggregating \(R^2\);
+- density is the open-line particle histogram;
+- pair-distance density and \(S(k)\) are optional vector observables.
 
-- `R2` is the mean squared cloud radius from sampled coordinates.
-- `RMS` is reported as \(\sqrt{R2}\).
-- density is a coordinate histogram.
+The repository provides two independent routes for coordinate quantities:
 
-These are mixed-coordinate observables unless a pure-estimator layer is also
-checked. Paper-grade coordinate claims require either:
+- transported auxiliary forward walking for \(R^2\), density, pair-distance
+  density, and \(S(k)\);
+- a Hellmann-Feynman energy response for trap \(R^2\), with RMS obtained only
+  after differentiating the energy.
 
-- a pure estimator such as transported auxiliary forward walking; or
-- a Hellmann-Feynman energy-response estimator for trap \(R2/RMS\).
+Direct weighted coordinate averages remain mixed-estimator diagnostics. They
+are not substituted for the forward-walking or energy-response result.
 
-Mixed coordinate observables remain diagnostic until that estimator check is
-closed.
+## Numerical Checks
 
-## Numerical Check Split
+A finite-\(A\) many-body result is interpreted together with the following
+evidence:
 
-The stationarity artifact separates hard methodology failures from precision
-warnings.
+- finite and valid retained samples;
+- density normalization when density is reported;
+- local-step acceptance, invalid-proposal rate, drift scale, and mobility;
+- log-weight span, weight ESS, resampling frequency, and source-family
+  genealogy;
+- agreement across independent seeds, including rank-normalized R-hat and an
+  effective sample count;
+- stable traces after burn-in and conservative correlated-error estimates;
+- a timestep comparison in the same physical parameter region;
+- a walker-population comparison when population sensitivity is plausible;
+- forward-walking lag stability and genealogy support for each reported
+  coordinate observable;
+- agreement with exact or deterministic anchors where available.
 
-Hard methodology failures are:
+Blocking, Sokal, Geyer, and flat-top HAC estimates describe precision; they do
+not repair invalid samples, chain disagreement, population collapse, or a
+failed timestep comparison. When several valid error estimates are available,
+the workflow reports the conservative maximum and retains the individual
+diagnostics.
 
-- non-finite or invalid retained samples;
-- density accounting failure;
-- RN weight-control failure;
-- R-hat failure;
-- effective independent sample failure;
-- explicit trace-stationarity failure.
+## Reading an Artifact
 
-No error-estimation method can override these failures.
+Benchmark packets store physical estimates under `estimates`. The packet keeps
+the mixed energy, forward-walking coordinate results, LDA references, seed-level
+summaries, stationarity diagnostics, and method metadata distinct. Optional
+collective RN metadata is absent or disabled for an ordinary local-DMC run.
 
-Precision warnings are separate. Blocking plateau detection can fail because
-the block curve is noisy or the coarsest block levels have too few blocks. If
-the methodology checks are clean, the workflow computes three correlated-trace
-standard-error estimates:
+A numerical status is a compact summary of the recorded checks, not a new
+physical quantity. The underlying values, thresholds, traces, and seed results
+remain the evidence used to interpret a row.
 
-- Sokal integrated-autocorrelation window;
-- Geyer initial positive/monotone sequence;
-- flat-top HAC long-run variance.
-
-The reported standard error is conservative:
-
-$$
-\mathrm{SE}_{\mathrm{reported}}
-=
-\max(
-\mathrm{SE}_{\mathrm{seed}},
-\mathrm{SE}_{\mathrm{blocking}},
-\mathrm{SE}_{\mathrm{correlated}}
-).
-$$
-
-If at least two correlated-error estimators agree within their estimated
-one-sigma uncertainty, the metric reports `TRIANGULATED_2_OF_3`. If they do not
-agree but remain finite, the artifact keeps the larger error and reports a
-precision warning. Missing blocking plateau is reported as
-`TRIANGULATED_PRECISION_WARNING`, but only after all hard methodology checks
-pass.
-
-The warning remains visible and the error bar is inflated.
-
-## Interpreting A Run
-
-A clean energy candidate needs:
-
-```text
-density_accounting_clean = true
-valid_finite_clean = true
-RN weight status controlled
-Rhat below threshold
-N_eff above threshold
-trace stationarity clean
-finite conservative energy error
-```
-
-If those pass but blocking plateau is absent, the run can still be a controlled
-energy candidate with `RN_TRAPPED_STATIONARITY_PRECISION_WARNING`.
-
-If R-hat, N_eff, RN weights, finite/valid sample checks, density accounting, or explicit
-trace-stationarity fail, the run remains unresolved.
-
-For \(R2/RMS/density\), a paper coordinate benchmark requires the mixed RN-DMC
-checks plus a completed pure-coordinate estimator or energy-response estimator
-check.
-
-## Claim Boundary
-
-Current RN-block outputs are candidate/reference-tier artifacts until the
-specific observable and parameter region passes the relevant timestep,
-population, stationarity, RN-weight, density-accounting, and estimator checks.
-
-Exact homogeneous and trapped limiting tests validate conventions and limiting
-behavior. Finite-rod trapped rows still require the observable-specific checks
-above before paper-level use.
+The default population diagnostics are deliberately conservative operational
+screens, not universal constants. Weight-ESS fractions of 0.20 (warning) and
+0.10 (invalid), a log-weight-span warning at 50, a forward-walking source-family
+ESS of at least 50, and a largest-family fraction no greater than 0.10 are used
+to expose poorly resolved populations before a physical comparison is made.
+They do not prove convergence by themselves, and a publishable result still
+requires seed, timestep, population, and lag-sensitivity evidence. Every value
+is serialized so a different policy cannot be inherited silently on resume.
 
 ## Core References
 
 - Foulkes, Mitas, Needs, and Rajagopal, Rev. Mod. Phys. 73, 33 (2001).
 - Umrigar, Nightingale, and Runge, J. Chem. Phys. 99, 2865 (1993).
-- Karlin and McGregor, Pacific J. Math. 9, 1141 (1959).
 - Flyvbjerg and Petersen, J. Chem. Phys. 91, 461 (1989).
 - Sokal, Functional Integration, NATO ASI Series B 361, 131-192 (1997).
 - Geyer, Statistical Science 7, 473-483 (1992).
@@ -223,5 +178,7 @@ above before paper-level use.
 - Politis and Romano, Journal of Time Series Analysis 16, 67-103 (1995).
 - Vehtari, Gelman, Simpson, Carpenter, and Buerkner, Bayesian Analysis 16,
   667-718 (2021).
+- Casulleras and Boronat, Phys. Rev. B 52, 3654-3661 (1995).
+- Sarsa, Boronat, and Casulleras, J. Chem. Phys. 116, 5956-5962 (2002).
 - Mazzanti, Astrakharchik, Boronat, and Casulleras, Phys. Rev. Lett. 100,
   020401 (2008).

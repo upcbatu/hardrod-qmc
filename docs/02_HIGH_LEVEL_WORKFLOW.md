@@ -57,9 +57,10 @@ The trapped model requires:
 - valid trapped initial configurations;
 - observables defined for open-line boundary conditions.
 
-The repository has initial implementations for these items and an RN-DMC
-candidate workflow. Systematic benchmark-tier expansion remains before
-thesis-level conclusions.
+The repository implements these items with a local importance-sampled DMC
+workflow. Collective RN-corrected moves are optional and are not part of the
+default trajectory. Systematic timestep, population, stationarity, and
+estimator checks remain necessary before drawing thesis conclusions.
 
 The primary trapped observables are:
 

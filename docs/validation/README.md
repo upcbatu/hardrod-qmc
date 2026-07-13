@@ -2,18 +2,18 @@
 
 This note records the validation status of the numerical workflow. It is written as a thesis-facing summary: what was tested, what reference was used, what the result means, and what remains to be validated before using the code for trapped-system conclusions.
 
-## Current RN-DMC Status Note
+## Current Trapped DMC Status
 
 The homogeneous ring checks below remain the baseline validation layer. The
-active trapped-system progress report, however, refers to the newer RN-block
-DMC workflow under `experiments/dmc/rn_block/`, the exact anchor entrypoints
-under `experiments/anchors/`, and the transported forward-walking estimator
-under `src/hrdmc/estimators/pure/forward_walking/`.
+active trapped-system workflow uses local DMC under `experiments/dmc/local/`,
+the exact anchor entrypoints under `experiments/anchors/`, and the transported
+forward-walking estimator under
+`src/hrdmc/estimators/pure/forward_walking/`. Collective RN moves are optional
+and disabled by default.
 
-That active workflow marks candidate rows only when the relevant RN-weight,
-stationarity, density-accounting, and pure-estimator numerical checks pass.
-These rows remain progress-note results until timestep and closure runs are
-complete.
+Each row records stationarity, population, density-accounting, timestep, and
+observable-specific estimator evidence. Optional collective-RN runs additionally
+record their change-of-measure weight diagnostics.
 
 ## 1. Purpose
 
@@ -30,7 +30,7 @@ periodic hard-rod geometry
 ```
 
 Historical trapped VMC diagnostics were used during development. They are not
-part of the public release-facing experiment surface.
+kept as current user commands.
 
 ## 2. Homogeneous Ring Benchmark
 
@@ -101,7 +101,7 @@ The energy error is at floating-point roundoff level. This indicates that the pe
 This validation establishes a controlled starting point for the code. It supports the use of the homogeneous ring as a benchmark for checking basic geometry, exclusion constraints, sampling, and energy-estimator consistency.
 
 Trapped-system validation is handled by the trapped TG anchor, the finite-\(a\)
-\(N=2\) anchor, and the RN-DMC stationarity/forward-walking checks listed
+\(N=2\) anchor, and the DMC stationarity/forward-walking checks listed
 below. The trapped workflow also requires propagation, timestep, population,
 and estimator checks before it is used as the production reference.
 
@@ -137,10 +137,11 @@ Before thesis-level trapped-system conclusions, the following checks remain.
   larger trapped systems.
 - Use `experiments/anchors/exact_tg_trap.py` for the zero-rod-length
   trapped TG harmonic validation.
-- Use `experiments/dmc/rn_block/trapped_stationarity_grid.py` for finite-`a`
-  trapped RN-DMC stationarity diagnostics.
-- Coordinate observables remain claim-limited unless the corresponding
-  estimator check is explicitly closed.
+- Use `experiments/dmc/local/trapped_stationarity_grid.py` for finite-`a`
+  trapped local-DMC stationarity diagnostics. Enable collective RN moves only
+  for an explicit comparison.
+- Report coordinate observables only with the corresponding forward-walking or
+  energy-response validation evidence.
 
 Those checks precede the main thesis comparison:
 

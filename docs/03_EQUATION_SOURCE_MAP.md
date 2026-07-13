@@ -7,7 +7,7 @@ This document is the audit map for formulas and method conventions in
 What is the formula?
 Where is it implemented?
 What is the source basis?
-What is the claim boundary?
+What has been validated, and under which assumptions?
 ```
 
 It intentionally does not source-map plotting, JSON IO, CLI parsing, or config
@@ -23,9 +23,9 @@ Every entry below has one of these statuses:
 - `Method paper`: formula is a standard QMC/statistical method with a cited
   method source.
 - `Analytic identity`: formula is an elementary analytic identity used by the
-  code, separate from thesis physics claims.
+  code, separate from thesis physics results.
 - `Repo convention`: implementation normalization or utility formula. These
-  require an added source before presentation as literature claims.
+  require an added source before presentation as literature statements.
 
 ## Bibliography
 
@@ -127,9 +127,9 @@ Every entry below has one of these statuses:
 ## Report-Facing Source Usage Summary
 
 This table is the compact source audit used by the report. It records each
-source's role and claim limit.
+source's role and range of applicability.
 
-| source | used for in this repository/report | claim boundary |
+| source | used for in this repository/report | validation scope |
 | --- | --- | --- |
 | `[Mazzanti2008HardRods]` | hard-rod potential, reduced length \(L'=L-Na\), homogeneous exact ring reference, homogeneous EOS | homogeneous exactness and EOS input for the trapped LDA |
 | `[AstrakharchikGiorgini2002TrappedCrossover]` | important trapped-QMC precedent for energies/radii and QMC-vs-LDA-style comparisons | trapped-QMC context for the comparison strategy |
@@ -206,7 +206,7 @@ R_2^{\rm pure}
 =
 \frac1N\frac{dE_0}{d\lambda},
 \qquad
-R_{\rm RMS}^{\rm paper}
+R_{\rm RMS}
 =
 \sqrt{R_2^{\rm pure}}.
 $$
@@ -215,10 +215,10 @@ Source basis:
 Hellmann-Feynman theorem from `[Hellmann1937Quantenchemie]` and
 `[Feynman1939Forces]`.
 
-Claim boundary:
-This estimates trap \(R_2\)/RMS from RN-DMC energy artifacts. It does not
-estimate density. Paper-grade use requires every energy point to pass the
-RN-DMC methodology checks; missing diagnostic metadata remains diagnostic only.
+Validation scope:
+This estimates trap \(R_2\)/RMS from local-DMC energy responses. It does not
+estimate density. Every energy point in the finite-difference stencil needs its
+own timestep, population, stationarity, and precision evidence.
 
 ## Systems And Geometry
 
@@ -248,9 +248,9 @@ where \(d_i\) are nearest-neighbor gaps on the ring.
 Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
-Claim boundary:
+Validation scope:
 This is geometry and boundary-condition ownership only. It does not own EOS,
-LDA, or DMC benchmark claims.
+LDA, or DMC benchmark results.
 
 ### S2. Open-Line Hard-Rod Geometry
 
@@ -269,7 +269,7 @@ Source basis:
 `Primary physics`, trapped one-dimensional hard-core context from
 `[GirardeauAstrakharchik2010TrappedHardSphere]`.
 
-Claim boundary:
+Validation scope:
 This is geometry only. The trap, guide, LDA, and sampler are separate owners.
 
 ### S3. External Potentials
@@ -305,7 +305,7 @@ one-dimensional finite-length hard-rod Hamiltonian and the excluded-volume LDA
 built from the hard-rod equation of state. The zero and cosine potentials are
 `Repo convention` utilities.
 
-Claim boundary:
+Validation scope:
 The thesis trapped hard-rod path uses the harmonic trap. The cosine potential
 has no thesis physics role without a separate source and use case.
 
@@ -323,7 +323,7 @@ $$
 Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
-Claim boundary:
+Validation scope:
 This geometry identity is used by ring theory and ring trial states. It is
 separate from the LDA solver and from trapped exact solutions.
 
@@ -346,9 +346,10 @@ Source basis:
 `Method paper`, DMC short-time-kernel convention from `[Foulkes2001QMC]` and
 `[UmrigarNightingaleRunge1993DMC]`.
 
-Claim boundary:
-`systems/` owns the target-kernel interface. RN-block consumes it through that
-interface instead of rebuilding Hamiltonian physics.
+Validation scope:
+`systems/` owns the target-kernel interface. The optional collective RN
+extension consumes it through that interface instead of rebuilding Hamiltonian
+physics.
 
 ### S6. Harmonic Mehler Kernel
 
@@ -377,7 +378,7 @@ Source basis:
 `Analytic identity`, normalized imaginary-time harmonic-oscillator transition.
 QMC kernel usage is method-backed by `[Foulkes2001QMC]`.
 
-Claim boundary:
+Validation scope:
 Exact for the one-body harmonic kernel in harmonic-oscillator units. The
 many-body trapped hard-rod propagator requires the hard-core ordering/domain
 layer as well.
@@ -415,7 +416,7 @@ Karlin-McGregor determinant `[KarlinMcGregor1959]`, TG mapping from
 `[GirardeauWrightTriscari2001TrappedTG]`, and trapped hard-core/TG context from
 `[GirardeauAstrakharchik2010TrappedHardSphere]`.
 
-Claim boundary:
+Validation scope:
 This is an exact validation anchor only for \(a=0\) in a harmonic trap. It
 validates the zero-rod-length trapped limit.
 
@@ -448,7 +449,7 @@ Source basis:
 `Method paper`, `[KarlinMcGregor1959]` determinant logic for non-crossing
 paths, applied to reduced hard-rod coordinates from `[Mazzanti2008HardRods]`.
 
-Claim boundary:
+Validation scope:
 Exact for free ordered/non-crossing diffusion. Trap effects are not included
 until the primitive endpoint factor below.
 
@@ -474,11 +475,11 @@ Source basis:
 `Method paper`, primitive short-time DMC convention from `[Foulkes2001QMC]` and
 `[UmrigarNightingaleRunge1993DMC]`.
 
-Claim boundary:
+Validation scope:
 Approximate short-time target density. It requires timestep validation before
-paper-level trapped benchmark claims.
+use in a finite-rod trapped comparison.
 
-### S10. Gap H-Transform RN Proposal
+### S10. Optional Collective Gap H-Transform Proposal
 
 Code:
 [src/hrdmc/systems/gap_h_transform.py](src/hrdmc/systems/gap_h_transform.py)
@@ -542,32 +543,32 @@ g\ge a,
 $$
 
 The implementation reconstructs positions from \(X'_{\mathrm{cm}}\) and the
-sampled gaps. This is the sampleable proposal family \(Q\). The RN target
-density \(K\) is selected separately by the workflow; current report runs use
-the gap-h-product target below.
+sampled gaps. This is the sampleable proposal family \(Q\). When the optional
+collective extension is enabled, its target density \(K\) is selected
+separately by the workflow.
 
 Source basis:
 `Analytic identity`, harmonic COM separation, Dirichlet relative-coordinate
 h-transform from `[Doob1957HTransform]`, and importance-sampled DMC proposal
 logic from `[Foulkes2001QMC]` and `[UmrigarNightingaleRunge1993DMC]`.
 
-Claim boundary:
+Validation scope:
 This entry maps the proposal family. For \(N=2\) it uses the finite-grid
 relative h-transform. For \(N>2\), the independent nearest-neighbor gap product
-is a sampling approximation. Benchmark rows additionally require the selected
-RN target/weight, stationarity, population, density accounting, cadence,
-timestep, and precision checks.
+is a sampling approximation. A run using this proposal additionally requires
+the selected target, correction-weight, cadence, local-baseline, timestep,
+population, stationarity, density-accounting, and precision checks.
 
-### S10b. Gap-H Product RN Target
+### S10b. Optional Collective Gap-H Product Target
 
 Code:
 [src/hrdmc/systems/gap_h_transform.py](src/hrdmc/systems/gap_h_transform.py)
 
 Formula:
 
-The current finite-\(a\) report runs use a raw target density built from the
-same COM and nearest-neighbor gap h-transform factors. The target converts the
-normalized h-transform product back to a raw kernel:
+This optional target density is built from the same COM and nearest-neighbor
+gap h-transform factors. It converts the normalized h-transform product back to
+a raw kernel:
 
 $$
 K_{\mathrm{product}}(\mathbf{x}'\mid\mathbf{x};\tau)
@@ -608,7 +609,7 @@ Source basis:
 `[Doob1957HTransform]`, and DMC target-kernel usage from `[Foulkes2001QMC]` /
 `[UmrigarNightingaleRunge1993DMC]`.
 
-Claim boundary:
+Validation scope:
 The target is exact for the finite-\(a\), \(N=2\) one-gap trapped problem. For
 \(N>2\), this product target is an approximate many-body kernel and requires
 cadence, timestep, and population validation before comparison use.
@@ -658,9 +659,10 @@ $$
 
 For \(N=2\), this restores the exact COM-separated relative guide up to the
 finite-grid interpolation. For \(N>2\), it is a nearest-neighbor product guide
-ansatz matched to the same gap table as the gap-H proposal. The RN target
-family is selected separately by the workflow; this guide only changes
-importance sampling, drift, guide ratio, and local energy.
+ansatz matched to the same gap table as the gap-H proposal. Any collective
+target family is selected separately by the workflow; this guide changes only
+importance sampling, drift, guide ratio, and local energy and can be used with
+ordinary local DMC.
 
 Source basis:
 `Analytic identity`, harmonic COM separation, N=2 Dirichlet relative-coordinate
@@ -668,12 +670,11 @@ ground state, h-transform context from `[Doob1957HTransform]`, and
 importance-sampled DMC guide logic from `[Foulkes2001QMC]` and
 `[UmrigarNightingaleRunge1993DMC]`.
 
-Claim boundary:
-This entry maps the guide/proposal matching layer. Benchmark rows also require
-the selected RN target, RN weight, stationarity, population, density accounting,
-cadence/timestep, and precision checks. Current report runs using `reduced-tg`
-cite W5 below, while this entry maps the optional `gap-h-corrected` guide
-family.
+Validation scope:
+This entry maps the guide/proposal matching layer. Every use requires guide,
+stationarity, population, timestep, density-accounting, and precision checks.
+Runs that also enable collective transport require the target, correction
+weight, cadence, and local-baseline checks described above.
 
 ## Theory
 
@@ -701,7 +702,7 @@ $$
 Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
-Claim boundary:
+Validation scope:
 This is the homogeneous validation benchmark. Trapped results use the
 open-line harmonic system.
 
@@ -729,7 +730,7 @@ $$
 Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
-Claim boundary:
+Validation scope:
 Thermodynamic homogeneous EOS in harmonic-oscillator units. This is the LDA
 input, separate from trapped exact solutions.
 
@@ -752,7 +753,7 @@ $$
 Source basis:
 `Primary physics`, derivative of the EOS from `[Mazzanti2008HardRods]`.
 
-Claim boundary:
+Validation scope:
 The inverse chemical potential in code is numerical bisection. The bisection is
 an implementation method rather than a separate physics formula.
 
@@ -805,7 +806,7 @@ Source basis:
 `Primary physics`, LDA precedent from `[Astrakharchik2005LDA]`, hard-rod EOS
 from `[Mazzanti2008HardRods]`.
 
-Claim boundary:
+Validation scope:
 LDA is the theory prediction being tested. It is not QMC data and not the
 benchmark.
 
@@ -835,7 +836,7 @@ $$
 Source basis:
 `Repo convention`, numerical quadrature and diagnostic support extraction.
 
-Claim boundary:
+Validation scope:
 Support edges are rough grid diagnostics. Normalization validates particle
 count on the chosen grid. LDA validity is assessed by comparison with sampled
 observables.
@@ -876,7 +877,7 @@ $$
 Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
-Claim boundary:
+Validation scope:
 The all-pair form is controlled for homogeneous validation. It is separate from
 trapped exact wavefunctions.
 
@@ -901,9 +902,9 @@ where \(g_i\) are nearest-neighbor ring gaps.
 Source basis:
 `Repo convention`.
 
-Claim boundary:
-Diagnostic scaffold only; no paper hard-rod trial claim is attached to this
-form.
+Validation scope:
+Diagnostic scaffold only; no validated hard-rod interpretation is attached to
+this form.
 
 ### W3. Trapped VMC Diagnostic Trial
 
@@ -924,9 +925,9 @@ $$
 Source basis:
 `Repo convention`, motivated by hard-core constraints and harmonic confinement.
 
-Claim boundary:
-VMC diagnostic trial only; no trapped hard-rod exactness claim is attached to
-this trial form.
+Validation scope:
+VMC diagnostic trial only; this trial form is not asserted to be exact for the
+trapped hard-rod problem.
 
 ### W4. DMC Guide Protocol
 
@@ -951,7 +952,7 @@ Source basis:
 `Method paper`, importance-sampled DMC conventions from `[Foulkes2001QMC]` and
 `[UmrigarNightingaleRunge1993DMC]`.
 
-Claim boundary:
+Validation scope:
 Protocol only. It defines what a DMC guide must provide.
 
 ### W5. Reduced TG-Like Trapped DMC Guide
@@ -996,8 +997,8 @@ Source basis:
 `[GirardeauAstrakharchik2010TrappedHardSphere]`; `Method paper` local-energy
 usage from `[Foulkes2001QMC]`.
 
-Claim boundary:
-Candidate DMC guide. Quality must be validated by variance, stationarity,
+Validation scope:
+DMC guide ansatz. Quality must be validated by variance, stationarity,
 timestep, and population controls.
 
 ## Monte Carlo Engines
@@ -1021,8 +1022,9 @@ $$
 Source basis:
 `Method paper`, VMC/Metropolis convention summarized in `[Foulkes2001QMC]`.
 
-Claim boundary:
-VMC is a diagnostic baseline unless separately validated for a specific claim.
+Validation scope:
+VMC is a diagnostic baseline unless separately validated for the intended
+comparison.
 
 ### M2. DMC Contract Helpers
 
@@ -1041,16 +1043,17 @@ Source basis:
 `Method paper`, population/weight-control context from `[Foulkes2001QMC]` and
 `[UmrigarNightingaleRunge1993DMC]`.
 
-Claim boundary:
+Validation scope:
 Contract layer only; concrete DMC benchmark status comes from the workflow
 checks.
 
-### M3. RN-Corrected Collective-Block DMC
+### M3. Local Importance-Sampled DMC
 
 Code:
-[src/hrdmc/monte_carlo/dmc/rn_block/](src/hrdmc/monte_carlo/dmc/rn_block/)
+[src/hrdmc/monte_carlo/dmc/local/](src/hrdmc/monte_carlo/dmc/local/)
 
-Local DMC proposal in harmonic-oscillator units:
+The default Metropolis-corrected drift-diffusion proposal in
+harmonic-oscillator units is:
 
 $$
 \mathbf{X}'
@@ -1062,6 +1065,18 @@ $$
 \sqrt{\Delta\tau}\,\boldsymbol{\eta},
 \qquad
 \boldsymbol{\eta}\sim\mathcal{N}(0,I).
+$$
+
+For Gaussian transition density \(q\), the Metropolis acceptance probability is
+
+$$
+A(\mathbf X\to\mathbf X')
+=
+\min\left[
+1,
+\frac{\Psi_T(\mathbf X')^2 q(\mathbf X\mid\mathbf X')}
+     {\Psi_T(\mathbf X)^2 q(\mathbf X'\mid\mathbf X)}
+\right].
 $$
 
 Local weight increment:
@@ -1077,7 +1092,21 @@ E_{\mathrm{ref}}
 \right].
 $$
 
-Collective block proposal:
+Source basis:
+`Method paper`, DMC and importance-sampling basis from `[Foulkes2001QMC]` and
+the drift/timestep treatment in `[UmrigarNightingaleRunge1993DMC]`.
+
+Validation scope:
+The engine supplies the local DMC trajectory and population bookkeeping.
+Reported rows still need timestep, population, stationarity, accounting, and
+observable-specific estimator checks.
+
+### M4. Optional Collective RN Scheduled Move
+
+Code:
+[src/hrdmc/monte_carlo/dmc/collective_rn/](src/hrdmc/monte_carlo/dmc/collective_rn/)
+
+An explicitly enabled scheduled extension can propose
 
 $$
 \mathbf{Y}=\Phi_q(\mathbf{X}),
@@ -1126,11 +1155,13 @@ Source basis:
 `[UmrigarNightingaleRunge1993DMC]`; Radon-Nikodym/change-of-measure convention
 from `[Billingsley1995Probability]`. Target-specific kernel sources are mapped
 by the system-kernel entries above, for example S9 for the primitive target and
-S10b for the gap-h-product target used in the current report.
+S10b for the optional gap-h-product target.
 
-Claim boundary:
-Candidate engine. It is DMC, but paper-level benchmark status requires
-timestep, population, stationarity, accounting, and archived run-artifact checks.
+Validation scope:
+This extension is not part of the default trajectory. A run that enables it
+must report the selected proposal and target, cadence, correction-weight
+behavior, and agreement with the local-DMC baseline in addition to the ordinary
+DMC checks.
 
 ## Estimators
 
@@ -1162,7 +1193,7 @@ Source basis:
 `Method paper`, standard coordinate estimator convention in QMC workflows
 summarized by `[Foulkes2001QMC]`.
 
-Claim boundary:
+Validation scope:
 Histogram normalization convention. Density integrates to \(N\) only when the
 grid captures all particles and weights are normalized.
 
@@ -1182,9 +1213,9 @@ $$
 Source basis:
 `Repo convention`.
 
-Claim boundary:
+Validation scope:
 Rough occupied-bin diagnostic only. Physical cloud-boundary use requires an
-explicit density threshold, grid, and estimator tier.
+explicit density threshold, grid, and validated density estimator.
 
 ### E2. Pair Distribution Function
 
@@ -1204,7 +1235,7 @@ Source basis:
 `Primary physics`, observable used in `[Mazzanti2008HardRods]`; normalization is
 the repository finite-ring convention.
 
-Claim boundary:
+Validation scope:
 Mainly homogeneous validation. Trapped local pair analysis would need a separate
 normalization.
 
@@ -1224,7 +1255,7 @@ $$
 Source basis:
 `Primary physics`, `[Mazzanti2008HardRods]`.
 
-Claim boundary:
+Validation scope:
 Uses physical wrapped particle positions \(x_j\). Reduced coordinates are
 reserved for the excluded-volume mapping.
 
@@ -1253,7 +1284,7 @@ $$
 Source basis:
 `Method paper`, local-energy convention from `[Foulkes2001QMC]`.
 
-Claim boundary:
+Validation scope:
 The homogeneous all-pair ring case is a validation benchmark. Trapped VMC local
 energy is diagnostic unless backed by DMC/external validation.
 
@@ -1280,9 +1311,9 @@ precedent for energy/radius reporting and QMC-vs-LDA-style comparison;
 `[GirardeauAstrakharchik2010TrappedHardSphere]` supplies hard-rod trapped
 context.
 
-Claim boundary:
+Validation scope:
 For DMC, direct weighted \(R^2\)/RMS from sampled coordinates is a
-mixed-coordinate diagnostic only. Paper \(R^2\)/RMS must come from
+mixed-coordinate diagnostic only. Reported pure \(R^2\)/RMS must come from
 Hellmann-Feynman energy response or a transported auxiliary forward-walking
 estimator that passes its own check.
 
@@ -1307,13 +1338,13 @@ Source basis:
 `Method paper`, weighted Monte Carlo and DMC estimator convention from
 `[Foulkes2001QMC]`.
 
-Claim boundary:
+Validation scope:
 The estimator filters non-finite, invalid, and non-positive-weight samples.
 Energy is the mixed Hamiltonian estimator. Direct weighted density, \(R^2\),
 RMS, pair-distance density, and \(S(k)\) are mixed-coordinate diagnostics for
-DMC. Paper coordinate observables require Hellmann-Feynman energy response for
-\(R^2\)/RMS or transported auxiliary forward walking for coordinate
-observables.
+DMC. Reported pure coordinate observables require Hellmann-Feynman energy
+response for \(R^2\)/RMS or transported auxiliary forward walking for
+coordinate observables.
 
 ## Analysis And Validation Metrics
 
@@ -1336,7 +1367,7 @@ $$
 Source basis:
 `Method paper`, `[FlyvbjergPetersen1989Blocking]`.
 
-Claim boundary:
+Validation scope:
 Plateau behavior is part of the validation record. A single blocking number
 alone is insufficient validation.
 
@@ -1421,13 +1452,12 @@ Geyer initial-sequence variance estimation from `[Geyer1992PracticalMCMC]`,
 HAC long-run variance from `[Andrews1991HAC]`, and the flat-top lag window from
 `[PolitisRomano1995FlatTop]`.
 
-Claim boundary:
-This replaces "blocking plateau missing" as a hard precision veto only when the
-methodology checks are already clean: finite/hard-core validity, density
-accounting, RN-weight check, R-hat, effective-sample, and explicit
-trace-stationarity checks still hard-fail. Missing blocking plateau becomes a
-precision warning with an explicitly inflated error bar; accepted benchmark
-status still requires the methodology checks.
+Validation scope:
+This can replace a missing blocking plateau as the precision estimate only when
+finite/hard-core validity, density accounting, R-hat, effective sample size,
+and explicit trace-stationarity checks pass. A collective-RN run must also pass
+its correction-weight checks. The missing plateau remains visible and the
+reported error bar is explicitly inflated.
 
 ### A3. Bias And MSE
 
@@ -1446,7 +1476,7 @@ Source basis:
 `Method paper`, standard statistical error definitions used in QMC validation
 workflows; QMC benchmark context from `[Foulkes2001QMC]`.
 
-Claim boundary:
+Validation scope:
 Needs a trustworthy reference \(\theta_{\mathrm{ref}}\). LDA is not the
 benchmark reference.
 
@@ -1488,9 +1518,10 @@ Source basis:
 `Repo convention`, standard L2 norm comparison; thesis use is QMC-vs-LDA error
 mapping.
 
-Claim boundary:
+Validation scope:
 This metric is mathematically valid as a normed discrepancy. It does not decide
-which curve is true; that depends on benchmark tier.
+which curve is physically accurate; that depends on independent reference and
+estimator validation.
 
 ### A5. Replicate Stability
 
@@ -1511,7 +1542,7 @@ Source basis:
 `Method paper`, standard replicate summary convention; QMC validation context
 from `[Foulkes2001QMC]`.
 
-Claim boundary:
+Validation scope:
 Replicate spread is a diagnostic, separate from timestep, population, and
 stationarity controls.
 
@@ -1643,7 +1674,7 @@ $$
 where \(s\) indexes independent seeds and \(M\) is the seed count. Energy-side
 spread warnings, missing blocking plateaus, or correlated-error inflation mark
 the energy case as a precision warning. Mixed coordinate traces have a
-separate diagnostic status and leave the Hamiltonian energy corridor unchanged.
+separate diagnostic status and do not alter the Hamiltonian energy estimate.
 
 Source basis:
 `Method paper`, autocorrelation/error-control logic aligned with
@@ -1651,17 +1682,17 @@ Source basis:
 `[VehtariGelmanSimpsonCarpenterBuerkner2021Rhat]`; DMC validation need from
 `[Foulkes2001QMC]`.
 
-Claim boundary:
+Validation scope:
 Diagnostic-support analysis only. It is separate from physics sources and from
 timestep/population/accounting validation.
 
-## RN Transport Event Contract And Transported FW
+## DMC Transport Event Contract and Transported Forward Walking
 
 Code:
-`src/hrdmc/monte_carlo/dmc/rn_block/transport.py`,
+`src/hrdmc/monte_carlo/dmc/local/transport.py`,
 `src/hrdmc/estimators/pure/forward_walking/`
 
-The RN-block engine can emit one transport event per DMC step. The event is a
+The local DMC engine can emit one transport event per DMC step. The event is a
 bookkeeping contract rather than an estimator formula:
 
 $$
@@ -1728,10 +1759,10 @@ $$
 so changing no-resample weights inside a collection block cannot break the
 lag-zero mixed-estimator identity.
 
-The paper RMS radius is defined by:
+The RMS radius is defined after aggregating \(R^2\):
 
 $$
-R_{\mathrm{rms,paper}} = \sqrt{\widehat{R^2}}.
+R_{\mathrm{rms}} = \sqrt{\widehat{R^2}}.
 $$
 
 Per-configuration square roots are diagnostic quantities.
@@ -1739,23 +1770,23 @@ Per-configuration square roots are diagnostic quantities.
 Source basis:
 Bookkeeping contract for the transported auxiliary-variable forward-walking
 approach in `[CasullerasBoronat1995Pure]` /
-`[SarsaBoronatCasulleras2002Pure]`, adapted to this repository's RN-block
+`[SarsaBoronatCasulleras2002Pure]`, adapted to this repository's local DMC
 weighted-population engine.
 
-Claim boundary:
-A paper coordinate claim requires the transport stream plus lag-0 identity,
-deterministic parent-map, gauge-cancellation, plateau, sufficient block count,
-walker-weight ESS, density-accounting when density is requested, and population
-checks.
+Validation scope:
+A reported coordinate result requires the transport stream plus lag-zero
+identity, deterministic parent-map, gauge cancellation, lag stability,
+sufficient block count, walker-weight support, independent source-family
+support, density accounting when density is requested, and population checks.
 
 ## Experiment Scripts
 
 Experiment scripts under `experiments/` are orchestration surfaces. They call
 the owners above without owning formulas. A new experiment-level formula needs
-a source-map entry before thesis or paper use.
+a source-map entry before it is used in the thesis.
 
 ## Current Missing Source-Map Items
 
 All active `src/hrdmc` physics/method formulas have source-map entries.
 Generated run scripts and archived artifacts sit outside this map; package
-formulas enter this document before thesis or paper use.
+formulas enter this document before thesis use.

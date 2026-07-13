@@ -1,7 +1,8 @@
 # DMC Notes
 
-This folder contains release-facing notes for the trapped hard-rod RN-block DMC
-corridor.
+This folder documents the trapped hard-rod DMC implementation. Local
+importance-sampled DMC is the default method. A collective
+Radon-Nikodym-corrected move is available as an optional scheduled extension.
 
 ## Trapped Unit Convention
 
@@ -18,14 +19,30 @@ The engine stores dimensionless variables \(q=x/a_{\mathrm{ho}}\) and
 variables is \(-\frac12\nabla_q^2+\frac12 q^2+\widetilde V_{\rm HR}\).
 Reported energies are in units of \(\hbar\Omega\).
 
-Legacy case strings such as `N8_a0.5_omega0.2` are no longer accepted by the
-production trapped runners. Convert them explicitly to \(A=a/a_{\mathrm{ho}}\)
-before launching a new run.
+## Contact-guide calibration
 
-- [method.md](method.md): end-to-end method flow, numerical checks, and scope
-  boundary.
-- [transport_contract.md](transport_contract.md): RN-block event stream
-  contract for transported auxiliary forward-walking estimators.
+The contact-corrected reduced-TG guide has a fail-closed calibration path:
+
+1. `optimize_contact_guide.py` produces a correlated-sampling parameter
+   candidate; it is not accepted directly by a DMC production runner.
+2. `guide_mala_diagnostic.py` tests that fixed candidate without branching or
+   population resampling, once from a compact start and once from an expanded
+   start with a different seed.
+3. `validate_contact_guide.py` verifies both manifests and compares tail
+   geometry, local-energy, proposal, and mobility diagnostics.
+4. Benchmark, stationarity, and Hellmann-Feynman runners accept the contact
+   guide only through that validated artifact and bind its summary and manifest
+   hashes into their own run configuration.
+
+These checks establish branching-free guide-squared MALA stability under the
+recorded calibration conditions. They do not establish DMC branching,
+population, timestep, or production-seed convergence; those remain separate
+short-run and production requirements.
+
+- [method.md](method.md): local DMC flow, optional collective move, observables,
+  and numerical checks.
+- [transport_contract.md](transport_contract.md): DMC event-stream contract for
+  transported auxiliary forward-walking estimators.
 
 Formula ownership and literature references remain in
 [../03_EQUATION_SOURCE_MAP.md](../03_EQUATION_SOURCE_MAP.md).
