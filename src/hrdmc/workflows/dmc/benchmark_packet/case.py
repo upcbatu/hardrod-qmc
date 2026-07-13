@@ -8,6 +8,8 @@ from hrdmc.artifacts import ensure_dir, write_json_atomic
 from hrdmc.estimators.pure.forward_walking import PureWalkingConfig
 from hrdmc.estimators.pure.forward_walking.diagnostics import plateau_summary
 from hrdmc.estimators.pure.forward_walking.results import (
+    GENEALOGY_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
+    GENEALOGY_SOURCE_FAMILY_DOMINANCE,
     PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
     PLATEAU_INSUFFICIENT_BLOCKS,
     PLATEAU_NO_BLOCKS,
@@ -420,14 +422,15 @@ def summarize_pure_observable(
     )
     metadata = results[0].get("metadata", {})
     summary: dict[str, Any] = {
-        "status": PURE_STATUS_ACCEPTED
-        if all(result.get("plateau_status") == PLATEAU_RESOLVED for result in results)
-        and all(result.get("schema_status") == SCHEMA_VALID for result in results)
-        else PURE_STATUS_PLATEAU_UNRESOLVED,
+        "status": _pure_observable_status(results),
         "plateau_statuses": [result.get("plateau_status") for result in results],
         "schema_statuses": [result.get("schema_status") for result in results],
+        "genealogy_statuses": [result.get("genealogy_status") for result in results],
         "plateau_diagnostics_by_seed": [
             result.get("plateau_diagnostics", {}) for result in results
+        ],
+        "genealogy_diagnostics_by_seed": [
+            result.get("genealogy_diagnostics", {}) for result in results
         ],
         "value": _result_value(mean_value),
         "stderr": _result_value(stderr_value),
@@ -443,6 +446,34 @@ def summarize_pure_observable(
     if observable == "structure_factor":
         summary["k_values"] = metadata.get("k_values", [])
     return summary
+
+
+def _pure_observable_status(results: list[dict[str, Any]]) -> str:
+    if any(result.get("schema_status") != SCHEMA_VALID for result in results):
+        return PURE_STATUS_SCHEMA_INVALID
+    if any(
+        result.get("genealogy_status")
+        in {
+            GENEALOGY_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
+            GENEALOGY_SOURCE_FAMILY_DOMINANCE,
+        }
+        for result in results
+    ):
+        return PURE_STATUS_INSUFFICIENT_SAMPLES
+    if all(result.get("plateau_status") == PLATEAU_RESOLVED for result in results):
+        return PURE_STATUS_ACCEPTED
+    if any(result.get("plateau_status") == PLATEAU_NO_BLOCKS for result in results):
+        return PURE_STATUS_NO_BLOCKS
+    if any(
+        result.get("plateau_status")
+        in {
+            PLATEAU_INSUFFICIENT_BLOCKS,
+            PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
+        }
+        for result in results
+    ):
+        return PURE_STATUS_INSUFFICIENT_SAMPLES
+    return PURE_STATUS_PLATEAU_UNRESOLVED
 
 
 def estimates(
