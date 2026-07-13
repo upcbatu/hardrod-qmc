@@ -9,6 +9,12 @@ from hrdmc.analysis.timeseries import TraceStationarityResult, trace_stationarit
 
 FloatArray = NDArray[np.float64]
 
+CHAIN_ACCEPTED = "accepted"
+CHAIN_RHAT_ABOVE_LIMIT = "rhat_above_limit"
+CHAIN_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM = "effective_sample_count_below_minimum"
+CHAIN_TRACE_NONSTATIONARY = "trace_nonstationary"
+CHAIN_SPREAD_WARNING = "spread_warning"
+
 
 @dataclass(frozen=True)
 class ChainObservableDiagnostics:
@@ -117,14 +123,14 @@ def classify_chain_diagnostics(
     min_effective_samples: float = 30.0,
 ) -> str:
     if not np.isfinite(rhat) or rhat >= rhat_threshold:
-        return "NO_GO_RHAT"
+        return CHAIN_RHAT_ABOVE_LIMIT
     if not np.isfinite(min_neff) or min_neff < min_effective_samples:
-        return "NO_GO_NEFF"
+        return CHAIN_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM
     if clean_count < chain_count:
-        return "NO_GO_STATIONARITY"
+        return CHAIN_TRACE_NONSTATIONARY
     if spread_warning_count > 0:
-        return "WARNING_SPREAD_ONLY"
-    return "GO"
+        return CHAIN_SPREAD_WARNING
+    return CHAIN_ACCEPTED
 
 
 def trace_stationarity_result_to_dict(result: TraceStationarityResult) -> dict:

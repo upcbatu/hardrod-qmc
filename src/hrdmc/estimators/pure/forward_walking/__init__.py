@@ -7,6 +7,7 @@ from hrdmc.estimators.pure.forward_walking.contributions import (
     event_contribution_matrix,
     event_r2_contributions,
     pair_distance_density_matrix,
+    rao_blackwell_r2_contribution_per_walker,
     raw_r2_contribution_per_walker,
     structure_factor_matrix,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "event_contribution_matrix",
     "event_r2_contributions",
     "pair_distance_density_matrix",
+    "rao_blackwell_r2_contribution_per_walker",
     "raw_r2_contribution_per_walker",
     "structure_factor_matrix",
 ]

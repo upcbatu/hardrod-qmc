@@ -7,6 +7,9 @@ from numpy.typing import NDArray
 
 FloatArray = NDArray[np.float64]
 
+BLOCKING_PLATEAU_RESOLVED = "plateau_resolved"
+BLOCKING_PLATEAU_UNRESOLVED = "plateau_unresolved"
+
 
 @dataclass(frozen=True)
 class BlockingResult:
@@ -126,7 +129,7 @@ def detect_blocking_plateau(
             plateau_stderr=float("nan"),
             plateau_block_size=0,
             plateau_n_blocks=0,
-            reason="NO_GO_NO_BLOCKING_PLATEAU",
+            reason=BLOCKING_PLATEAU_UNRESOLVED,
         )
 
     tail_indices = valid_indices[-window:]
@@ -144,7 +147,7 @@ def detect_blocking_plateau(
             plateau_stderr=float("nan"),
             plateau_block_size=int(sizes[tail_indices[-1]]),
             plateau_n_blocks=int(counts[tail_indices[-1]]),
-            reason="NO_GO_NO_BLOCKING_PLATEAU",
+            reason=BLOCKING_PLATEAU_UNRESOLVED,
         )
 
     selected = int(tail_indices[-1])
@@ -153,7 +156,7 @@ def detect_blocking_plateau(
         plateau_stderr=float(np.max(tail_errors)),
         plateau_block_size=int(sizes[selected]),
         plateau_n_blocks=int(counts[selected]),
-        reason="PLATEAU_FOUND",
+        reason=BLOCKING_PLATEAU_RESOLVED,
     )
 
 

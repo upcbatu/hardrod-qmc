@@ -16,11 +16,14 @@ class PureWalkingConfig:
     lag_unit: str = "dmc_steps"
     observables: tuple[str, ...] = ("r2",)
     observable_source: str = "raw_r2"
+    r2_rb_com_variance: float | None = None
     density_bin_edges: FloatArray | None = None
     pair_bin_edges: FloatArray | None = None
     structure_k_values: FloatArray | None = None
     min_block_count: int = 30
     min_walker_weight_ess: float = 30.0
+    min_source_ancestor_ess: float = 1.0
+    max_source_family_fraction: float = 1.0
     block_size_steps: int = 1
     collection_stride_steps: int = 1
     transport_mode: str = "post_resample_auxiliary"
@@ -54,6 +57,12 @@ class PureWalkingConfig:
             raise ValueError(f"unsupported pure-walking observables: {sorted(unsupported)}")
         if self.observable_source not in {"raw_r2", "r2_rb"}:
             raise ValueError("observable_source must be 'raw_r2' or 'r2_rb'")
+        if self.observable_source == "r2_rb" and self.r2_rb_com_variance is None:
+            raise ValueError("r2_rb requires r2_rb_com_variance")
+        if self.r2_rb_com_variance is not None and (
+            not np.isfinite(self.r2_rb_com_variance) or self.r2_rb_com_variance < 0.0
+        ):
+            raise ValueError("r2_rb_com_variance must be finite and non-negative")
         if "density" in self.observables:
             _validate_edges(self.density_bin_edges, "density_bin_edges")
         if "pair_distance_density" in self.observables:
@@ -68,6 +77,10 @@ class PureWalkingConfig:
             raise ValueError("min_block_count must be positive")
         if self.min_walker_weight_ess <= 0.0:
             raise ValueError("min_walker_weight_ess must be positive")
+        if self.min_source_ancestor_ess <= 0.0:
+            raise ValueError("min_source_ancestor_ess must be positive")
+        if not 0.0 < self.max_source_family_fraction <= 1.0:
+            raise ValueError("max_source_family_fraction must lie in (0, 1]")
         if self.block_size_steps <= 0:
             raise ValueError("block_size_steps must be positive")
         if self.collection_stride_steps <= 0:

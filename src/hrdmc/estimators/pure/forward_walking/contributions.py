@@ -13,9 +13,6 @@ class ContributionEventLike(Protocol):
     @property
     def positions(self) -> FloatArray: ...
 
-    @property
-    def r2_rb_per_walker(self) -> FloatArray | None: ...
-
 
 def raw_r2_contribution_per_walker(
     positions: FloatArray,
@@ -28,21 +25,41 @@ def raw_r2_contribution_per_walker(
     return np.mean((values - center) ** 2, axis=1)
 
 
+def rao_blackwell_r2_contribution_per_walker(
+    positions: FloatArray,
+    *,
+    center: float,
+    com_variance: float,
+) -> FloatArray:
+    """Return the COM Rao-Blackwellized R2 contribution for each walker."""
+
+    values = np.asarray(positions, dtype=float)
+    if values.ndim != 2:
+        raise ValueError("positions must have shape (walkers, particles)")
+    if not np.isfinite(com_variance) or com_variance < 0.0:
+        raise ValueError("com_variance must be finite and non-negative")
+    centered = values - center
+    relative = centered - np.mean(centered, axis=1, keepdims=True)
+    return np.mean(relative * relative, axis=1) + float(com_variance)
+
+
 def event_r2_contributions(
     event: ContributionEventLike,
     *,
     source: str,
     center: float,
+    r2_rb_com_variance: float | None,
 ) -> FloatArray:
     if source == "raw_r2":
         return raw_r2_contribution_per_walker(event.positions, center=center)
     if source == "r2_rb":
-        if event.r2_rb_per_walker is None:
-            raise ValueError("event does not carry r2_rb_per_walker")
-        values = np.asarray(event.r2_rb_per_walker, dtype=float)
-        if values.shape != (event.positions.shape[0],):
-            raise ValueError("r2_rb_per_walker must have one value per walker")
-        return values
+        if r2_rb_com_variance is None:
+            raise ValueError("r2_rb requires an explicit COM variance")
+        return rao_blackwell_r2_contribution_per_walker(
+            event.positions,
+            center=center,
+            com_variance=r2_rb_com_variance,
+        )
     raise ValueError(f"unsupported observable source: {source}")
 
 
@@ -52,6 +69,7 @@ def event_contribution_matrix(
     observable: str,
     center: float,
     observable_source: str,
+    r2_rb_com_variance: float | None = None,
     density_bin_edges: FloatArray | None = None,
     pair_bin_edges: FloatArray | None = None,
     structure_k_values: FloatArray | None = None,
@@ -61,6 +79,7 @@ def event_contribution_matrix(
             event,
             source=observable_source,
             center=center,
+            r2_rb_com_variance=r2_rb_com_variance,
         )
         return values[:, np.newaxis]
     if observable == "density":

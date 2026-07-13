@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 
 from hrdmc.estimators.pure.forward_walking.config import PureWalkingConfig
 from hrdmc.estimators.pure.forward_walking.diagnostics import (
+    genealogy_support_status,
     plateau_summary,
     rms_delta_stderr,
     schema_status,
@@ -26,6 +27,10 @@ def assemble_observable_result_from_stats(
     block_count_by_lag: dict[int, int],
     weight_ess_min_by_lag: dict[int, float],
     weight_ess_mean_by_lag: dict[int, float],
+    source_ancestor_ess_min_by_lag: dict[int, float],
+    source_ancestor_ess_mean_by_lag: dict[int, float],
+    unique_source_ancestor_min_by_lag: dict[int, int],
+    max_source_family_fraction_by_lag: dict[int, float],
     variance_by_lag: dict[int, float],
     mixed_observable_reference: LagValue | None,
     mixed_r2_reference: float | None,
@@ -49,9 +54,7 @@ def assemble_observable_result_from_stats(
     rms_by_lag = None
     rms_stderr_by_lag = None
     if observable == "r2":
-        rms_by_lag = {
-            lag: _rms_from_result_value(values_by_lag[lag]) for lag in config.lag_steps
-        }
+        rms_by_lag = {lag: _rms_from_result_value(values_by_lag[lag]) for lag in config.lag_steps}
         rms_stderr_by_lag = {
             lag: rms_delta_stderr(
                 _scalar_result_value(values_by_lag[lag]),
@@ -65,9 +68,7 @@ def assemble_observable_result_from_stats(
         values_by_lag=values_by_lag,
         mixed_observable_reference=mixed_observable_reference,
         mixed_r2_reference=mixed_r2_reference if observable == "r2" else None,
-        mixed_rms_radius_reference=mixed_rms_radius_reference
-        if observable == "r2"
-        else None,
+        mixed_rms_radius_reference=mixed_rms_radius_reference if observable == "r2" else None,
     )
     (
         plateau_value,
@@ -83,15 +84,26 @@ def assemble_observable_result_from_stats(
         block_count_by_lag=block_count_by_lag,
         weight_ess_min_by_lag=weight_ess_min_by_lag,
     )
-    paper_rms = None
-    paper_rms_stderr = None
+    rms_radius = None
+    rms_radius_stderr = None
     if observable == "r2":
-        paper_rms = _rms_from_result_value(plateau_value)
-        paper_rms_stderr = rms_delta_stderr(
+        rms_radius = _rms_from_result_value(plateau_value)
+        rms_radius_stderr = rms_delta_stderr(
             _scalar_result_value(plateau_value),
             _scalar_result_value(plateau_stderr),
         )
     metadata = _observable_metadata(config, observable)
+    metadata.update(
+        {
+            "min_block_count": config.min_block_count,
+            "min_walker_weight_ess": config.min_walker_weight_ess,
+            "min_source_ancestor_ess": config.min_source_ancestor_ess,
+            "max_source_family_fraction": config.max_source_family_fraction,
+            "plateau_sigma_threshold": config.plateau_sigma_threshold,
+            "plateau_abs_tolerance": config.plateau_abs_tolerance,
+            "plateau_window_lag_count": config.plateau_window_lag_count,
+        }
+    )
     metadata.update(
         _schema_reference_metadata(
             config=config,
@@ -99,6 +111,13 @@ def assemble_observable_result_from_stats(
             lag0_value=values_by_lag.get(0),
             mixed_observable_reference=mixed_observable_reference,
         )
+    )
+    genealogy_status, genealogy_diagnostics = genealogy_support_status(
+        config=config,
+        block_count_by_lag=block_count_by_lag,
+        source_ancestor_ess_min_by_lag=source_ancestor_ess_min_by_lag,
+        unique_source_ancestor_min_by_lag=unique_source_ancestor_min_by_lag,
+        max_source_family_fraction_by_lag=max_source_family_fraction_by_lag,
     )
     return TransportedLagResult(
         observable=observable,
@@ -109,16 +128,22 @@ def assemble_observable_result_from_stats(
         block_count_by_lag=block_count_by_lag,
         block_weight_ess_min_by_lag=weight_ess_min_by_lag,
         block_weight_ess_mean_by_lag=weight_ess_mean_by_lag,
+        block_source_ancestor_ess_min_by_lag=source_ancestor_ess_min_by_lag,
+        block_source_ancestor_ess_mean_by_lag=source_ancestor_ess_mean_by_lag,
+        block_unique_source_ancestor_min_by_lag=unique_source_ancestor_min_by_lag,
+        block_max_source_family_fraction_by_lag=max_source_family_fraction_by_lag,
         variance_inflation_by_lag=variance_by_lag,
-        paper_rms_radius_by_lag=rms_by_lag,
-        paper_rms_radius_stderr_by_lag=rms_stderr_by_lag,
+        rms_radius_by_lag=rms_by_lag,
+        rms_radius_stderr_by_lag=rms_stderr_by_lag,
         plateau_value=plateau_value,
         plateau_stderr=plateau_stderr,
-        paper_rms_radius=paper_rms,
-        paper_rms_radius_stderr=paper_rms_stderr,
+        rms_radius=rms_radius,
+        rms_radius_stderr=rms_radius_stderr,
         bias_bracket=bias_bracket,
         plateau_status=plateau_status,
         schema_status=schema,
+        genealogy_status=genealogy_status,
+        genealogy_diagnostics=genealogy_diagnostics,
         plateau_diagnostics=plateau_diagnostics,
         metadata=metadata,
     )
@@ -167,7 +192,7 @@ def _observable_metadata(config: PureWalkingConfig, observable: str) -> dict[str
     if observable == "structure_factor":
         return {"k_values": np.asarray(config.structure_k_values, dtype=float).tolist()}
     if observable == "r2":
-        return {"paper_rms_radius": "sqrt(aggregated_pure_r2)"}
+        return {"rms_radius": "sqrt(aggregated_pure_r2)"}
     return {}
 
 
@@ -179,9 +204,7 @@ def _schema_reference_metadata(
     mixed_observable_reference: LagValue | None,
 ) -> dict[str, object]:
     metadata: dict[str, object] = {
-        "lag0_identity_required": (
-            "lag0_identity" in config.transport_invariant_tests_passed
-        ),
+        "lag0_identity_required": ("lag0_identity" in config.transport_invariant_tests_passed),
         "lag0_reference_available": mixed_observable_reference is not None,
     }
     if lag0_value is None or mixed_observable_reference is None:

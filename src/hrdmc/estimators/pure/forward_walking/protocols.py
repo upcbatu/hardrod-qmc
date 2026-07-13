@@ -28,9 +28,6 @@ class TransportEventLike(Protocol):
     def positions(self) -> FloatArray: ...
 
     @property
-    def r2_rb_per_walker(self) -> FloatArray | None: ...
-
-    @property
     def log_weights_post_resample(self) -> FloatArray: ...
 
     @property

@@ -171,14 +171,12 @@ def trace_stationarity_diagnostics(
     block = _block_drift(values)
     trend_clean = bool(adjusted_z <= slope_z_threshold)
     cumulative_clean = bool(
-        first_last_quarter_z <= quarter_z_threshold
-        and late_cumulative_z <= cumulative_z_threshold
+        first_last_quarter_z <= quarter_z_threshold and late_cumulative_z <= cumulative_z_threshold
     )
     first_last_block_clean = bool(block.first_last_z <= quarter_z_threshold)
     spread_warning = bool(block.spread_z > spread_warning_z_threshold)
     spread_veto = bool(
-        spread_warning
-        and (not trend_clean or not cumulative_clean or not first_last_block_clean)
+        spread_warning and (not trend_clean or not cumulative_clean or not first_last_block_clean)
     )
     blocking_clean = bool(first_last_block_clean and not spread_veto)
     clean = bool(trend_clean and cumulative_clean and blocking_clean)

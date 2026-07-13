@@ -15,6 +15,7 @@ from hrdmc.estimators.pure.forward_walking.contributions import (
 from hrdmc.estimators.pure.forward_walking.lag_state import LagState, SlidingLagState
 from hrdmc.estimators.pure.forward_walking.protocols import FloatArray, TransportEventLike
 from hrdmc.estimators.pure.forward_walking.results import (
+    PURE_STATUS_NO_BLOCKS,
     LagValue,
     PureWalkingResult,
     TransportedLagResult,
@@ -102,6 +103,7 @@ class TransportedAuxiliaryForwardWalking:
                 observable=observable,
                 center=self.config.center,
                 observable_source=self.config.observable_source,
+                r2_rb_com_variance=self.config.r2_rb_com_variance,
                 density_bin_edges=self.config.density_bin_edges,
                 pair_bin_edges=self.config.pair_bin_edges,
                 structure_k_values=self.config.structure_k_values,
@@ -130,7 +132,7 @@ class TransportedAuxiliaryForwardWalking:
     ) -> PureWalkingResult:
         if self._n_walkers is None:
             return PureWalkingResult(
-                status="PURE_WALKING_NO_BLOCKS_NO_GO",
+                status=PURE_STATUS_NO_BLOCKS,
                 observable_results={},
                 metadata=self._metadata(),
             )
@@ -143,8 +145,7 @@ class TransportedAuxiliaryForwardWalking:
         for observable in self.config.observables:
             observable_config = self._observable_configs[observable]
             stats = {
-                lag: state.block_stats()
-                for lag, state in self._lag_states[observable].items()
+                lag: state.block_stats() for lag, state in self._lag_states[observable].items()
             }
             if observable == "r2":
                 observable_results[observable] = assemble_observable_result_from_stats(
@@ -153,15 +154,23 @@ class TransportedAuxiliaryForwardWalking:
                     block_mean_by_lag={lag: stat.mean for lag, stat in stats.items()},
                     block_stderr_by_lag={lag: stat.stderr for lag, stat in stats.items()},
                     block_count_by_lag={lag: stat.count for lag, stat in stats.items()},
-                    weight_ess_min_by_lag={
-                        lag: stat.weight_ess_min for lag, stat in stats.items()
-                    },
+                    weight_ess_min_by_lag={lag: stat.weight_ess_min for lag, stat in stats.items()},
                     weight_ess_mean_by_lag={
                         lag: stat.weight_ess_mean for lag, stat in stats.items()
                     },
-                    variance_by_lag={
-                        lag: stat.variance_inflation for lag, stat in stats.items()
+                    source_ancestor_ess_min_by_lag={
+                        lag: stat.source_ancestor_ess_min for lag, stat in stats.items()
                     },
+                    source_ancestor_ess_mean_by_lag={
+                        lag: stat.source_ancestor_ess_mean for lag, stat in stats.items()
+                    },
+                    unique_source_ancestor_min_by_lag={
+                        lag: stat.unique_source_ancestor_min for lag, stat in stats.items()
+                    },
+                    max_source_family_fraction_by_lag={
+                        lag: stat.max_source_family_fraction for lag, stat in stats.items()
+                    },
+                    variance_by_lag={lag: stat.variance_inflation for lag, stat in stats.items()},
                     mixed_observable_reference=direct_references.get(observable),
                     mixed_r2_reference=mixed_r2_reference,
                     mixed_rms_radius_reference=mixed_rms_radius_reference,
@@ -173,15 +182,23 @@ class TransportedAuxiliaryForwardWalking:
                     block_mean_by_lag={lag: stat.mean for lag, stat in stats.items()},
                     block_stderr_by_lag={lag: stat.stderr for lag, stat in stats.items()},
                     block_count_by_lag={lag: stat.count for lag, stat in stats.items()},
-                    weight_ess_min_by_lag={
-                        lag: stat.weight_ess_min for lag, stat in stats.items()
-                    },
+                    weight_ess_min_by_lag={lag: stat.weight_ess_min for lag, stat in stats.items()},
                     weight_ess_mean_by_lag={
                         lag: stat.weight_ess_mean for lag, stat in stats.items()
                     },
-                    variance_by_lag={
-                        lag: stat.variance_inflation for lag, stat in stats.items()
+                    source_ancestor_ess_min_by_lag={
+                        lag: stat.source_ancestor_ess_min for lag, stat in stats.items()
                     },
+                    source_ancestor_ess_mean_by_lag={
+                        lag: stat.source_ancestor_ess_mean for lag, stat in stats.items()
+                    },
+                    unique_source_ancestor_min_by_lag={
+                        lag: stat.unique_source_ancestor_min for lag, stat in stats.items()
+                    },
+                    max_source_family_fraction_by_lag={
+                        lag: stat.max_source_family_fraction for lag, stat in stats.items()
+                    },
+                    variance_by_lag={lag: stat.variance_inflation for lag, stat in stats.items()},
                     mixed_observable_reference=direct_references.get(observable),
                     mixed_r2_reference=None,
                     mixed_rms_radius_reference=None,
@@ -208,6 +225,7 @@ class TransportedAuxiliaryForwardWalking:
             "collection_stride_steps": self.config.collection_stride_steps,
             "density_collection_stride_steps": self.config.density_collection_stride_steps,
             "observable_source": self.config.observable_source,
+            "r2_rb_com_variance": self.config.r2_rb_com_variance,
             "observables": list(self.config.observables),
             "transport_mode": self.config.transport_mode,
             "collection_mode": self.config.collection_mode,
@@ -215,20 +233,18 @@ class TransportedAuxiliaryForwardWalking:
             "plateau_sigma_threshold": self.config.plateau_sigma_threshold,
             "plateau_abs_tolerance": self.config.plateau_abs_tolerance,
             "plateau_window_lag_count": self.config.plateau_window_lag_count,
-            "density_plateau_window_lag_count": (
-                self.config.density_plateau_window_lag_count
-            ),
+            "density_plateau_window_lag_count": (self.config.density_plateau_window_lag_count),
             "density_plateau_relative_l2_tolerance": (
                 self.config.density_plateau_relative_l2_tolerance
             ),
             "schema_atol": self.config.schema_atol,
             "schema_rtol": self.config.schema_rtol,
+            "min_source_ancestor_ess": self.config.min_source_ancestor_ess,
+            "max_source_family_fraction": self.config.max_source_family_fraction,
             "weight_convention": "post_step_normalized_log_weights",
             "parent_convention": "post_resample_parent_indices",
-            "rms_semantics": "paper_rms_radius=sqrt(aggregated_pure_r2)",
-            "transport_invariant_tests_passed": list(
-                self.config.transport_invariant_tests_passed
-            ),
+            "rms_semantics": "rms_radius=sqrt(aggregated_pure_r2)",
+            "transport_invariant_tests_passed": list(self.config.transport_invariant_tests_passed),
             "event_count": self._event_count,
             "production_event_count": self._production_event_count,
             "schema_reference": "internal_same_event_weighted_mixed_reference",
@@ -261,9 +277,7 @@ class TransportedAuxiliaryForwardWalking:
         config: PureWalkingConfig,
     ) -> LagState:
         state_cls = (
-            SlidingLagState
-            if config.collection_mode == "sliding_window" and lag > 0
-            else LagState
+            SlidingLagState if config.collection_mode == "sliding_window" and lag > 0 else LagState
         )
         return state_cls(
             lag_steps=lag,

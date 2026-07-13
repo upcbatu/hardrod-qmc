@@ -53,9 +53,9 @@ class TriangulatedErrorResult:
         }
 
 
-TRIANGULATED_STATUS = "TRIANGULATED_2_OF_3"
-DISAGREE_STATUS = "DISAGREE_HONEST_LARGE"
-UNAVAILABLE_STATUS = "CORRELATED_ERROR_UNAVAILABLE"
+CORRELATED_ERROR_AGREEMENT = "two_of_three_error_estimates_agree"
+CORRELATED_ERROR_DISAGREEMENT = "error_estimates_disagree"
+CORRELATED_ERROR_UNAVAILABLE = "correlated_error_unavailable"
 
 
 def triangulated_error_estimate(
@@ -67,8 +67,8 @@ def triangulated_error_estimate(
     """Estimate a correlated-trace mean error by Sokal/Geyer/HAC triangulation.
 
     The returned stderr is always the maximum finite stderr among the three
-    estimators. A ``TRIANGULATED_2_OF_3`` status means at least one pair agrees
-    within its estimated one-sigma stderr uncertainty. Disagreement is not
+    estimators. A ``two_of_three_error_estimates_agree`` status means at least
+    one pair agrees within its estimated one-sigma stderr uncertainty. Disagreement is not
     accepted as a precise result; it is reported as an honest large-error
     precision warning rather than silently shrinking the error bar.
     """
@@ -80,23 +80,23 @@ def triangulated_error_estimate(
         hac_flat_top_error_estimate(arr, trace_spacing_tau=trace_spacing_tau),
     )
     finite_stderr = [
-        estimate.stderr_mean
-        for estimate in estimates
-        if np.isfinite(estimate.stderr_mean)
+        estimate.stderr_mean for estimate in estimates if np.isfinite(estimate.stderr_mean)
     ]
     if not finite_stderr:
         return TriangulatedErrorResult(
             estimates=estimates,
             conservative_stderr=float("nan"),
             overlap_pair_count=0,
-            status=UNAVAILABLE_STATUS,
+            status=CORRELATED_ERROR_UNAVAILABLE,
         )
     overlap_count = _overlap_pair_count(estimates, sigma=overlap_sigma)
     return TriangulatedErrorResult(
         estimates=estimates,
         conservative_stderr=float(max(finite_stderr)),
         overlap_pair_count=overlap_count,
-        status=TRIANGULATED_STATUS if overlap_count >= 1 else DISAGREE_STATUS,
+        status=(
+            CORRELATED_ERROR_AGREEMENT if overlap_count >= 1 else CORRELATED_ERROR_DISAGREEMENT
+        ),
     )
 
 

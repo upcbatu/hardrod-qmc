@@ -1,13 +1,13 @@
 from hrdmc.estimators.pure.energy_response import (
+    BASE_TRAP_QUADRATIC_COUPLING,
     ENERGY_RESPONSE_SCHEMA_VERSION,
-    EnergyResponseFitResult,
-    EnergyResponsePoint,
+    PairedEnergyResponsePoint,
+    SeedEnergyResponseResult,
     TrapR2EnergyResponseResult,
-    fit_energy_response,
-    lambda_from_omega,
-    omega_from_lambda,
-    omega_ladder_from_relative_lambda_offsets,
-    trap_r2_from_energy_response,
+    lambda_from_relative_offset,
+    lambda_ladder_from_relative_offsets,
+    paired_seed_trap_r2,
+    paired_trap_r2_from_energy_response,
 )
 from hrdmc.estimators.pure.forward_walking import (
     PureWalkingConfig,
@@ -18,18 +18,18 @@ from hrdmc.estimators.pure.forward_walking import (
 )
 
 __all__ = [
+    "BASE_TRAP_QUADRATIC_COUPLING",
     "ENERGY_RESPONSE_SCHEMA_VERSION",
-    "EnergyResponseFitResult",
-    "EnergyResponsePoint",
+    "PairedEnergyResponsePoint",
     "PureWalkingConfig",
     "PureWalkingResult",
+    "SeedEnergyResponseResult",
     "TransportedAuxiliaryForwardWalking",
     "TransportedLagResult",
     "TrapR2EnergyResponseResult",
     "estimate_transported_auxiliary_forward_walking",
-    "fit_energy_response",
-    "lambda_from_omega",
-    "omega_from_lambda",
-    "omega_ladder_from_relative_lambda_offsets",
-    "trap_r2_from_energy_response",
+    "lambda_from_relative_offset",
+    "lambda_ladder_from_relative_offsets",
+    "paired_seed_trap_r2",
+    "paired_trap_r2_from_energy_response",
 ]

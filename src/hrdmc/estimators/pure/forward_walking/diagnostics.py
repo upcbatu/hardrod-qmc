@@ -3,7 +3,20 @@ from __future__ import annotations
 import numpy as np
 
 from hrdmc.estimators.pure.forward_walking.config import PureWalkingConfig
-from hrdmc.estimators.pure.forward_walking.results import LagValue
+from hrdmc.estimators.pure.forward_walking.results import (
+    GENEALOGY_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
+    GENEALOGY_NOT_EVALUATED,
+    GENEALOGY_SOURCE_FAMILY_DOMINANCE,
+    GENEALOGY_SUPPORT_ACCEPTED,
+    PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
+    PLATEAU_INSUFFICIENT_BLOCKS,
+    PLATEAU_NO_BLOCKS,
+    PLATEAU_RESOLVED,
+    PLATEAU_UNRESOLVED,
+    SCHEMA_INVALID,
+    SCHEMA_VALID,
+    LagValue,
+)
 
 
 def standard_error(values: np.ndarray) -> float:
@@ -42,38 +55,82 @@ def schema_status(
     for value in values_by_lag.values():
         arr = np.asarray(value, dtype=float)
         if np.any(np.isfinite(arr) & (arr < 0.0)):
-            return "PURE_WALKING_SCHEMA_NO_GO"
+            return SCHEMA_INVALID
     lag0 = values_by_lag.get(0)
     if lag0 is None or not np.all(np.isfinite(np.asarray(lag0, dtype=float))):
-        return "PURE_WALKING_SCHEMA_NO_GO"
+        return SCHEMA_INVALID
     if (
         "lag0_identity" in config.transport_invariant_tests_passed
         and mixed_observable_reference is None
         and mixed_r2_reference is None
     ):
-        return "PURE_WALKING_SCHEMA_NO_GO"
+        return SCHEMA_INVALID
     if mixed_observable_reference is not None and not _lag0_matches_reference(
         config=config,
         observable=observable,
         lag0=lag0,
         reference=mixed_observable_reference,
     ):
-        return "PURE_WALKING_SCHEMA_NO_GO"
+        return SCHEMA_INVALID
     if mixed_r2_reference is not None and not np.isclose(
         float(np.asarray(lag0, dtype=float).reshape(-1)[0]),
         mixed_r2_reference,
         rtol=config.schema_rtol,
         atol=config.schema_atol,
     ):
-        return "PURE_WALKING_SCHEMA_NO_GO"
+        return SCHEMA_INVALID
     if mixed_rms_radius_reference is not None and not np.isclose(
         np.sqrt(float(np.asarray(lag0, dtype=float).reshape(-1)[0])),
         mixed_rms_radius_reference,
         rtol=config.schema_rtol,
         atol=config.schema_atol,
     ):
-        return "PURE_WALKING_SCHEMA_NO_GO"
-    return "SCHEMA_GO"
+        return SCHEMA_INVALID
+    return SCHEMA_VALID
+
+
+def genealogy_support_status(
+    *,
+    config: PureWalkingConfig,
+    block_count_by_lag: dict[int, int],
+    source_ancestor_ess_min_by_lag: dict[int, float],
+    unique_source_ancestor_min_by_lag: dict[int, int],
+    max_source_family_fraction_by_lag: dict[int, float],
+) -> tuple[str, dict[str, object]]:
+    """Classify whether late-lag FW blocks retain independent source families."""
+
+    supported_lags = [
+        lag for lag in config.lag_steps if lag > 0 and block_count_by_lag.get(lag, 0) > 0
+    ]
+    if not supported_lags:
+        return GENEALOGY_NOT_EVALUATED, {"reason": "no_positive_lag_blocks"}
+    window_lags = supported_lags[-min(config.plateau_window_lag_count, len(supported_lags)) :]
+    diagnostics: dict[str, object] = {
+        "window_lags": list(window_lags),
+        "source_ancestor_ess_min_by_lag": {
+            lag: source_ancestor_ess_min_by_lag.get(lag, 0.0) for lag in window_lags
+        },
+        "unique_source_ancestor_min_by_lag": {
+            lag: unique_source_ancestor_min_by_lag.get(lag, 0) for lag in window_lags
+        },
+        "max_source_family_fraction_by_lag": {
+            lag: max_source_family_fraction_by_lag.get(lag, 1.0) for lag in window_lags
+        },
+        "min_source_ancestor_ess": config.min_source_ancestor_ess,
+        "max_source_family_fraction": config.max_source_family_fraction,
+    }
+    for lag in window_lags:
+        observed = source_ancestor_ess_min_by_lag.get(lag, 0.0)
+        if observed < config.min_source_ancestor_ess:
+            diagnostics.update({"failed_lag": lag, "observed_source_ancestor_ess": observed})
+            return GENEALOGY_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM, diagnostics
+        family_fraction = max_source_family_fraction_by_lag.get(lag, 1.0)
+        if family_fraction > config.max_source_family_fraction:
+            diagnostics.update(
+                {"failed_lag": lag, "observed_max_source_family_fraction": family_fraction}
+            )
+            return GENEALOGY_SOURCE_FAMILY_DOMINANCE, diagnostics
+    return GENEALOGY_SUPPORT_ACCEPTED, diagnostics
 
 
 def plateau_summary(
@@ -91,11 +148,9 @@ def plateau_summary(
     str,
     dict[str, object],
 ]:
-    value_lags = [
-        lag for lag in config.lag_steps if _all_finite(values_by_lag.get(lag))
-    ]
+    value_lags = [lag for lag in config.lag_steps if _all_finite(values_by_lag.get(lag))]
     if not value_lags:
-        return None, None, None, "NO_BLOCKS", {"reason": "no_finite_lag_values"}
+        return None, None, None, PLATEAU_NO_BLOCKS, {"reason": "no_finite_lag_values"}
     lag_max = value_lags[-1]
     if block_count_by_lag[lag_max] < config.min_block_count:
         value = values_by_lag[lag_max]
@@ -103,7 +158,7 @@ def plateau_summary(
             value,
             stderr_by_lag[lag_max],
             (value, value),
-            "INSUFFICIENT_BLOCKS",
+            PLATEAU_INSUFFICIENT_BLOCKS,
             {
                 "lag_max": lag_max,
                 "block_count": block_count_by_lag[lag_max],
@@ -116,28 +171,38 @@ def plateau_summary(
             value,
             stderr_by_lag[lag_max],
             (value, value),
-            "INSUFFICIENT_WEIGHT_ESS",
+            PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
             {
                 "lag_max": lag_max,
                 "weight_ess_min": weight_ess_min_by_lag[lag_max],
                 "min_walker_weight_ess": config.min_walker_weight_ess,
             },
         )
-    finite_lags = [
-        lag for lag in value_lags if _all_finite(stderr_by_lag.get(lag))
-    ]
+    finite_lags = [lag for lag in value_lags if _all_finite(stderr_by_lag.get(lag))]
     if not finite_lags:
         value = values_by_lag[lag_max]
-        return value, stderr_by_lag[lag_max], (value, value), "INSUFFICIENT_BLOCKS", {
-            "reason": "no_finite_lag_stderr",
-            "lag_max": lag_max,
-        }
+        return (
+            value,
+            stderr_by_lag[lag_max],
+            (value, value),
+            PLATEAU_INSUFFICIENT_BLOCKS,
+            {
+                "reason": "no_finite_lag_stderr",
+                "lag_max": lag_max,
+            },
+        )
     if len(finite_lags) == 1:
         value = values_by_lag[lag_max]
-        return value, stderr_by_lag[lag_max], (value, value), "NO_LAG_PLATEAU", {
-            "reason": "only_one_finite_lag",
-            "lag_max": lag_max,
-        }
+        return (
+            value,
+            stderr_by_lag[lag_max],
+            (value, value),
+            PLATEAU_UNRESOLVED,
+            {
+                "reason": "only_one_finite_lag",
+                "lag_max": lag_max,
+            },
+        )
     window_lags = finite_lags[-min(config.plateau_window_lag_count, len(finite_lags)) :]
     for lag in window_lags:
         if block_count_by_lag[lag] < config.min_block_count:
@@ -146,7 +211,7 @@ def plateau_summary(
                 values_by_lag[lag_max],
                 stderr_by_lag[lag_max],
                 bracket,
-                "INSUFFICIENT_BLOCKS",
+                PLATEAU_INSUFFICIENT_BLOCKS,
                 {
                     "method": "late_window",
                     "window_lags": list(window_lags),
@@ -162,7 +227,7 @@ def plateau_summary(
                 values_by_lag[lag_max],
                 stderr_by_lag[lag_max],
                 bracket,
-                "INSUFFICIENT_WEIGHT_ESS",
+                PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
                 {
                     "method": "late_window",
                     "window_lags": list(window_lags),
@@ -217,7 +282,7 @@ def _last_two_plateau_summary(
             values_by_lag[lag_max],
             stderr_by_lag[lag_max],
             bracket,
-            "INSUFFICIENT_BLOCKS",
+            PLATEAU_INSUFFICIENT_BLOCKS,
             {
                 "lag_previous": lag_prev,
                 "lag_max": lag_max,
@@ -230,7 +295,7 @@ def _last_two_plateau_summary(
             values_by_lag[lag_max],
             stderr_by_lag[lag_max],
             bracket,
-            "INSUFFICIENT_WEIGHT_ESS",
+            PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
             {
                 "lag_previous": lag_prev,
                 "lag_max": lag_max,
@@ -257,7 +322,7 @@ def _last_two_plateau_summary(
         observable=observable,
         combined_stderr=combined,
     )
-    status = "PLATEAU_FOUND" if delta <= threshold else "NO_LAG_PLATEAU"
+    status = PLATEAU_RESOLVED if delta <= threshold else PLATEAU_UNRESOLVED
     stderr = np.maximum(
         _lag_array(stderr_by_lag[lag_max]),
         _lag_array(stderr_by_lag[lag_prev]),
@@ -358,7 +423,7 @@ def _late_window_plateau_summary(
         combined_stderr=slope_combined,
     )
     slope_pass = slope_delta <= slope_threshold
-    status = "PLATEAU_FOUND" if spread_pass and slope_pass else "NO_LAG_PLATEAU"
+    status = PLATEAU_RESOLVED if spread_pass and slope_pass else PLATEAU_UNRESOLVED
     return (
         plateau_value,
         plateau_stderr_value,
@@ -384,9 +449,7 @@ def _late_window_plateau_summary(
             "base_tolerance": base_tolerance,
             "sigma_threshold": config.plateau_sigma_threshold,
             "decision": status,
-            "block_count_by_window_lag": {
-                lag: block_count_by_lag[lag] for lag in window_lags
-            },
+            "block_count_by_window_lag": {lag: block_count_by_lag[lag] for lag in window_lags},
             "weight_ess_min_by_window_lag": {
                 lag: weight_ess_min_by_lag[lag] for lag in window_lags
             },
@@ -415,13 +478,9 @@ def _lag0_matches_reference(
         denominator = float(np.sqrt(np.sum(ref_arr * ref_arr * widths)))
         if denominator <= 0.0 or not np.isfinite(denominator):
             return False
-        relative_l2 = float(
-            np.sqrt(np.sum((lag0_arr - ref_arr) ** 2 * widths)) / denominator
-        )
+        relative_l2 = float(np.sqrt(np.sum((lag0_arr - ref_arr) ** 2 * widths)) / denominator)
         return relative_l2 <= max(config.schema_atol, config.schema_rtol)
-    return bool(
-        np.allclose(lag0_arr, ref_arr, rtol=config.schema_rtol, atol=config.schema_atol)
-    )
+    return bool(np.allclose(lag0_arr, ref_arr, rtol=config.schema_rtol, atol=config.schema_atol))
 
 
 def _plateau_delta_and_stderr(
@@ -509,11 +568,7 @@ def _window_slope_delta_and_stderr(
     span = float(lags[-1] - lags[0])
     slope = np.sum(centered[:, None] * values, axis=0) / denominator
     span_change = slope * span
-    slope_stderr = (
-        np.sqrt(np.sum((centered[:, None] * stderrs) ** 2, axis=0))
-        * span
-        / denominator
-    )
+    slope_stderr = np.sqrt(np.sum((centered[:, None] * stderrs) ** 2, axis=0)) * span / denominator
     delta = _delta_norm(
         config=config,
         observable=observable,

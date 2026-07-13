@@ -60,9 +60,7 @@ def filter_weighted_configurations(
         raise ValueError("weights must have one value per sample")
 
     finite_mask = (
-        np.all(np.isfinite(samples), axis=1)
-        & np.isfinite(local_energies)
-        & np.isfinite(weights)
+        np.all(np.isfinite(samples), axis=1) & np.isfinite(local_energies) & np.isfinite(weights)
     )
     positive_weight_mask = finite_mask & (weights > 0.0)
     included = positive_weight_mask & valid_mask

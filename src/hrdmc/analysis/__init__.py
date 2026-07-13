@@ -1,4 +1,6 @@
 from hrdmc.analysis.blocking import (
+    BLOCKING_PLATEAU_RESOLVED,
+    BLOCKING_PLATEAU_UNRESOLVED,
     BlockingPlateauResult,
     BlockingResult,
     blocking_curve,
@@ -6,6 +8,11 @@ from hrdmc.analysis.blocking import (
     detect_blocking_plateau,
 )
 from hrdmc.analysis.chain_diagnostics import (
+    CHAIN_ACCEPTED,
+    CHAIN_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
+    CHAIN_RHAT_ABOVE_LIMIT,
+    CHAIN_SPREAD_WARNING,
+    CHAIN_TRACE_NONSTATIONARY,
     ChainObservableDiagnostics,
     classify_chain_diagnostics,
     diagnose_chains,
@@ -13,6 +20,9 @@ from hrdmc.analysis.chain_diagnostics import (
     trace_stationarity_result_to_dict,
 )
 from hrdmc.analysis.correlated_error import (
+    CORRELATED_ERROR_AGREEMENT,
+    CORRELATED_ERROR_DISAGREEMENT,
+    CORRELATED_ERROR_UNAVAILABLE,
     CorrelatedErrorEstimate,
     TriangulatedErrorResult,
     geyer_error_estimate,
@@ -40,9 +50,19 @@ from hrdmc.analysis.timeseries import (
 
 __all__ = [
     "AutocorrelationResult",
+    "BLOCKING_PLATEAU_RESOLVED",
+    "BLOCKING_PLATEAU_UNRESOLVED",
     "BlockingResult",
     "BlockingPlateauResult",
+    "CHAIN_ACCEPTED",
+    "CHAIN_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM",
+    "CHAIN_RHAT_ABOVE_LIMIT",
+    "CHAIN_SPREAD_WARNING",
+    "CHAIN_TRACE_NONSTATIONARY",
     "ChainObservableDiagnostics",
+    "CORRELATED_ERROR_AGREEMENT",
+    "CORRELATED_ERROR_DISAGREEMENT",
+    "CORRELATED_ERROR_UNAVAILABLE",
     "CorrelatedErrorEstimate",
     "SlopeResult",
     "TraceStationarityResult",
