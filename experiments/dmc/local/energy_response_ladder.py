@@ -31,6 +31,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--relative-lambda-offsets", default=DEFAULT_OFFSETS)
     parser.add_argument("--seeds", default="9501,9502,9503,9504,9505")
     parser.add_argument("--dt", type=float, default=0.00025)
+    parser.add_argument(
+        "--drift-limiter",
+        choices=("none", "umrigar"),
+        default="none",
+        help=(
+            "Finite-timestep MALA drift limiter; the fixed guide and "
+            "response Hamiltonian are unchanged."
+        ),
+    )
     parser.add_argument("--walkers", type=int, default=512)
     parser.add_argument("--burn-tau", type=float, default=20.0)
     parser.add_argument("--production-tau", type=float, default=60.0)
@@ -96,6 +105,7 @@ def main() -> None:
         n_bins=args.n_bins,
         ess_resample_fraction=args.ess_resample_fraction,
         local_step_method="metropolis",
+        drift_limiter=args.drift_limiter,
         relative_alpha=relative_alpha,
         contact_beta=contact_beta,
     )

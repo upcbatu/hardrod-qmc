@@ -747,6 +747,8 @@ def write_response_point_table(output_dir: Path, rows: list[dict[str, Any]]) -> 
         "lambda0",
         "relative_lambda_offset",
         "lambda_value",
+        "local_step_method",
+        "drift_limiter",
         "mixed_energy",
         "mixed_energy_conservative_stderr",
         "seed_count",
@@ -766,7 +768,12 @@ def write_response_point_table(output_dir: Path, rows: list[dict[str, Any]]) -> 
         writer = csv.DictWriter(file, fieldnames=fields)
         writer.writeheader()
         for row in rows:
-            writer.writerow({field: row.get(field, "") for field in fields})
+            values = {field: row.get(field, "") for field in fields}
+            point_controls = row.get("point_run_controls")
+            if isinstance(point_controls, dict):
+                values["local_step_method"] = point_controls.get("local_step_method", "")
+                values["drift_limiter"] = point_controls.get("drift_limiter", "none")
+            writer.writerow(values)
     return path
 
 
@@ -950,6 +957,8 @@ def _validate_stationarity_binding(
     for row in rows:
         if row.get("local_step_method") != run_controls.local_step_method:
             raise ValueError("stationarity seed used a different local step method")
+        if row.get("drift_limiter") != run_controls.drift_limiter:
+            raise ValueError("stationarity seed used a different drift limiter")
         _require_optional_float_match(
             row.get("relative_alpha"),
             run_controls.relative_alpha,
