@@ -120,6 +120,7 @@ class FinalMatrixResult:
 class RowMethod:
     dt: float
     walkers: int
+    drift_limiter: str
     relative_alpha: float | None
     initialization_mode: str
     init_width_log_sigma: float
@@ -402,6 +403,8 @@ def _benchmark_command(
         str(method.walkers),
         "--local-step-method",
         LOCAL_STEP_METHOD,
+        "--drift-limiter",
+        method.drift_limiter,
         "--burn-tau",
         _format_number(config.burn_tau),
         "--production-tau",
@@ -491,6 +494,10 @@ def _write_matrix_manifest(
             "implementation": implementation,
             "invocation_settings": {
                 "local_step_method": LOCAL_STEP_METHOD,
+                "drift_limiter_policy": {
+                    "a_over_aho_0_and_0p1": "none",
+                    "a_over_aho_1_and_10": "umrigar",
+                },
                 "burn_tau": config.burn_tau,
                 "production_tau": config.production_tau,
                 "grid_extent": config.grid_extent,
@@ -511,9 +518,18 @@ def _write_matrix_manifest(
                 "calculation": "metropolis_corrected_drift_diffusion_dmc",
                 "row_method_policy": {
                     "a_over_aho_0_and_0p1": ("dt=0.0025, walkers=256, reduced-TG default guide"),
-                    "N10_a_over_aho_1": ("dt=0.00125, walkers=256, relative-alpha=1.5"),
-                    "N20_a_over_aho_1": ("dt=0.000625, walkers=512, relative-alpha=1.86658"),
-                    "a_over_aho_10": ("dt=0.00025, walkers=256, reduced-TG default guide"),
+                    "N10_a_over_aho_1": (
+                        "dt=0.00125, walkers=256, relative-alpha=1.5, Umrigar drift"
+                    ),
+                    "N20_a_over_aho_1": (
+                        "dt=0.000625, walkers=512, relative-alpha=1.86658, Umrigar drift"
+                    ),
+                    "N10_a_over_aho_10": (
+                        "dt=0.000125, walkers=256, relative-alpha=5.59585, Umrigar drift"
+                    ),
+                    "N20_a_over_aho_10": (
+                        "dt=0.00025, walkers=512, relative-alpha=7.01001, Umrigar drift"
+                    ),
                     "density_fw": (
                         "physical lags=(0,2,4,7); snapshot interval=0.1 "
                         "except 0.5 for the large a/a_ho=10 grids"
@@ -583,6 +599,7 @@ def _dmc_controls(
         n_bins=n_bins,
         ess_resample_fraction=config.ess_resample_fraction,
         local_step_method=LOCAL_STEP_METHOD,
+        drift_limiter=method.drift_limiter,
         relative_alpha=method.relative_alpha,
     )
 
@@ -719,26 +736,30 @@ def _steps_for_tau(tau: float, dt: float) -> int:
 def _row_method(case_id: str) -> RowMethod:
     case = parse_case(case_id)
     if math.isclose(case.rod_length, 10.0, rel_tol=0.0, abs_tol=1e-12):
-        dt = 0.00025
-        walkers = DEFAULT_WALKERS
-        relative_alpha = None
+        dt = 0.000125 if case.n_particles == 10 else 0.00025
+        walkers = 512 if case.n_particles == 20 else DEFAULT_WALKERS
+        relative_alpha = 5.59585 if case.n_particles == 10 else 7.01001
+        drift_limiter = "umrigar"
         initialization_mode = "lda-rms-lattice"
         preburn_steps = 0
     elif math.isclose(case.rod_length, 1.0, rel_tol=0.0, abs_tol=1e-12):
         dt = 0.000625 if case.n_particles == 20 else 0.00125
         walkers = 512 if case.n_particles == 20 else DEFAULT_WALKERS
         relative_alpha = 1.5 if case.n_particles == 10 else 1.86658
+        drift_limiter = "umrigar"
         initialization_mode = "lda-rms-lattice"
         preburn_steps = 0
     else:
         dt = DEFAULT_DT
         walkers = DEFAULT_WALKERS
         relative_alpha = None
+        drift_limiter = "none"
         initialization_mode = DEFAULT_INITIALIZATION_MODE
         preburn_steps = DEFAULT_BREATHING_PREBURN_STEPS
     return RowMethod(
         dt=dt,
         walkers=walkers,
+        drift_limiter=drift_limiter,
         relative_alpha=relative_alpha,
         initialization_mode=initialization_mode,
         init_width_log_sigma=DEFAULT_INIT_WIDTH_LOG_SIGMA,
@@ -763,6 +784,7 @@ def _row_method_metadata(method: RowMethod) -> dict[str, float | int | list[int]
     return {
         "dt": method.dt,
         "walkers": method.walkers,
+        "drift_limiter": method.drift_limiter,
         "relative_alpha": method.relative_alpha,
         "initialization_mode": method.initialization_mode,
         "store_every": method.store_every,
