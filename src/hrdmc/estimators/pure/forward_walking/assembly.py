@@ -115,6 +115,8 @@ def assemble_observable_result_from_stats(
             "max_source_family_fraction": config.max_source_family_fraction,
             "plateau_sigma_threshold": config.plateau_sigma_threshold,
             "plateau_abs_tolerance": config.plateau_abs_tolerance,
+            "rms_plateau_relative_tolerance": config.rms_plateau_relative_tolerance,
+            "plateau_equivalence_confidence_level": (config.plateau_equivalence_confidence_level),
             "plateau_window_lag_count": config.plateau_window_lag_count,
             "density_plateau_relative_l2_tolerance": (config.density_plateau_relative_l2_tolerance),
         }

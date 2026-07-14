@@ -36,6 +36,8 @@ class PureWalkingConfig:
     center: float = 0.0
     plateau_sigma_threshold: float = 1.0
     plateau_abs_tolerance: float = 0.0
+    rms_plateau_relative_tolerance: float = 0.0
+    plateau_equivalence_confidence_level: float = 0.95
     plateau_window_lag_count: int = 4
     density_lag_steps: tuple[int, ...] | None = None
     density_collection_stride_steps: int | None = None
@@ -110,6 +112,18 @@ class PureWalkingConfig:
             raise ValueError("collection_stride_steps must be positive")
         if self.density_plateau_relative_l2_tolerance < 0.0:
             raise ValueError("density_plateau_relative_l2_tolerance must be non-negative")
+        if (
+            not np.isfinite(self.rms_plateau_relative_tolerance)
+            or self.rms_plateau_relative_tolerance < 0.0
+        ):
+            raise ValueError("rms_plateau_relative_tolerance must be finite and non-negative")
+        if (
+            not np.isfinite(self.plateau_equivalence_confidence_level)
+            or not 0.0 < self.plateau_equivalence_confidence_level < 1.0
+        ):
+            raise ValueError(
+                "plateau_equivalence_confidence_level must lie strictly between zero and one"
+            )
         if self.plateau_window_lag_count < 2:
             raise ValueError("plateau_window_lag_count must be at least 2")
         if self.density_lag_steps is not None:

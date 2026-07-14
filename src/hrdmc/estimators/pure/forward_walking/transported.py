@@ -273,6 +273,10 @@ class TransportedAuxiliaryForwardWalking:
             "density_transport_storage_mode": self._density_transport_storage_mode(),
             "plateau_sigma_threshold": self.config.plateau_sigma_threshold,
             "plateau_abs_tolerance": self.config.plateau_abs_tolerance,
+            "rms_plateau_relative_tolerance": self.config.rms_plateau_relative_tolerance,
+            "plateau_equivalence_confidence_level": (
+                self.config.plateau_equivalence_confidence_level
+            ),
             "plateau_window_lag_count": self.config.plateau_window_lag_count,
             "density_plateau_window_lag_count": (self.config.density_plateau_window_lag_count),
             "density_plateau_relative_l2_tolerance": (
