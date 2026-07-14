@@ -23,33 +23,64 @@ def draw_fw_lag_panel(ax: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
     lags, values = lag_values
     stderr = stderr_values[1] if stderr_values is not None else None
     _draw_seed_lag_traces(ax, payload)
-    ax.plot(
-        lags,
-        values,
-        marker="o",
-        color=tokens.DMC_PRIMARY,
-        linewidth=2.0,
-        label=r"aggregate FW $R^2$",
-    )
-    if stderr is not None and stderr.shape == values.shape:
-        ax.fill_between(lags, values - stderr, values + stderr, color=tokens.SEED_BAND, alpha=0.3)
+    selected_lags = _integer_set(r2.get("selected_window_lags"))
+    if selected_lags:
+        _draw_aggregate_support(
+            ax,
+            lags=lags,
+            values=values,
+            stderr=stderr,
+            selected_lags=selected_lags,
+        )
+    else:
+        ax.plot(
+            lags,
+            values,
+            marker="o",
+            color=tokens.DMC_PRIMARY,
+            linewidth=2.0,
+            label=r"aggregate FW $R^2$",
+        )
+        if stderr is not None and stderr.shape == values.shape:
+            ax.fill_between(
+                lags,
+                values - stderr,
+                values + stderr,
+                color=tokens.SEED_BAND,
+                alpha=0.3,
+            )
     plateau = finite_float(r2.get("plateau_value"))
     if np.isfinite(plateau):
-        ax.axhline(
-            plateau,
-            color=tokens.ACCEPTED,
-            linestyle=(0, (4, 2)),
-            linewidth=1.2,
-            label="plateau",
-        )
+        selected = sorted(selected_lags)
+        if selected:
+            ax.hlines(
+                plateau,
+                selected[0],
+                selected[-1],
+                color=tokens.ACCEPTED,
+                linestyle=(0, (4, 2)),
+                linewidth=1.4,
+                label="selected plateau",
+            )
+        else:
+            ax.axhline(
+                plateau,
+                color=tokens.ACCEPTED,
+                linestyle=(0, (4, 2)),
+                linewidth=1.2,
+                label="plateau",
+            )
     ax.set_title("Transported FW R2 lag ladder")
     ax.set_xlabel("lag steps")
     ax.set_ylabel(r"$R^2$")
     ax.legend(loc="best", fontsize=8)
+    status_text = f"status={r2.get('plateau_status', 'unknown')}"
+    if selected_lags:
+        status_text += "; selected=" + ",".join(str(lag) for lag in sorted(selected_lags))
     ax.text(
         0.02,
         0.04,
-        f"status={r2.get('plateau_status', 'unknown')}",
+        status_text,
         transform=ax.transAxes,
         ha="left",
         va="bottom",
@@ -87,7 +118,62 @@ def _aggregate_r2_lag_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "stderr_by_lag": stderr,
         "plateau_value": pure.get("r2_aggregate_plateau_value"),
         "plateau_status": pure.get("r2_aggregate_plateau_status", ""),
+        "selected_window_lags": diagnostics.get("selected_window_lags", []),
+        "excluded_unsupported_lags": diagnostics.get("excluded_unsupported_lags", []),
     }
+
+
+def _draw_aggregate_support(
+    ax: Any,  # noqa: ANN401
+    *,
+    lags: np.ndarray,
+    values: np.ndarray,
+    stderr: np.ndarray | None,
+    selected_lags: set[int],
+) -> None:
+    selected_mask = np.asarray([int(lag) in selected_lags for lag in lags], dtype=bool)
+    diagnostic_mask = ~selected_mask
+    if np.any(diagnostic_mask):
+        ax.plot(
+            lags[diagnostic_mask],
+            values[diagnostic_mask],
+            linestyle="none",
+            marker="x",
+            markersize=5.0,
+            color=tokens.DMC_DIAGNOSTIC,
+            label="non-plateau lag diagnostics",
+            zorder=2,
+        )
+    ax.plot(
+        lags[selected_mask],
+        values[selected_mask],
+        marker="o",
+        color=tokens.DMC_PRIMARY,
+        linewidth=2.2,
+        label=r"supported aggregate FW $R^2$",
+        zorder=4,
+    )
+    if stderr is not None and stderr.shape == values.shape:
+        selected_stderr = stderr[selected_mask]
+        selected_values = values[selected_mask]
+        selected_x = lags[selected_mask]
+        ax.fill_between(
+            selected_x,
+            selected_values - selected_stderr,
+            selected_values + selected_stderr,
+            color=tokens.SEED_BAND,
+            alpha=0.35,
+            zorder=3,
+        )
+
+
+def _integer_set(value: object) -> set[int]:
+    if not isinstance(value, (list, tuple)):
+        return set()
+    try:
+        return {int(item) for item in value}
+    except (TypeError, ValueError):
+        return set()
 
 
 def _draw_seed_lag_traces(ax: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401

@@ -137,9 +137,10 @@ def _write_fw_lag_diagnostics(
     *,
     formats: tuple[str, ...],
 ) -> list[Path]:
-    fig, ax = plt.subplots(figsize=(7.2, 4.1))
+    fig, ax = plt.subplots(figsize=(7.2, 4.1), constrained_layout=False)
     draw_case_header(fig, payload)
     draw_fw_lag_panel(ax, payload)
+    fig.subplots_adjust(top=0.84, bottom=0.14, left=0.11, right=0.985)
     paths = save_figure(fig, plot_dir / "fw_lag_diagnostics", formats)
     plt.close(fig)
     return paths
@@ -265,7 +266,7 @@ def _write_one_page_packet(
         2,
         1,
         height_ratios=(2.2, 0.8),
-        hspace=0.06,
+        hspace=0.14,
     )
     draw_density_panel(
         fig.add_subplot(density_spec[0, 0]),

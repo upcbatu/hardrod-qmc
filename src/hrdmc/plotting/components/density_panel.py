@@ -250,7 +250,7 @@ def _draw_density_residuals(
         ax.set_ylim(-1.15 * max_abs, 1.15 * max_abs)
     ax.set_xlabel(r"$x/a_{\mathrm{ho}}$")
     ax.set_ylabel(r"$\Delta n\,a_{\mathrm{ho}}$")
-    ax.set_title("Residual to LDA envelope", loc="left", pad=3, fontsize=8.5)
+    ax.set_title("Residual to LDA envelope", loc="left", y=0.93, pad=0, fontsize=8.5)
     ax.legend(loc="upper right", fontsize=7.2)
 
 
