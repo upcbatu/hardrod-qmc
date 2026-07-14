@@ -4,6 +4,10 @@ from typing import Any
 
 import numpy as np
 
+from hrdmc.analysis import (
+    simultaneous_pairwise_equivalence,
+    simultaneous_pairwise_norm_equivalence,
+)
 from hrdmc.estimators.pure.forward_walking.config import PureWalkingConfig
 from hrdmc.estimators.pure.forward_walking.results import (
     GENEALOGY_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
@@ -135,12 +139,25 @@ def aggregate_fw_observable_summary(
         lag for lag in excluded_later_lags if not bool(lag_support[lag]["supported"])
     ]
     selected_values = np.stack([lag_values[lag] for lag in selected_lags], axis=1)
-    plateau = _paired_plateau_summary(
-        selected_values,
-        selected_lags=selected_lags,
-        observable=observable,
-        config=observable_config,
-    )
+    if observable == "r2":
+        plateau = _paired_rms_equivalence_summary(
+            selected_values,
+            selected_lags=selected_lags,
+            config=observable_config,
+        )
+    elif observable == "density":
+        plateau = _paired_density_equivalence_summary(
+            selected_values,
+            selected_lags=selected_lags,
+            config=observable_config,
+        )
+    else:
+        plateau = _paired_plateau_summary(
+            selected_values,
+            selected_lags=selected_lags,
+            observable=observable,
+            config=observable_config,
+        )
     selected_support = [lag_support[lag] for lag in selected_lags]
     diagnostics = {
         **support_diagnostics,
@@ -511,6 +528,149 @@ def _paired_plateau_summary(
             "slope_paired_stderr": slope_uncertainty,
             "slope_threshold": slope_threshold,
             "slope_pass": slope_pass,
+            "decision": status,
+        },
+    }
+
+
+def _paired_rms_equivalence_summary(
+    values: np.ndarray,
+    *,
+    selected_lags: tuple[int, ...],
+    config: PureWalkingConfig,
+) -> dict[str, Any]:
+    """Test a scalar R2 ladder against a declared practical RMS margin."""
+
+    if len(selected_lags) < MIN_AGGREGATE_PLATEAU_LAGS:
+        raise ValueError("aggregate FW plateau requires at least three supported lags")
+    if values.ndim != 3 or values.shape[2] != 1:
+        raise ValueError("R2 aggregate values must contain one scalar per seed and lag")
+
+    scalar_r2 = values[:, :, 0]
+    seed_plateaus = np.mean(values, axis=1)
+    plateau = np.mean(seed_plateaus, axis=0)
+    plateau_stderr = _seed_sem(seed_plateaus)
+    if not np.all(np.isfinite(scalar_r2)) or np.any(scalar_r2 <= 0.0):
+        return {
+            "plateau_status": PLATEAU_UNRESOLVED,
+            "plateau_value": _lag_value(plateau, scalar=True),
+            "plateau_stderr": _lag_value(plateau_stderr, scalar=True),
+            "bias_bracket": (
+                _lag_value(np.mean(values[:, 0, :], axis=0), scalar=True),
+                _lag_value(np.mean(values[:, -1, :], axis=0), scalar=True),
+            ),
+            "plateau_diagnostics": {
+                "method": "paired_seed_simultaneous_rms_equivalence",
+                "window_lags": list(selected_lags),
+                "reason": "nonpositive_or_nonfinite_r2",
+                "decision": PLATEAU_UNRESOLVED,
+            },
+        }
+
+    rms_values = np.sqrt(scalar_r2)
+    rms_scale = float(np.sqrt(np.mean(scalar_r2)))
+    relative_margin = float(config.rms_plateau_relative_tolerance)
+    absolute_margin = float(relative_margin * rms_scale)
+    equivalence = simultaneous_pairwise_equivalence(
+        rms_values,
+        equivalence_margin=absolute_margin,
+        confidence_level=config.plateau_equivalence_confidence_level,
+    )
+    relative_upper_bound = float(equivalence.simultaneous_upper_bound / rms_scale)
+    relative_observed_difference = float(equivalence.observed_max_difference / rms_scale)
+    status = PLATEAU_RESOLVED if equivalence.equivalent else PLATEAU_UNRESOLVED
+    return {
+        "plateau_status": status,
+        "plateau_value": _lag_value(plateau, scalar=True),
+        "plateau_stderr": _lag_value(plateau_stderr, scalar=True),
+        "bias_bracket": (
+            _lag_value(np.mean(values[:, 0, :], axis=0), scalar=True),
+            _lag_value(np.mean(values[:, -1, :], axis=0), scalar=True),
+        ),
+        "plateau_diagnostics": {
+            "method": "paired_seed_simultaneous_rms_equivalence",
+            "familywise_method": "bonferroni_paired_student_t",
+            "window_lags": list(selected_lags),
+            "rms_scale": rms_scale,
+            "rms_relative_equivalence_margin": relative_margin,
+            "rms_absolute_equivalence_margin": absolute_margin,
+            "confidence_level": equivalence.confidence_level,
+            "pair_count": equivalence.pair_count,
+            "critical_value": equivalence.critical_value,
+            "observed_max_rms_pairwise_difference": equivalence.observed_max_difference,
+            "observed_max_rms_pairwise_relative_difference": (relative_observed_difference),
+            "simultaneous_rms_upper_bound": equivalence.simultaneous_upper_bound,
+            "simultaneous_rms_relative_upper_bound": relative_upper_bound,
+            "equivalence_pass": equivalence.equivalent,
+            "pairwise_bounds": [
+                {
+                    **bound.to_dict(),
+                    "first_lag": selected_lags[bound.first_index],
+                    "second_lag": selected_lags[bound.second_index],
+                }
+                for bound in equivalence.pairwise_bounds
+            ],
+            "decision": status,
+        },
+    }
+
+
+def _paired_density_equivalence_summary(
+    values: np.ndarray,
+    *,
+    selected_lags: tuple[int, ...],
+    config: PureWalkingConfig,
+) -> dict[str, Any]:
+    """Test a density ladder against a declared practical relative L2 margin."""
+
+    if len(selected_lags) < MIN_AGGREGATE_PLATEAU_LAGS:
+        raise ValueError("aggregate FW plateau requires at least three supported lags")
+    if values.ndim != 3:
+        raise ValueError("density aggregate values must contain one vector per seed and lag")
+    edges = np.asarray(config.density_bin_edges, dtype=float)
+    if edges.ndim != 1 or edges.size != values.shape[2] + 1:
+        raise ValueError("density equivalence requires matching bin edges")
+    widths = np.diff(edges)
+    seed_plateaus = np.mean(values, axis=1)
+    plateau = np.mean(seed_plateaus, axis=0)
+    plateau_stderr = _seed_sem(seed_plateaus)
+    equivalence = simultaneous_pairwise_norm_equivalence(
+        values,
+        feature_weights=widths,
+        scale_vector=plateau,
+        equivalence_margin=config.density_plateau_relative_l2_tolerance,
+        confidence_level=config.plateau_equivalence_confidence_level,
+    )
+    status = PLATEAU_RESOLVED if equivalence.equivalent else PLATEAU_UNRESOLVED
+    return {
+        "plateau_status": status,
+        "plateau_value": _lag_value(plateau, scalar=False),
+        "plateau_stderr": _lag_value(plateau_stderr, scalar=False),
+        "bias_bracket": (
+            _lag_value(np.mean(values[:, 0, :], axis=0), scalar=False),
+            _lag_value(np.mean(values[:, -1, :], axis=0), scalar=False),
+        ),
+        "plateau_diagnostics": {
+            "method": "paired_seed_simultaneous_density_l2_equivalence",
+            "familywise_method": "bonferroni_paired_student_t",
+            "window_lags": list(selected_lags),
+            "density_relative_l2_equivalence_margin": (
+                config.density_plateau_relative_l2_tolerance
+            ),
+            "confidence_level": equivalence.confidence_level,
+            "pair_count": equivalence.pair_count,
+            "critical_value": equivalence.critical_value,
+            "observed_max_density_relative_l2": (equivalence.observed_max_relative_norm),
+            "simultaneous_density_relative_l2_upper_bound": (equivalence.simultaneous_upper_bound),
+            "equivalence_pass": equivalence.equivalent,
+            "pairwise_bounds": [
+                {
+                    **bound.to_dict(),
+                    "first_lag": selected_lags[bound.first_index],
+                    "second_lag": selected_lags[bound.second_index],
+                }
+                for bound in equivalence.pairwise_bounds
+            ],
             "decision": status,
         },
     }

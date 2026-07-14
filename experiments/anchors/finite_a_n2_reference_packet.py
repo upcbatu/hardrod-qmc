@@ -141,6 +141,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.03,
     )
+    parser.add_argument(
+        "--pure-fw-rms-plateau-relative-tolerance",
+        type=float,
+        default=0.001,
+        help=(
+            "Declared practical RMS equivalence margin for the FW lag window. "
+            "The 0.1%% default is an anchor reporting resolution, not a universal "
+            "physical constant."
+        ),
+    )
+    parser.add_argument(
+        "--pure-fw-plateau-equivalence-confidence-level",
+        type=float,
+        default=0.95,
+    )
     parser.add_argument("--reference-grid-points", type=int, default=1400)
     parser.add_argument("--reference-y-max", type=float, default=None)
     parser.add_argument("--energy-abs-tolerance", type=float, default=0.02)
@@ -275,6 +290,8 @@ def _build_payload(
         collection_stride_steps=args.pure_fw_collection_stride_steps,
         density_collection_stride_steps=args.pure_fw_density_collection_stride_steps,
         density_plateau_relative_l2_tolerance=(args.density_plateau_relative_l2_tolerance),
+        rms_plateau_relative_tolerance=args.pure_fw_rms_plateau_relative_tolerance,
+        plateau_equivalence_confidence_level=(args.pure_fw_plateau_equivalence_confidence_level),
         transport_invariant_tests_passed=("lag0_identity",),
     )
     tolerances = FiniteAN2ReferenceTolerances(
@@ -322,7 +339,7 @@ def _build_payload(
         else "one_or_more_reference_cases_unresolved"
     )
     return {
-        "schema_version": "finite_a_n2_reference_packet_v2",
+        "schema_version": "finite_a_n2_reference_packet_v3",
         "status": status,
         "validation": "finite-A DMC/FW against the deterministic N=2 reference",
         "controls": controls_to_dict(controls),

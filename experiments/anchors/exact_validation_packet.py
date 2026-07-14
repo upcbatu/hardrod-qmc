@@ -88,6 +88,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.03,
     )
+    parser.add_argument(
+        "--pure-fw-rms-plateau-relative-tolerance",
+        type=float,
+        default=0.001,
+        help=(
+            "Declared practical RMS equivalence margin for the FW lag window. "
+            "The 0.1%% default is an anchor reporting resolution, not a universal "
+            "physical constant."
+        ),
+    )
+    parser.add_argument(
+        "--pure-fw-plateau-equivalence-confidence-level",
+        type=float,
+        default=0.95,
+    )
     parser.add_argument("--pure-r2-relative-tolerance", type=float, default=0.05)
     parser.add_argument("--pure-rms-relative-tolerance", type=float, default=0.03)
     parser.add_argument("--pure-density-l2-tolerance", type=float, default=0.10)
@@ -204,6 +219,10 @@ def _build_payload(
                 pure_collection_stride_steps=args.pure_fw_collection_stride_steps,
                 pure_density_collection_stride_steps=(args.pure_fw_density_collection_stride_steps),
                 density_plateau_relative_l2_tolerance=(args.density_plateau_relative_l2_tolerance),
+                pure_rms_plateau_relative_tolerance=(args.pure_fw_rms_plateau_relative_tolerance),
+                pure_plateau_equivalence_confidence_level=(
+                    args.pure_fw_plateau_equivalence_confidence_level
+                ),
                 pure_r2_relative_tolerance=args.pure_r2_relative_tolerance,
                 pure_rms_relative_tolerance=args.pure_rms_relative_tolerance,
                 pure_density_l2_tolerance=args.pure_density_l2_tolerance,
@@ -231,7 +250,7 @@ def _build_payload(
         else "one_or_more_exact_references_unresolved"
     )
     return {
-        "schema_version": "dmc_exact_validation_packet_v3",
+        "schema_version": "dmc_exact_validation_packet_v4",
         "status": status,
         "validation": "exact trapped TG and homogeneous hard-rod cases",
         "controls": controls_to_dict(controls),

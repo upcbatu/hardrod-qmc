@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 
+from hrdmc.analysis import relative_density_l2_error
 from hrdmc.artifacts import ensure_dir, write_json_atomic
 from hrdmc.estimators.pure.forward_walking import PureWalkingConfig
 from hrdmc.estimators.pure.forward_walking.results import (
@@ -49,6 +50,8 @@ from hrdmc.workflows.dmc.trapped import (
     make_grid,
     resolve_parallel_workers,
 )
+
+BENCHMARK_PACKET_SCHEMA_VERSION = "dmc_benchmark_packet_v3"
 
 
 def summarize_benchmark_packet_case(
@@ -128,7 +131,7 @@ def summarize_benchmark_packet_case(
         "DMC with scheduled collective RN moves" if collective_rn is not None else "DMC"
     )
     return {
-        "schema_version": "dmc_benchmark_packet_v2",
+        "schema_version": BENCHMARK_PACKET_SCHEMA_VERSION,
         "status": status,
         "case_id": case.case_id,
         "n_particles": case.n_particles,
@@ -298,6 +301,10 @@ def _plateau_config_from_seed_result(
         max_source_family_fraction=float(metadata.get("max_source_family_fraction", 1.0)),
         plateau_sigma_threshold=float(metadata.get("plateau_sigma_threshold", 1.0)),
         plateau_abs_tolerance=float(metadata.get("plateau_abs_tolerance", 0.0)),
+        rms_plateau_relative_tolerance=float(metadata.get("rms_plateau_relative_tolerance", 0.0)),
+        plateau_equivalence_confidence_level=float(
+            metadata.get("plateau_equivalence_confidence_level", 0.95)
+        ),
         plateau_window_lag_count=int(metadata.get("plateau_window_lag_count", 4)),
         density_plateau_relative_l2_tolerance=float(
             metadata.get("density_plateau_relative_l2_tolerance", 0.03)
@@ -397,6 +404,11 @@ def _optional_float(value: Any) -> float:
         return float("nan")
 
 
+def _finite_or_none(value: Any) -> float | None:
+    result = _optional_float(value)
+    return result if np.isfinite(result) else None
+
+
 def estimates(
     stationarity: dict[str, Any],
     pure_summary: dict[str, Any],
@@ -407,6 +419,20 @@ def estimates(
     pure_r2 = float(pure_summary.get("pure_r2", float("nan")))
     pure_rms = float(pure_summary.get("rms_radius", float("nan")))
     observables = pure_summary.get("observables", {})
+    r2_diagnostics = pure_summary.get("r2_aggregate_plateau_diagnostics", {})
+    if not isinstance(r2_diagnostics, dict):
+        r2_diagnostics = {}
+    density_diagnostics = observables.get("density", {}).get("aggregate_plateau_diagnostics", {})
+    if not isinstance(density_diagnostics, dict):
+        density_diagnostics = {}
+    lag_systematic = _finite_or_none(r2_diagnostics.get("simultaneous_rms_upper_bound"))
+    relative_lag_systematic = _finite_or_none(
+        r2_diagnostics.get("simultaneous_rms_relative_upper_bound")
+    )
+    lag_margin = _finite_or_none(r2_diagnostics.get("rms_relative_equivalence_margin"))
+    lag_confidence = _finite_or_none(r2_diagnostics.get("confidence_level"))
+    rms_stderr = pure_summary.get("rms_radius_stderr")
+    density_comparisons = _density_comparison_metrics(observables, stationarity)
     return {
         "energy": {
             "value": stationarity.get("mixed_energy"),
@@ -424,10 +450,21 @@ def estimates(
             "mixed_diagnostic": stationarity.get("r2_radius"),
             "lda_value": lda_rms * lda_rms if np.isfinite(lda_rms) else float("nan"),
             "delta_vs_lda": pure_r2 - lda_rms * lda_rms if np.isfinite(lda_rms) else float("nan"),
+            "rms_lag_systematic_upper_bound": lag_systematic,
+            "rms_lag_systematic_relative_upper_bound": relative_lag_systematic,
         },
         "rms": {
             "value": pure_rms,
-            "stderr": pure_summary.get("rms_radius_stderr"),
+            "stderr": rms_stderr,
+            "mc_statistical_stderr": rms_stderr,
+            "fw_lag_systematic_upper_bound": lag_systematic,
+            "fw_lag_systematic_relative_upper_bound": relative_lag_systematic,
+            "fw_lag_relative_equivalence_margin": lag_margin,
+            "fw_lag_equivalence_confidence_level": lag_confidence,
+            "uncertainty_semantics": (
+                "mc_statistical_stderr and fw_lag_systematic_upper_bound are reported "
+                "separately and are not combined"
+            ),
             "estimator": _fw_estimator_label(observables, "r2"),
             "status": _observable_status(observables, "r2"),
             "mixed_diagnostic": stationarity.get("rms_radius"),
@@ -447,6 +484,20 @@ def estimates(
             "mixed_diagnostic_x": stationarity.get("density_profile", {}).get("x"),
             "mixed_diagnostic_value": stationarity.get("density_profile", {}).get("mixed_n_x"),
             "mixed_diagnostic_density_l2": stationarity.get("density_relative_l2"),
+            "fw_lag_systematic_relative_l2_upper_bound": _finite_or_none(
+                density_diagnostics.get("simultaneous_density_relative_l2_upper_bound")
+            ),
+            "fw_lag_relative_l2_equivalence_margin": _finite_or_none(
+                density_diagnostics.get("density_relative_l2_equivalence_margin")
+            ),
+            "fw_lag_equivalence_confidence_level": _finite_or_none(
+                density_diagnostics.get("confidence_level")
+            ),
+            "comparison_semantics": (
+                "FW-versus-LDA and FW-versus-mixed relative L2 values are descriptive "
+                "shape discrepancies, not acceptance criteria"
+            ),
+            **density_comparisons,
         },
         "pair_distance_density": {
             "status": _observable_status(observables, "pair_distance_density"),
@@ -465,6 +516,57 @@ def estimates(
             "k_values": observables.get("structure_factor", {}).get("k_values"),
         },
     }
+
+
+def _density_comparison_metrics(
+    observables: dict[str, Any],
+    stationarity: dict[str, Any],
+) -> dict[str, float | None]:
+    density = observables.get("density", {})
+    profile = stationarity.get("density_profile", {})
+    try:
+        x = np.asarray(density.get("x"), dtype=float)
+        value = np.asarray(density.get("value"), dtype=float)
+        lda_x = np.asarray(profile.get("x"), dtype=float)
+        lda_value = np.asarray(profile.get("lda_n_x"), dtype=float)
+        mixed_value = np.asarray(profile.get("mixed_n_x"), dtype=float)
+    except (TypeError, ValueError):
+        return {
+            "fw_relative_l2_vs_lda": None,
+            "fw_relative_l2_vs_mixed": None,
+        }
+    if (
+        x.ndim != 1
+        or x.size < 2
+        or value.shape != x.shape
+        or lda_x.ndim != 1
+        or lda_x.size < 2
+        or lda_value.shape != lda_x.shape
+        or mixed_value.shape != lda_x.shape
+        or not np.all(np.isfinite(x))
+        or not np.all(np.isfinite(value))
+        or not np.all(np.isfinite(lda_x))
+        or not np.all(np.isfinite(lda_value))
+        or not np.all(np.isfinite(mixed_value))
+        or not np.all(np.diff(x) > 0.0)
+        or not np.all(np.diff(lda_x) > 0.0)
+    ):
+        return {
+            "fw_relative_l2_vs_lda": None,
+            "fw_relative_l2_vs_mixed": None,
+        }
+    lda_on_x = np.interp(x, lda_x, lda_value)
+    mixed_on_x = np.interp(x, lda_x, mixed_value)
+    try:
+        return {
+            "fw_relative_l2_vs_lda": relative_density_l2_error(x, value, lda_on_x),
+            "fw_relative_l2_vs_mixed": relative_density_l2_error(x, value, mixed_on_x),
+        }
+    except ValueError:
+        return {
+            "fw_relative_l2_vs_lda": None,
+            "fw_relative_l2_vs_mixed": None,
+        }
 
 
 def _result_value(value: np.ndarray, *, scalar: bool) -> float | list[float]:

@@ -76,7 +76,7 @@ def summarize_pure_walking_case(
         ),
     )
     return {
-        "schema_version": "transported_pure_walking_case_v2",
+        "schema_version": "transported_pure_walking_case_v3",
         "case_id": case.case_id,
         "n_particles": case.n_particles,
         "rod_length": case.rod_length,
@@ -167,6 +167,8 @@ def pure_config_metadata(config: PureWalkingConfig) -> dict[str, Any]:
         "center": config.center,
         "plateau_sigma_threshold": config.plateau_sigma_threshold,
         "plateau_abs_tolerance": config.plateau_abs_tolerance,
+        "rms_plateau_relative_tolerance": config.rms_plateau_relative_tolerance,
+        "plateau_equivalence_confidence_level": (config.plateau_equivalence_confidence_level),
         "plateau_window_lag_count": config.plateau_window_lag_count,
         "density_plateau_window_lag_count": config.density_plateau_window_lag_count,
         "density_plateau_relative_l2_tolerance": (config.density_plateau_relative_l2_tolerance),

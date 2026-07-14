@@ -177,6 +177,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
     parser.add_argument("--pure-fw-min-source-ancestor-ess", type=float, default=50.0)
     parser.add_argument("--pure-fw-max-source-family-fraction", type=float, default=0.10)
+    parser.add_argument(
+        "--pure-fw-rms-plateau-relative-tolerance",
+        type=float,
+        default=0.0,
+        help=(
+            "Practical relative RMS-radius equivalence margin for the aggregate "
+            "paired-seed R2 lag window. Zero requires exact equivalence."
+        ),
+    )
+    parser.add_argument(
+        "--pure-fw-plateau-equivalence-confidence-level",
+        type=float,
+        default=0.95,
+        help="Family-wise confidence level for aggregate paired-lag equivalence.",
+    )
     parser.add_argument("--pure-fw-plateau-window-lag-count", type=int, default=4)
     parser.add_argument("--pure-fw-density-plateau-window-lag-count", type=int, default=None)
     parser.add_argument(
@@ -265,6 +280,8 @@ def main() -> None:
         min_walker_weight_ess=args.pure_fw_min_walker_weight_ess,
         min_source_ancestor_ess=args.pure_fw_min_source_ancestor_ess,
         max_source_family_fraction=args.pure_fw_max_source_family_fraction,
+        rms_plateau_relative_tolerance=args.pure_fw_rms_plateau_relative_tolerance,
+        plateau_equivalence_confidence_level=(args.pure_fw_plateau_equivalence_confidence_level),
         plateau_window_lag_count=args.pure_fw_plateau_window_lag_count,
         density_lag_steps=(
             None

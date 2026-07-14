@@ -67,6 +67,7 @@ def _write_scalar_comparison(
             observable=observable,
             precision_status=precision_status,
         )
+    fig.subplots_adjust(top=0.82, bottom=0.12, left=0.07, right=0.985, wspace=0.30)
     paths = save_figure(fig, plot_dir / "scalar_comparison", formats)
     plt.close(fig)
     return paths

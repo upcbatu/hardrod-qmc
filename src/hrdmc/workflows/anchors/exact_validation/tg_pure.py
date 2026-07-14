@@ -23,6 +23,8 @@ def trapped_tg_pure_config(
     collection_stride_steps: int,
     density_collection_stride_steps: int | None,
     density_plateau_relative_l2_tolerance: float,
+    rms_plateau_relative_tolerance: float,
+    plateau_equivalence_confidence_level: float,
 ) -> PureWalkingConfig:
     clean_lags = tuple(sorted(set(int(lag) for lag in lag_steps)))
     clean_observables = tuple(dict.fromkeys(observables))
@@ -42,6 +44,8 @@ def trapped_tg_pure_config(
         density_lag_steps=density_lag_steps,
         density_collection_stride_steps=density_collection_stride_steps,
         density_plateau_relative_l2_tolerance=density_plateau_relative_l2_tolerance,
+        rms_plateau_relative_tolerance=rms_plateau_relative_tolerance,
+        plateau_equivalence_confidence_level=plateau_equivalence_confidence_level,
         block_size_steps=1,
         transport_invariant_tests_passed=("lag0_identity",),
     )
@@ -67,6 +71,8 @@ def pure_config_payload(config: PureWalkingConfig) -> dict[str, Any]:
         "collection_mode": config.collection_mode,
         "plateau_sigma_threshold": config.plateau_sigma_threshold,
         "plateau_abs_tolerance": config.plateau_abs_tolerance,
+        "rms_plateau_relative_tolerance": config.rms_plateau_relative_tolerance,
+        "plateau_equivalence_confidence_level": (config.plateau_equivalence_confidence_level),
         "plateau_window_lag_count": config.plateau_window_lag_count,
         "density_plateau_relative_l2_tolerance": (config.density_plateau_relative_l2_tolerance),
         "schema_atol": config.schema_atol,

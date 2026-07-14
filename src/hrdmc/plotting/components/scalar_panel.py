@@ -47,6 +47,15 @@ def draw_scalar_panel(
     )
     ax.scatter([0.0], [lda], marker="_", s=240, color=tokens.LDA_PREDICTION, zorder=3)
     delta = value - lda
+    diagnostic_lines = [f"Delta={delta:.4g}", sigma_text]
+    lag_bound = finite_float(data.get("fw_lag_systematic_upper_bound"))
+    relative_lag_bound = finite_float(data.get("fw_lag_systematic_relative_upper_bound"))
+    lag_confidence = finite_float(data.get("fw_lag_equivalence_confidence_level"))
+    if observable == "rms" and np.isfinite(lag_bound) and np.isfinite(relative_lag_bound):
+        confidence_text = f"{100.0 * lag_confidence:g}%" if np.isfinite(lag_confidence) else "FW"
+        diagnostic_lines.append(
+            f"{confidence_text} lag bound <= {lag_bound:.3g} ({100.0 * relative_lag_bound:.3g}%)"
+        )
     ax.set_xlim(-0.65, 0.65)
     ax.set_xticks([])
     ax.set_title(title)
@@ -54,7 +63,7 @@ def draw_scalar_panel(
     ax.text(
         0.03,
         0.04,
-        f"Delta={delta:.4g}\n{sigma_text}",
+        "\n".join(diagnostic_lines),
         transform=ax.transAxes,
         ha="left",
         va="bottom",

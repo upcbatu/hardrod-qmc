@@ -68,6 +68,8 @@ def run_trapped_tg_anchor(
     pure_collection_stride_steps: int,
     pure_density_collection_stride_steps: int | None,
     density_plateau_relative_l2_tolerance: float,
+    pure_rms_plateau_relative_tolerance: float,
+    pure_plateau_equivalence_confidence_level: float,
     pure_r2_relative_tolerance: float,
     pure_rms_relative_tolerance: float,
     pure_density_l2_tolerance: float,
@@ -92,6 +94,8 @@ def run_trapped_tg_anchor(
         collection_stride_steps=pure_collection_stride_steps,
         density_collection_stride_steps=pure_density_collection_stride_steps,
         density_plateau_relative_l2_tolerance=density_plateau_relative_l2_tolerance,
+        rms_plateau_relative_tolerance=pure_rms_plateau_relative_tolerance,
+        plateau_equivalence_confidence_level=(pure_plateau_equivalence_confidence_level),
     )
     seed_runs, actual_workers = _run_trapped_tg_seed_runs(
         anchor,

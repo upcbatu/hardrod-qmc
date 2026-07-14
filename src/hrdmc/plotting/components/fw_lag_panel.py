@@ -77,6 +77,13 @@ def draw_fw_lag_panel(ax: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
     status_text = f"status={r2.get('plateau_status', 'unknown')}"
     if selected_lags:
         status_text += "; selected=" + ",".join(str(lag) for lag in sorted(selected_lags))
+    relative_bound = finite_float(r2.get("simultaneous_rms_relative_upper_bound"))
+    relative_margin = finite_float(r2.get("rms_relative_equivalence_margin"))
+    if np.isfinite(relative_bound) and np.isfinite(relative_margin):
+        status_text += (
+            f"; RMS lag bound={100.0 * relative_bound:.3g}%"
+            f" <= margin={100.0 * relative_margin:.3g}%"
+        )
     ax.text(
         0.02,
         0.04,
@@ -120,6 +127,10 @@ def _aggregate_r2_lag_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "plateau_status": pure.get("r2_aggregate_plateau_status", ""),
         "selected_window_lags": diagnostics.get("selected_window_lags", []),
         "excluded_unsupported_lags": diagnostics.get("excluded_unsupported_lags", []),
+        "simultaneous_rms_relative_upper_bound": diagnostics.get(
+            "simultaneous_rms_relative_upper_bound"
+        ),
+        "rms_relative_equivalence_margin": diagnostics.get("rms_relative_equivalence_margin"),
     }
 
 
