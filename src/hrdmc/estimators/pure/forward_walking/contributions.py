@@ -182,8 +182,9 @@ def _com_rao_blackwell_density_profile(
     """
 
     widths = np.diff(edges)
-    dx = float(widths[0])
-    if not np.allclose(widths, dx, rtol=1.0e-12, atol=1.0e-14):
+    dx = float((edges[-1] - edges[0]) / (edges.size - 1))
+    subtraction_roundoff = 32.0 * np.finfo(float).eps * max(1.0, float(np.max(np.abs(edges))))
+    if not np.allclose(widths, dx, rtol=32.0 * np.finfo(float).eps, atol=subtraction_roundoff):
         raise ValueError("com_rao_blackwell density requires uniform bin widths")
     centers = 0.5 * (edges[:-1] + edges[1:])
     relative = samples - np.mean(samples, axis=1, keepdims=True) + float(center)
