@@ -12,7 +12,11 @@ from hrdmc.estimators.pure.forward_walking.contributions import (
     event_contribution_matrix,
     weighted_density_profile,
 )
-from hrdmc.estimators.pure.forward_walking.lag_state import LagState, SlidingLagState
+from hrdmc.estimators.pure.forward_walking.lag_state import (
+    LagState,
+    SlidingDensityLagState,
+    SlidingLagState,
+)
 from hrdmc.estimators.pure.forward_walking.protocols import FloatArray, TransportEventLike
 from hrdmc.estimators.pure.forward_walking.results import (
     PURE_STATUS_NO_BLOCKS,
@@ -38,6 +42,7 @@ class TransportedAuxiliaryForwardWalking:
         self._observable_configs: dict[str, PureWalkingConfig] = {}
         self._observable_dimensions: dict[str, int] = {}
         self._direct_reference_sum: dict[str, FloatArray] = {}
+        self._direct_reference_count: dict[str, int] = {}
         self._event_count = 0
         self._production_event_count = 0
 
@@ -67,6 +72,7 @@ class TransportedAuxiliaryForwardWalking:
             self._lag_states = {
                 observable: {
                     lag: self._new_lag_state(
+                        observable=observable,
                         lag=lag,
                         n_walkers=n_walkers,
                         dimension=self._observable_dimensions[observable],
@@ -80,22 +86,52 @@ class TransportedAuxiliaryForwardWalking:
                 observable: np.zeros(self._observable_dimensions[observable], dtype=float)
                 for observable in self.config.observables
             }
+            self._direct_reference_count = {observable: 0 for observable in self.config.observables}
         elif n_walkers != self._n_walkers:
             raise ValueError("walker count changed inside transported FW stream")
         for observable in self.config.observables:
             if observable == "density":
-                self._direct_reference_sum[observable] += weighted_density_profile(
-                    event.positions,
-                    bin_edges=self.config.density_bin_edges,
-                    walker_weights=normalized,
+                density_config = self._observable_configs[observable]
+                collect_density = (
+                    self._production_event_count % density_config.collection_stride_steps == 0
                 )
-                for state in self._lag_states[observable].values():
+                if collect_density:
+                    density = weighted_density_profile(
+                        event.positions,
+                        bin_edges=self.config.density_bin_edges,
+                        walker_weights=normalized,
+                        source=self.config.density_source,
+                        center=self.config.center,
+                        com_variance=self.config.density_com_variance,
+                        parity_average=self.config.density_parity_average,
+                    )
+                    self._direct_reference_sum[observable] += density
+                    self._direct_reference_count[observable] += 1
+                    self._lag_states[observable][0].step_density(
+                        parent_indices=parent_indices,
+                        parent_is_identity=parent_is_identity,
+                        positions=event.positions,
+                        bin_edges=self.config.density_bin_edges,
+                        normalized_weights=normalized,
+                        density_source=self.config.density_source,
+                        center=self.config.center,
+                        density_com_variance=self.config.density_com_variance,
+                        density_parity_average=self.config.density_parity_average,
+                        precomputed_density=density,
+                    )
+                for lag, state in self._lag_states[observable].items():
+                    if lag == 0:
+                        continue
                     state.step_density(
                         parent_indices=parent_indices,
                         parent_is_identity=parent_is_identity,
                         positions=event.positions,
                         bin_edges=self.config.density_bin_edges,
                         normalized_weights=normalized,
+                        density_source=self.config.density_source,
+                        center=self.config.center,
+                        density_com_variance=self.config.density_com_variance,
+                        density_parity_average=self.config.density_parity_average,
                     )
                 continue
             values = event_contribution_matrix(
@@ -114,6 +150,7 @@ class TransportedAuxiliaryForwardWalking:
                 normalized[:, np.newaxis] * values,
                 axis=0,
             )
+            self._direct_reference_count[observable] += 1
             for state in self._lag_states[observable].values():
                 state.step(
                     parent_indices=parent_indices,
@@ -226,10 +263,14 @@ class TransportedAuxiliaryForwardWalking:
             "density_collection_stride_steps": self.config.density_collection_stride_steps,
             "observable_source": self.config.observable_source,
             "r2_rb_com_variance": self.config.r2_rb_com_variance,
+            "density_source": self.config.density_source,
+            "density_com_variance": self.config.density_com_variance,
+            "density_parity_average": self.config.density_parity_average,
             "observables": list(self.config.observables),
             "transport_mode": self.config.transport_mode,
             "collection_mode": self.config.collection_mode,
             "block_storage_mode": "online_mean_variance_no_block_history",
+            "density_transport_storage_mode": self._density_transport_storage_mode(),
             "plateau_sigma_threshold": self.config.plateau_sigma_threshold,
             "plateau_abs_tolerance": self.config.plateau_abs_tolerance,
             "plateau_window_lag_count": self.config.plateau_window_lag_count,
@@ -255,9 +296,22 @@ class TransportedAuxiliaryForwardWalking:
             return {}
         references: dict[str, LagValue] = {}
         for observable, total in self._direct_reference_sum.items():
-            value = total / self._production_event_count
+            count = self._direct_reference_count.get(observable, 0)
+            if count <= 0:
+                continue
+            value = total / count
             references[observable] = float(value[0]) if value.shape == (1,) else value.copy()
         return references
+
+    def _density_transport_storage_mode(self) -> str:
+        if "density" not in self.config.observables:
+            return "not_applicable"
+        density_config = self.config.for_observable("density")
+        if density_config.collection_mode == "sliding_window" and any(
+            lag > 0 for lag in density_config.lag_steps
+        ):
+            return "source_positions_until_lag_maturity"
+        return "dense_auxiliary"
 
     def _validate_event_convention(self, event: TransportEventLike) -> None:
         convention = event.convention
@@ -271,14 +325,16 @@ class TransportedAuxiliaryForwardWalking:
     def _new_lag_state(
         self,
         *,
+        observable: str,
         lag: int,
         n_walkers: int,
         dimension: int,
         config: PureWalkingConfig,
     ) -> LagState:
-        state_cls = (
-            SlidingLagState if config.collection_mode == "sliding_window" and lag > 0 else LagState
-        )
+        if config.collection_mode == "sliding_window" and lag > 0:
+            state_cls = SlidingDensityLagState if observable == "density" else SlidingLagState
+        else:
+            state_cls = LagState
         return state_cls(
             lag_steps=lag,
             block_size_steps=config.block_size_steps,

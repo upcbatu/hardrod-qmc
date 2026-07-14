@@ -17,6 +17,11 @@ class PureWalkingConfig:
     observables: tuple[str, ...] = ("r2",)
     observable_source: str = "raw_r2"
     r2_rb_com_variance: float | None = None
+    density_source: str = "raw_density"
+    density_com_variance: float | None = None
+    density_parity_average: bool = False
+    density_expected_particles: float | None = None
+    density_accounting_abs_tolerance: float = 5.0e-3
     density_bin_edges: FloatArray | None = None
     pair_bin_edges: FloatArray | None = None
     structure_k_values: FloatArray | None = None
@@ -63,6 +68,24 @@ class PureWalkingConfig:
             not np.isfinite(self.r2_rb_com_variance) or self.r2_rb_com_variance < 0.0
         ):
             raise ValueError("r2_rb_com_variance must be finite and non-negative")
+        if self.density_source not in {"raw_density", "com_rao_blackwell"}:
+            raise ValueError("density_source must be 'raw_density' or 'com_rao_blackwell'")
+        if self.density_source == "com_rao_blackwell" and self.density_com_variance is None:
+            raise ValueError("com_rao_blackwell density requires density_com_variance")
+        if self.density_com_variance is not None and (
+            not np.isfinite(self.density_com_variance) or self.density_com_variance <= 0.0
+        ):
+            raise ValueError("density_com_variance must be finite and positive")
+        if self.density_expected_particles is not None and (
+            not np.isfinite(self.density_expected_particles)
+            or self.density_expected_particles <= 0.0
+        ):
+            raise ValueError("density_expected_particles must be finite and positive")
+        if (
+            not np.isfinite(self.density_accounting_abs_tolerance)
+            or self.density_accounting_abs_tolerance < 0.0
+        ):
+            raise ValueError("density_accounting_abs_tolerance must be finite and non-negative")
         if "density" in self.observables:
             _validate_edges(self.density_bin_edges, "density_bin_edges")
         if "pair_distance_density" in self.observables:
@@ -110,6 +133,14 @@ class PureWalkingConfig:
             raise ValueError("unsupported transport_mode")
         if self.collection_mode not in {"single_point", "sliding_window"}:
             raise ValueError("unsupported transported FW collection_mode")
+        if (
+            "density" in self.observables
+            and (self.density_source != "raw_density" or self.density_parity_average)
+            and self.collection_mode != "sliding_window"
+        ):
+            raise ValueError(
+                "COM-integrated or parity-averaged density requires sliding_window collection"
+            )
         if (
             self.collection_mode == "sliding_window"
             and any(lag > 0 for lag in self.lag_steps)

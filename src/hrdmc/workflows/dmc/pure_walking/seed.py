@@ -92,8 +92,11 @@ def run_pure_walking_seed_run(
         guide_family=guide_family,
         transport_observer=observer,
     )
-    mixed_r2_reference = summary.r2_radius if controls.store_every == 1 else None
-    mixed_rms_reference = summary.rms_radius if controls.store_every == 1 else None
+    use_stored_raw_reference = (
+        controls.store_every == 1 and pure_config.observable_source == "raw_r2"
+    )
+    mixed_r2_reference = summary.r2_radius if use_stored_raw_reference else None
+    mixed_rms_reference = summary.rms_radius if use_stored_raw_reference else None
     pure_result = observer.result(
         mixed_r2_reference=mixed_r2_reference,
         mixed_rms_radius_reference=mixed_rms_reference,
@@ -103,9 +106,13 @@ def run_pure_walking_seed_run(
         dmc_summary=summary,
         pure_result=pure_result,
         schema_reference=(
-            "dmc_summary_store_every_1"
-            if controls.store_every == 1
-            else "internal_fw_event_stream; dmc_summary cadence differs"
+            "dmc_summary_store_every_1_raw_r2"
+            if use_stored_raw_reference
+            else (
+                "internal_fw_event_stream_r2_rb"
+                if pure_config.observable_source == "r2_rb"
+                else "internal_fw_event_stream; dmc_summary cadence differs"
+            )
         ),
     )
 

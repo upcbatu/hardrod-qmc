@@ -6,7 +6,6 @@ import numpy as np
 
 from hrdmc.estimators.pure.forward_walking.contributions import (
     add_density_profile_to_auxiliary,
-    density_profile_matrix,
     weighted_density_profile,
 )
 from hrdmc.estimators.pure.forward_walking.protocols import FloatArray, IntArray
@@ -110,15 +109,31 @@ class LagState:
         positions: FloatArray,
         bin_edges: FloatArray | None,
         normalized_weights: FloatArray,
+        density_source: str = "raw_density",
+        center: float = 0.0,
+        density_com_variance: float | None = None,
+        density_parity_average: bool = False,
+        precomputed_density: FloatArray | None = None,
     ) -> None:
         weight_ess = float(1.0 / np.sum(normalized_weights * normalized_weights))
         self.min_weight_ess = min(self.min_weight_ess, weight_ess)
         if self.lag_steps == 0:
-            self.weighted_collect_sum += weighted_density_profile(
-                positions,
-                bin_edges=bin_edges,
-                walker_weights=normalized_weights,
+            density = (
+                weighted_density_profile(
+                    positions,
+                    bin_edges=bin_edges,
+                    walker_weights=normalized_weights,
+                    source=density_source,
+                    center=center,
+                    com_variance=density_com_variance,
+                    parity_average=density_parity_average,
+                )
+                if precomputed_density is None
+                else np.asarray(precomputed_density, dtype=float)
             )
+            if density.shape != (self.dimension,) or not np.all(np.isfinite(density)):
+                raise ValueError("precomputed density does not match the lag-state grid")
+            self.weighted_collect_sum += density
             self.collect_count += 1
             if self.collect_count == self.block_size_steps:
                 self._record_block(
@@ -128,6 +143,9 @@ class LagState:
                 )
                 self._reset_window()
             return
+
+        if density_source != "raw_density" or density_parity_average:
+            raise ValueError("non-raw positive-lag density requires sliding_window collection")
 
         if self.collect_count == 0 and self.delay_count == 0:
             self.source_ancestors = np.arange(self.n_walkers, dtype=np.int64)
@@ -312,44 +330,6 @@ class SlidingLagState(LagState):
             self._append_active(observable_values, weight_ess)
         self.event_index += 1
 
-    def step_density(
-        self,
-        *,
-        parent_indices: IntArray,
-        parent_is_identity: bool,
-        positions: FloatArray,
-        bin_edges: FloatArray | None,
-        normalized_weights: FloatArray,
-    ) -> None:
-        weight_ess = float(1.0 / np.sum(normalized_weights * normalized_weights))
-        should_collect = self._should_collect()
-        if self.lag_steps == 0:
-            block_value = weighted_density_profile(
-                positions,
-                bin_edges=bin_edges,
-                walker_weights=normalized_weights,
-            )
-            self._record_block_with_weight_ess(
-                block_value,
-                weight_ess,
-                normalized_weights=normalized_weights,
-                source_ancestors=np.arange(self.n_walkers, dtype=np.int64),
-            )
-            self.event_index += 1
-            return
-        self._advance_active(
-            parent_indices=parent_indices,
-            parent_is_identity=parent_is_identity,
-            normalized_weights=normalized_weights,
-            weight_ess=weight_ess,
-        )
-        if should_collect:
-            self._append_active(
-                density_profile_matrix(positions, bin_edges=bin_edges),
-                weight_ess,
-            )
-        self.event_index += 1
-
     def _advance_active(
         self,
         *,
@@ -406,6 +386,115 @@ class SlidingLagState(LagState):
 
     def _should_collect(self) -> bool:
         return self.event_index % self.collection_stride_steps == 0
+
+
+@dataclass
+class SlidingDensityLagState(LagState):
+    """Sliding density FW state that transports source positions, not dense histograms."""
+
+    active_positions: list[FloatArray] = field(default_factory=list)
+    active_ages: list[int] = field(default_factory=list)
+    active_weight_ess_min: list[float] = field(default_factory=list)
+    active_source_ancestors: list[IntArray] = field(default_factory=list)
+    event_index: int = 0
+
+    def step_density(
+        self,
+        *,
+        parent_indices: IntArray,
+        parent_is_identity: bool,
+        positions: FloatArray,
+        bin_edges: FloatArray | None,
+        normalized_weights: FloatArray,
+        density_source: str = "raw_density",
+        center: float = 0.0,
+        density_com_variance: float | None = None,
+        density_parity_average: bool = False,
+        precomputed_density: FloatArray | None = None,
+    ) -> None:
+        if precomputed_density is not None:
+            raise ValueError("positive-lag density transports source positions, not profiles")
+        if self.lag_steps <= 0:
+            raise ValueError("sliding density position transport requires a positive lag")
+        weight_ess = float(1.0 / np.sum(normalized_weights * normalized_weights))
+        should_collect = self.event_index % self.collection_stride_steps == 0
+        self._advance_active_density(
+            parent_indices=parent_indices,
+            parent_is_identity=parent_is_identity,
+            normalized_weights=normalized_weights,
+            weight_ess=weight_ess,
+            bin_edges=bin_edges,
+            density_source=density_source,
+            center=center,
+            density_com_variance=density_com_variance,
+            density_parity_average=density_parity_average,
+        )
+        if should_collect:
+            self.active_positions.append(np.asarray(positions, dtype=float).copy())
+            self.active_ages.append(0)
+            self.active_weight_ess_min.append(weight_ess)
+            self.active_source_ancestors.append(np.arange(self.n_walkers, dtype=np.int64))
+        self.event_index += 1
+
+    def _advance_active_density(
+        self,
+        *,
+        parent_indices: IntArray,
+        parent_is_identity: bool,
+        normalized_weights: FloatArray,
+        weight_ess: float,
+        bin_edges: FloatArray | None,
+        density_source: str,
+        center: float,
+        density_com_variance: float | None,
+        density_parity_average: bool,
+    ) -> None:
+        if not self.active_positions:
+            return
+        next_positions: list[FloatArray] = []
+        next_ages: list[int] = []
+        next_weight_ess: list[float] = []
+        next_source_ancestors: list[IntArray] = []
+        for source_positions, age, ess_min, source_ancestors in zip(
+            self.active_positions,
+            self.active_ages,
+            self.active_weight_ess_min,
+            self.active_source_ancestors,
+            strict=True,
+        ):
+            transported_positions = (
+                source_positions if parent_is_identity else source_positions[parent_indices]
+            )
+            transported_ancestors = (
+                source_ancestors if parent_is_identity else source_ancestors[parent_indices]
+            )
+            new_age = age + 1
+            new_ess_min = min(ess_min, weight_ess)
+            if new_age >= self.lag_steps:
+                block_value = weighted_density_profile(
+                    transported_positions,
+                    bin_edges=bin_edges,
+                    walker_weights=normalized_weights,
+                    source=density_source,
+                    center=center,
+                    com_variance=density_com_variance,
+                    parity_average=density_parity_average,
+                )
+                self._record_block_with_weight_ess(
+                    block_value,
+                    new_ess_min,
+                    normalized_weights=normalized_weights,
+                    source_ancestors=transported_ancestors,
+                )
+            else:
+                next_positions.append(transported_positions)
+                next_ages.append(new_age)
+                next_weight_ess.append(new_ess_min)
+                next_source_ancestors.append(transported_ancestors)
+        self.active_positions = next_positions
+        self.active_ages = next_ages
+        self.active_weight_ess_min = next_weight_ess
+        self.active_source_ancestors = next_source_ancestors
 
 
 def _source_family_diagnostics(

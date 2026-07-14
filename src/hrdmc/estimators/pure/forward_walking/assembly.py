@@ -11,6 +11,7 @@ from hrdmc.estimators.pure.forward_walking.diagnostics import (
     schema_status,
 )
 from hrdmc.estimators.pure.forward_walking.results import (
+    SCHEMA_INVALID,
     LagValue,
     TransportedLagResult,
 )
@@ -45,11 +46,17 @@ def assemble_observable_result_from_stats(
         if count <= 0:
             dim = _observable_dimension(config, observable)
             nan_vec = np.full(dim, np.nan, dtype=float)
-            values_by_lag[lag] = _as_result_value(nan_vec)
-            stderr_by_lag[lag] = _as_result_value(nan_vec)
+            values_by_lag[lag] = _as_result_value(nan_vec, scalar=observable == "r2")
+            stderr_by_lag[lag] = _as_result_value(nan_vec, scalar=observable == "r2")
         else:
-            values_by_lag[lag] = _as_result_value(block_mean_by_lag[lag])
-            stderr_by_lag[lag] = _as_result_value(block_stderr_by_lag[lag])
+            values_by_lag[lag] = _as_result_value(
+                block_mean_by_lag[lag],
+                scalar=observable == "r2",
+            )
+            stderr_by_lag[lag] = _as_result_value(
+                block_stderr_by_lag[lag],
+                scalar=observable == "r2",
+            )
 
     rms_by_lag = None
     rms_stderr_by_lag = None
@@ -70,6 +77,13 @@ def assemble_observable_result_from_stats(
         mixed_r2_reference=mixed_r2_reference if observable == "r2" else None,
         mixed_rms_radius_reference=mixed_rms_radius_reference if observable == "r2" else None,
     )
+    density_accounting = _density_accounting_metadata(
+        config=config,
+        observable=observable,
+        values_by_lag=values_by_lag,
+    )
+    if density_accounting.get("density_accounting_status") == ("density_normalization_mismatch"):
+        schema = SCHEMA_INVALID
     (
         plateau_value,
         plateau_stderr,
@@ -102,6 +116,7 @@ def assemble_observable_result_from_stats(
             "plateau_sigma_threshold": config.plateau_sigma_threshold,
             "plateau_abs_tolerance": config.plateau_abs_tolerance,
             "plateau_window_lag_count": config.plateau_window_lag_count,
+            "density_plateau_relative_l2_tolerance": (config.density_plateau_relative_l2_tolerance),
         }
     )
     metadata.update(
@@ -112,6 +127,7 @@ def assemble_observable_result_from_stats(
             mixed_observable_reference=mixed_observable_reference,
         )
     )
+    metadata.update(density_accounting)
     genealogy_status, genealogy_diagnostics = genealogy_support_status(
         config=config,
         block_count_by_lag=block_count_by_lag,
@@ -149,9 +165,9 @@ def assemble_observable_result_from_stats(
     )
 
 
-def _as_result_value(value: FloatArray) -> LagValue:
+def _as_result_value(value: FloatArray, *, scalar: bool) -> LagValue:
     arr = np.asarray(value, dtype=float)
-    if arr.shape == (1,):
+    if scalar and arr.shape == (1,):
         return float(arr[0])
     return arr.copy()
 
@@ -186,13 +202,24 @@ def _observable_dimension(config: PureWalkingConfig, observable: str) -> int:
 
 def _observable_metadata(config: PureWalkingConfig, observable: str) -> dict[str, object]:
     if observable == "density":
-        return {"bin_edges": np.asarray(config.density_bin_edges, dtype=float).tolist()}
+        return {
+            "bin_edges": np.asarray(config.density_bin_edges, dtype=float).tolist(),
+            "density_source": config.density_source,
+            "density_com_variance": config.density_com_variance,
+            "density_parity_average": config.density_parity_average,
+            "density_expected_particles": config.density_expected_particles,
+            "density_accounting_abs_tolerance": config.density_accounting_abs_tolerance,
+        }
     if observable == "pair_distance_density":
         return {"bin_edges": np.asarray(config.pair_bin_edges, dtype=float).tolist()}
     if observable == "structure_factor":
         return {"k_values": np.asarray(config.structure_k_values, dtype=float).tolist()}
     if observable == "r2":
-        return {"rms_radius": "sqrt(aggregated_pure_r2)"}
+        return {
+            "rms_radius": "sqrt(aggregated_pure_r2)",
+            "observable_source": config.observable_source,
+            "r2_rb_com_variance": config.r2_rb_com_variance,
+        }
     return {}
 
 
@@ -229,3 +256,37 @@ def _schema_reference_metadata(
     metadata["lag0_identity_metric"] = float(np.max(np.abs(lag0 - reference)))
     metadata["lag0_identity_norm"] = "max_abs"
     return metadata
+
+
+def _density_accounting_metadata(
+    *,
+    config: PureWalkingConfig,
+    observable: str,
+    values_by_lag: dict[int, LagValue],
+) -> dict[str, object]:
+    if observable != "density" or config.density_expected_particles is None:
+        return {"density_accounting_status": "not_evaluated"}
+    widths = np.diff(np.asarray(config.density_bin_edges, dtype=float))
+    integrals: dict[int, float] = {}
+    errors: dict[int, float] = {}
+    failed = False
+    for lag, value in values_by_lag.items():
+        density = np.asarray(value, dtype=float)
+        if density.shape != widths.shape or not np.all(np.isfinite(density)):
+            continue
+        integral = float(np.sum(density * widths))
+        error = abs(integral - config.density_expected_particles)
+        integrals[lag] = integral
+        errors[lag] = error
+        failed = failed or (
+            not np.isfinite(error) or error > config.density_accounting_abs_tolerance
+        )
+    status = "density_normalization_mismatch" if failed else "accepted"
+    if not integrals:
+        status = "not_evaluated"
+    return {
+        "density_accounting_status": status,
+        "density_integral_by_lag": integrals,
+        "density_accounting_abs_error_by_lag": errors,
+        "density_accounting_abs_error_max": max(errors.values(), default=float("nan")),
+    }

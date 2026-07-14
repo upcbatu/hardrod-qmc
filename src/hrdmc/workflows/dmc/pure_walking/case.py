@@ -150,6 +150,11 @@ def pure_config_metadata(config: PureWalkingConfig) -> dict[str, Any]:
         "observables": list(config.observables),
         "observable_source": config.observable_source,
         "r2_rb_com_variance": config.r2_rb_com_variance,
+        "density_source": config.density_source,
+        "density_com_variance": config.density_com_variance,
+        "density_parity_average": config.density_parity_average,
+        "density_expected_particles": config.density_expected_particles,
+        "density_accounting_abs_tolerance": config.density_accounting_abs_tolerance,
         "min_block_count": config.min_block_count,
         "min_walker_weight_ess": config.min_walker_weight_ess,
         "min_source_ancestor_ess": config.min_source_ancestor_ess,
@@ -184,6 +189,16 @@ def pure_config_for_case(
             ([grid[0] - 0.5 * dx], 0.5 * (grid[:-1] + grid[1:]), [grid[-1] + 0.5 * dx])
         )
         resolved = replace(resolved, density_bin_edges=edges)
+    if "density" in resolved.observables:
+        expected_particles = float(case.n_particles)
+        if resolved.density_expected_particles is not None and not np.isclose(
+            resolved.density_expected_particles,
+            expected_particles,
+            rtol=0.0,
+            atol=1.0e-12,
+        ):
+            raise ValueError("density_expected_particles does not match the trapped case")
+        resolved = replace(resolved, density_expected_particles=expected_particles)
     if resolved.observable_source == "r2_rb":
         expected_variance = harmonic_com_ground_variance(case.n_particles, case.omega)
         if resolved.r2_rb_com_variance is not None and not np.isclose(
@@ -194,5 +209,15 @@ def pure_config_for_case(
         ):
             raise ValueError("r2_rb_com_variance does not match the trapped COM ground state")
         resolved = replace(resolved, r2_rb_com_variance=expected_variance)
+    if resolved.density_source == "com_rao_blackwell":
+        expected_variance = harmonic_com_ground_variance(case.n_particles, case.omega)
+        if resolved.density_com_variance is not None and not np.isclose(
+            resolved.density_com_variance,
+            expected_variance,
+            rtol=0.0,
+            atol=1.0e-12,
+        ):
+            raise ValueError("density_com_variance does not match the trapped COM ground state")
+        resolved = replace(resolved, density_com_variance=expected_variance)
     resolved.validate()
     return resolved
