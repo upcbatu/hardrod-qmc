@@ -83,8 +83,7 @@ class FinalMatrixConfig:
     parallel_workers: int = 5
     plot_formats: str = "png,pdf"
     output_root: Path = DEFAULT_OUTPUT_ROOT
-    n10_a0p1_guide_validation_summary: Path | None = None
-    n20_a0p1_guide_validation_summary: Path | None = None
+    guide_validation_root: Path | None = None
     dry_run: bool = False
     force: bool = False
     continue_on_error: bool = False
@@ -179,11 +178,7 @@ def run_final_matrix(config: FinalMatrixConfig, *, repo_root: Path) -> FinalMatr
     plans: list[_PlannedRow] = []
     for case_id in cases:
         case_output_dir = output_root / case_id
-        method = _row_method(
-            case_id,
-            n10_a0p1_guide_validation_summary=(config.n10_a0p1_guide_validation_summary),
-            n20_a0p1_guide_validation_summary=(config.n20_a0p1_guide_validation_summary),
-        )
+        method = _row_method(case_id, guide_validation_root=config.guide_validation_root)
         grid_plan = _case_grid_plan(config, case_id, method)
         completed, completion_errors = _verified_completed_row(
             config,
@@ -534,7 +529,7 @@ def _write_matrix_manifest(
     write_json(
         path,
         {
-            "schema_version": "hardrod_final_matrix_v5",
+            "schema_version": "hardrod_final_matrix_v6",
             "requested_cases": cases,
             "seeds": seeds,
             "implementation": implementation,
@@ -576,24 +571,21 @@ def _write_matrix_manifest(
                     "a_over_aho_0": (
                         "dt=0.0025, walkers=256, reduced-TG default guide, no drift limiter"
                     ),
-                    "N10_a_over_aho_0p1": (
-                        "dt=0.0025, walkers=256, validated contact-guide parameters, Umrigar drift"
-                    ),
-                    "N20_a_over_aho_0p1": (
-                        "dt=0.0025, walkers=256, validated contact-guide parameters, Umrigar drift"
+                    "a_over_aho_0p1": (
+                        "dt=0.0025, walkers=256, case-validated optimized guide, Umrigar drift"
                     ),
                     "N10_a_over_aho_1": (
-                        "dt=0.00125, walkers=512, relative-alpha=1.5, Umrigar drift; "
+                        "dt=0.00125, walkers=512, case-validated optimized guide, Umrigar drift; "
                         "R2 physical lags=(0,4,6,8,10)"
                     ),
                     "N20_a_over_aho_1": (
-                        "dt=0.000625, walkers=512, relative-alpha=1.86658, Umrigar drift"
+                        "dt=0.000625, walkers=512, case-validated optimized guide, Umrigar drift"
                     ),
                     "N10_a_over_aho_10": (
-                        "dt=0.000125, walkers=256, relative-alpha=5.59585, Umrigar drift"
+                        "dt=0.000125, walkers=256, case-validated optimized guide, Umrigar drift"
                     ),
                     "N20_a_over_aho_10": (
-                        "dt=0.00025, walkers=512, relative-alpha=7.01001, Umrigar drift"
+                        "dt=0.00025, walkers=512, case-validated optimized guide, Umrigar drift"
                     ),
                     "density_fw": (
                         "physical lags=(0,2,4,7); snapshot interval=0.1 "
@@ -627,11 +619,7 @@ def _discover_completed_rows(
             parse_case(case_id)
         except ValueError:
             continue
-        method = _row_method(
-            case_id,
-            n10_a0p1_guide_validation_summary=(config.n10_a0p1_guide_validation_summary),
-            n20_a0p1_guide_validation_summary=(config.n20_a0p1_guide_validation_summary),
-        )
+        method = _row_method(case_id, guide_validation_root=config.guide_validation_root)
         grid_plan = _case_grid_plan(config, case_id, method)
         completed, _errors = _verified_completed_row(
             config,
@@ -839,8 +827,7 @@ def _steps_for_tau(tau: float, dt: float) -> int:
 def _row_method(
     case_id: str,
     *,
-    n10_a0p1_guide_validation_summary: Path | None,
-    n20_a0p1_guide_validation_summary: Path | None,
+    guide_validation_root: Path | None,
 ) -> RowMethod:
     case = parse_case(case_id)
     guide_family = "reduced-tg"
@@ -853,14 +840,14 @@ def _row_method(
     if math.isclose(case.rod_length, 10.0, rel_tol=0.0, abs_tol=1e-12):
         dt = 0.000125 if case.n_particles == 10 else 0.00025
         walkers = 512 if case.n_particles == 20 else DEFAULT_WALKERS
-        relative_alpha = 5.59585 if case.n_particles == 10 else 7.01001
+        relative_alpha = None
         drift_limiter = "umrigar"
         initialization_mode = "lda-rms-lattice"
         preburn_steps = 0
     elif math.isclose(case.rod_length, 1.0, rel_tol=0.0, abs_tol=1e-12):
         dt = 0.000625 if case.n_particles == 20 else 0.00125
         walkers = 512 if case.n_particles == 20 else DEFAULT_WALKERS
-        relative_alpha = 1.5 if case.n_particles == 10 else 1.86658
+        relative_alpha = None
         drift_limiter = "umrigar"
         initialization_mode = "lda-rms-lattice"
         preburn_steps = 0
@@ -871,35 +858,33 @@ def _row_method(
         dt = DEFAULT_DT
         walkers = DEFAULT_WALKERS
         relative_alpha = None
-        is_a0p1 = math.isclose(case.rod_length, 0.1, rel_tol=0.0, abs_tol=1e-12)
-        drift_limiter = "umrigar" if is_a0p1 else "none"
+        is_finite_rod = case.rod_length > 0.0
+        drift_limiter = "umrigar" if is_finite_rod else "none"
         initialization_mode = DEFAULT_INITIALIZATION_MODE
         preburn_steps = DEFAULT_BREATHING_PREBURN_STEPS
-        if is_a0p1:
-            if case.n_particles == 10:
-                guide_validation_summary = n10_a0p1_guide_validation_summary
-            elif case.n_particles == 20:
-                guide_validation_summary = n20_a0p1_guide_validation_summary
-            else:
-                raise ValueError(
-                    f"{case.case_id} has no final-matrix contact-guide calibration slot"
-                )
-            if guide_validation_summary is None:
-                raise ValueError(
-                    f"{case.case_id} requires --n{case.n_particles}-a0p1-guide-"
-                    "validation-summary from the completed contact-guide calibration chain"
-                )
-            validated = load_validated_contact_guide(
-                guide_validation_summary,
-                case=case,
+    if case.rod_length > 0.0:
+        if guide_validation_root is None:
+            raise ValueError(
+                f"{case.case_id} requires --guide-validation-root with a validated "
+                "case-specific optimized guide"
             )
-            guide_family = "contact-corrected-reduced-tg"
-            relative_alpha = validated.relative_alpha
-            contact_beta = validated.contact_beta
-            guide_parameter_source = str(validated.summary_path)
-            guide_parameter_source_sha256 = validated.summary_sha256
-            guide_parameter_source_manifest_sha256 = validated.manifest_sha256
-            guide_parameter_source_identity_fingerprint = validated.identity_fingerprint
+        guide_validation_summary = (
+            guide_validation_root.expanduser().resolve()
+            / case.case_id
+            / "validation"
+            / "summary.json"
+        )
+        validated = load_validated_contact_guide(
+            guide_validation_summary,
+            case=case,
+        )
+        guide_family = "contact-corrected-reduced-tg"
+        relative_alpha = validated.relative_alpha
+        contact_beta = validated.contact_beta
+        guide_parameter_source = str(validated.summary_path)
+        guide_parameter_source_sha256 = validated.summary_sha256
+        guide_parameter_source_manifest_sha256 = validated.manifest_sha256
+        guide_parameter_source_identity_fingerprint = validated.identity_fingerprint
     return RowMethod(
         dt=dt,
         walkers=walkers,

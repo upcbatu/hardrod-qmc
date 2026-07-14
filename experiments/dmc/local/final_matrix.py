@@ -75,16 +75,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--plot-formats", default="png,pdf")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument(
-        "--n10-a0p1-guide-validation-summary",
+        "--guide-validation-root",
         type=Path,
         default=None,
-        help=("Validated contact-guide summary required when N10_A0.1 is requested."),
-    )
-    parser.add_argument(
-        "--n20-a0p1-guide-validation-summary",
-        type=Path,
-        default=None,
-        help=("Validated contact-guide summary required when N20_A0.1 is requested."),
+        help=(
+            "Root containing <case>/validation/summary.json artifacts for every "
+            "requested finite-rod row."
+        ),
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
