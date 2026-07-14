@@ -16,6 +16,8 @@ from hrdmc.artifacts import (
     verify_run_manifest,
     write_json,
 )
+from hrdmc.workflows.dmc.benchmark_packet.case import BENCHMARK_PACKET_SCHEMA_VERSION
+from hrdmc.workflows.dmc.guide_validation import load_validated_contact_guide
 from hrdmc.workflows.dmc.trapped import (
     DMCRunControls,
     controls_to_dict,
@@ -34,6 +36,11 @@ DEFAULT_INITIALIZATION_MODE = "lda-rms-logspread"
 DEFAULT_INIT_WIDTH_LOG_SIGMA = 0.10
 DEFAULT_BREATHING_PREBURN_STEPS = 1000
 DEFAULT_BREATHING_PREBURN_LOG_STEP = 0.04
+# Practical thesis reporting resolution for RMS lag equivalence.  This is a
+# case-study numerical criterion, not a universal hard-rod or DMC constant;
+# Monte Carlo uncertainty and the measured lag bound remain separate outputs.
+DEFAULT_RMS_PLATEAU_RELATIVE_TOLERANCE = 1.0e-3
+DEFAULT_PLATEAU_EQUIVALENCE_CONFIDENCE_LEVEL = 0.95
 LOCAL_STEP_METHOD = "metropolis"
 PURE_FW_R2_SOURCE = "r2_rb"
 PURE_FW_DENSITY_SOURCE = "com_rao_blackwell"
@@ -42,6 +49,7 @@ PURE_FW_DENSITY_SOURCE = "com_rao_blackwell"
 # the earlier seven-unit ladder. The longest lag is 50 oscillator-time units,
 # while production retains support through tau_prod=480.
 FW_LAG_TIMES = (0.0, 5.0, 10.0, 20.0, 30.0, 40.0, 50.0)
+N10_A1_FW_LAG_TIMES = (0.0, 4.0, 6.0, 8.0, 10.0)
 # Density needs enough independent transported snapshots to resolve finite-N
 # shell structure. Its shorter ladder keeps large density histograms bounded.
 DENSITY_FW_LAG_TIMES = (0.0, 2.0, 4.0, 7.0)
@@ -67,10 +75,16 @@ class FinalMatrixConfig:
     pure_fw_min_walker_weight_ess: float = 30.0
     pure_fw_min_source_ancestor_ess: float = 50.0
     pure_fw_max_source_family_fraction: float = 0.10
+    pure_fw_rms_plateau_relative_tolerance: float = DEFAULT_RMS_PLATEAU_RELATIVE_TOLERANCE
+    pure_fw_plateau_equivalence_confidence_level: float = (
+        DEFAULT_PLATEAU_EQUIVALENCE_CONFIDENCE_LEVEL
+    )
     pure_fw_density_plateau_window_lag_count: int = 3
     parallel_workers: int = 5
     plot_formats: str = "png,pdf"
     output_root: Path = DEFAULT_OUTPUT_ROOT
+    n10_a0p1_guide_validation_summary: Path | None = None
+    n20_a0p1_guide_validation_summary: Path | None = None
     dry_run: bool = False
     force: bool = False
     continue_on_error: bool = False
@@ -123,7 +137,13 @@ class RowMethod:
     dt: float
     walkers: int
     drift_limiter: str
+    guide_family: str
     relative_alpha: float | None
+    contact_beta: float | None
+    guide_parameter_source: str
+    guide_parameter_source_sha256: str | None
+    guide_parameter_source_manifest_sha256: str | None
+    guide_parameter_source_identity_fingerprint: str | None
     initialization_mode: str
     init_width_log_sigma: float
     breathing_preburn_steps: int
@@ -159,7 +179,11 @@ def run_final_matrix(config: FinalMatrixConfig, *, repo_root: Path) -> FinalMatr
     plans: list[_PlannedRow] = []
     for case_id in cases:
         case_output_dir = output_root / case_id
-        method = _row_method(case_id)
+        method = _row_method(
+            case_id,
+            n10_a0p1_guide_validation_summary=(config.n10_a0p1_guide_validation_summary),
+            n20_a0p1_guide_validation_summary=(config.n20_a0p1_guide_validation_summary),
+        )
         grid_plan = _case_grid_plan(config, case_id, method)
         completed, completion_errors = _verified_completed_row(
             config,
@@ -302,6 +326,15 @@ def _validate_config(config: FinalMatrixConfig) -> None:
         raise ValueError("pure_fw_min_source_ancestor_ess must be positive")
     if not 0.0 < config.pure_fw_max_source_family_fraction <= 1.0:
         raise ValueError("pure_fw_max_source_family_fraction must lie in (0, 1]")
+    if (
+        not math.isfinite(config.pure_fw_rms_plateau_relative_tolerance)
+        or config.pure_fw_rms_plateau_relative_tolerance < 0.0
+    ):
+        raise ValueError("pure_fw_rms_plateau_relative_tolerance must be finite and non-negative")
+    if not 0.0 < config.pure_fw_plateau_equivalence_confidence_level < 1.0:
+        raise ValueError(
+            "pure_fw_plateau_equivalence_confidence_level must lie strictly between zero and one"
+        )
     if config.pure_fw_density_plateau_window_lag_count <= 0:
         raise ValueError("pure_fw_density_plateau_window_lag_count must be positive")
     if not [value.strip() for value in config.plot_formats.split(",") if value.strip()]:
@@ -425,8 +458,6 @@ def _benchmark_command(
         str(method.breathing_preburn_steps),
         "--breathing-preburn-log-step",
         _format_number(method.breathing_preburn_log_step),
-        "--guide-family",
-        "reduced-tg",
         "--ess-resample-fraction",
         _format_number(config.ess_resample_fraction),
         "--pure-fw-lags",
@@ -452,6 +483,10 @@ def _benchmark_command(
         _format_number(config.pure_fw_min_source_ancestor_ess),
         "--pure-fw-max-source-family-fraction",
         _format_number(config.pure_fw_max_source_family_fraction),
+        "--pure-fw-rms-plateau-relative-tolerance",
+        _format_number(config.pure_fw_rms_plateau_relative_tolerance),
+        "--pure-fw-plateau-equivalence-confidence-level",
+        _format_number(config.pure_fw_plateau_equivalence_confidence_level),
         "--pure-fw-density-plateau-window-lag-count",
         str(config.pure_fw_density_plateau_window_lag_count),
         "--parallel-workers",
@@ -461,7 +496,11 @@ def _benchmark_command(
         "--output-dir",
         str(output_dir),
     ]
-    if method.relative_alpha is not None:
+    if method.guide_parameter_source != "explicit":
+        command.extend(("--guide-validation-summary", method.guide_parameter_source))
+    else:
+        command.extend(("--guide-family", method.guide_family))
+    if method.relative_alpha is not None and method.guide_parameter_source == "explicit":
         command.extend(("--relative-alpha", _format_number(method.relative_alpha)))
     if config.progress:
         command.append("--progress")
@@ -495,14 +534,15 @@ def _write_matrix_manifest(
     write_json(
         path,
         {
-            "schema_version": "hardrod_final_matrix_v3",
+            "schema_version": "hardrod_final_matrix_v5",
             "requested_cases": cases,
             "seeds": seeds,
             "implementation": implementation,
             "invocation_settings": {
                 "local_step_method": LOCAL_STEP_METHOD,
                 "drift_limiter_policy": {
-                    "a_over_aho_0_and_0p1": "none",
+                    "a_over_aho_0": "none",
+                    "a_over_aho_0p1": "umrigar",
                     "a_over_aho_1_and_10": "umrigar",
                 },
                 "burn_tau": config.burn_tau,
@@ -517,6 +557,12 @@ def _write_matrix_manifest(
                 "pure_fw_min_walker_weight_ess": config.pure_fw_min_walker_weight_ess,
                 "pure_fw_min_source_ancestor_ess": (config.pure_fw_min_source_ancestor_ess),
                 "pure_fw_max_source_family_fraction": (config.pure_fw_max_source_family_fraction),
+                "pure_fw_rms_plateau_relative_tolerance": (
+                    config.pure_fw_rms_plateau_relative_tolerance
+                ),
+                "pure_fw_plateau_equivalence_confidence_level": (
+                    config.pure_fw_plateau_equivalence_confidence_level
+                ),
                 "pure_fw_density_plateau_window_lag_count": (
                     config.pure_fw_density_plateau_window_lag_count
                 ),
@@ -527,9 +573,18 @@ def _write_matrix_manifest(
                 "plot_formats": config.plot_formats,
                 "calculation": "metropolis_corrected_drift_diffusion_dmc",
                 "row_method_policy": {
-                    "a_over_aho_0_and_0p1": ("dt=0.0025, walkers=256, reduced-TG default guide"),
+                    "a_over_aho_0": (
+                        "dt=0.0025, walkers=256, reduced-TG default guide, no drift limiter"
+                    ),
+                    "N10_a_over_aho_0p1": (
+                        "dt=0.0025, walkers=256, validated contact-guide parameters, Umrigar drift"
+                    ),
+                    "N20_a_over_aho_0p1": (
+                        "dt=0.0025, walkers=256, validated contact-guide parameters, Umrigar drift"
+                    ),
                     "N10_a_over_aho_1": (
-                        "dt=0.00125, walkers=256, relative-alpha=1.5, Umrigar drift"
+                        "dt=0.00125, walkers=512, relative-alpha=1.5, Umrigar drift; "
+                        "R2 physical lags=(0,4,6,8,10)"
                     ),
                     "N20_a_over_aho_1": (
                         "dt=0.000625, walkers=512, relative-alpha=1.86658, Umrigar drift"
@@ -543,6 +598,11 @@ def _write_matrix_manifest(
                     "density_fw": (
                         "physical lags=(0,2,4,7); snapshot interval=0.1 "
                         "except 0.5 for the large a/a_ho=10 grids"
+                    ),
+                    "rms_plateau": (
+                        f"{100.0 * config.pure_fw_plateau_equivalence_confidence_level:g}% "
+                        "family-wise paired-seed Bonferroni equivalence; relative RMS "
+                        f"margin={100.0 * config.pure_fw_rms_plateau_relative_tolerance:g}%"
                     ),
                 },
             },
@@ -567,7 +627,11 @@ def _discover_completed_rows(
             parse_case(case_id)
         except ValueError:
             continue
-        method = _row_method(case_id)
+        method = _row_method(
+            case_id,
+            n10_a0p1_guide_validation_summary=(config.n10_a0p1_guide_validation_summary),
+            n20_a0p1_guide_validation_summary=(config.n20_a0p1_guide_validation_summary),
+        )
         grid_plan = _case_grid_plan(config, case_id, method)
         completed, _errors = _verified_completed_row(
             config,
@@ -611,6 +675,7 @@ def _dmc_controls(
         local_step_method=LOCAL_STEP_METHOD,
         drift_limiter=method.drift_limiter,
         relative_alpha=method.relative_alpha,
+        contact_beta=method.contact_beta,
     )
 
 
@@ -634,10 +699,24 @@ def _verified_completed_row(
     if not verified:
         return False, errors
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    try:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return False, [f"invalid benchmark summary: {exc}"]
     if manifest.get("run_name") != "dmc_benchmark_packet":
         return False, ["run manifest has the wrong artifact owner"]
-    if manifest.get("result_schema_version") != "dmc_benchmark_packet_v2":
+    if manifest.get("result_schema_version") != BENCHMARK_PACKET_SCHEMA_VERSION:
         return False, ["run manifest has the wrong result schema"]
+    if manifest.get("status") != "accepted":
+        return False, [f"run manifest scientific status is {manifest.get('status')!r}"]
+    if summary.get("schema_version") != BENCHMARK_PACKET_SCHEMA_VERSION:
+        return False, ["benchmark summary has the wrong result schema"]
+    if summary.get("case_id") != case_id:
+        return False, ["benchmark summary case does not match the planned row"]
+    if summary.get("status") != "accepted":
+        return False, [f"benchmark summary scientific status is {summary.get('status')!r}"]
+    if summary.get("status") != manifest.get("status"):
+        return False, ["benchmark summary and run manifest statuses disagree"]
     manifest_implementation = manifest.get("provenance", {}).get("implementation", {})
     if manifest_implementation.get("source_tree_sha256") != implementation_fingerprint:
         return False, ["run manifest implementation fingerprint mismatch"]
@@ -691,7 +770,13 @@ def _expected_manifest_fields(
         "init_width_log_sigma": method.init_width_log_sigma,
         "breathing_preburn_steps": method.breathing_preburn_steps,
         "breathing_preburn_log_step": method.breathing_preburn_log_step,
-        "guide_family": "reduced-tg",
+        "guide_family": method.guide_family,
+        "guide_parameter_source": method.guide_parameter_source,
+        "guide_parameter_source_sha256": method.guide_parameter_source_sha256,
+        "guide_parameter_source_manifest_sha256": (method.guide_parameter_source_manifest_sha256),
+        "guide_parameter_source_identity_fingerprint": (
+            method.guide_parameter_source_identity_fingerprint
+        ),
         "pure_config.lag_steps": list(method.pure_fw_lags),
         "pure_config.density_lag_steps": list(method.pure_fw_density_lags),
         "pure_config.observables": ["r2", "density"],
@@ -707,6 +792,12 @@ def _expected_manifest_fields(
         "pure_config.min_walker_weight_ess": config.pure_fw_min_walker_weight_ess,
         "pure_config.min_source_ancestor_ess": config.pure_fw_min_source_ancestor_ess,
         "pure_config.max_source_family_fraction": (config.pure_fw_max_source_family_fraction),
+        "pure_config.rms_plateau_relative_tolerance": (
+            config.pure_fw_rms_plateau_relative_tolerance
+        ),
+        "pure_config.plateau_equivalence_confidence_level": (
+            config.pure_fw_plateau_equivalence_confidence_level
+        ),
         "pure_config.plateau_window_lag_count": 4,
         "pure_config.density_plateau_window_lag_count": (
             config.pure_fw_density_plateau_window_lag_count
@@ -745,8 +836,20 @@ def _steps_for_tau(tau: float, dt: float) -> int:
     return steps
 
 
-def _row_method(case_id: str) -> RowMethod:
+def _row_method(
+    case_id: str,
+    *,
+    n10_a0p1_guide_validation_summary: Path | None,
+    n20_a0p1_guide_validation_summary: Path | None,
+) -> RowMethod:
     case = parse_case(case_id)
+    guide_family = "reduced-tg"
+    contact_beta: float | None = None
+    guide_parameter_source = "explicit"
+    guide_parameter_source_sha256: str | None = None
+    guide_parameter_source_manifest_sha256: str | None = None
+    guide_parameter_source_identity_fingerprint: str | None = None
+    r2_lag_times = FW_LAG_TIMES
     if math.isclose(case.rod_length, 10.0, rel_tol=0.0, abs_tol=1e-12):
         dt = 0.000125 if case.n_particles == 10 else 0.00025
         walkers = 512 if case.n_particles == 20 else DEFAULT_WALKERS
@@ -761,24 +864,59 @@ def _row_method(case_id: str) -> RowMethod:
         drift_limiter = "umrigar"
         initialization_mode = "lda-rms-lattice"
         preburn_steps = 0
+        if case.n_particles == 10:
+            walkers = 512
+            r2_lag_times = N10_A1_FW_LAG_TIMES
     else:
         dt = DEFAULT_DT
         walkers = DEFAULT_WALKERS
         relative_alpha = None
-        drift_limiter = "none"
+        is_a0p1 = math.isclose(case.rod_length, 0.1, rel_tol=0.0, abs_tol=1e-12)
+        drift_limiter = "umrigar" if is_a0p1 else "none"
         initialization_mode = DEFAULT_INITIALIZATION_MODE
         preburn_steps = DEFAULT_BREATHING_PREBURN_STEPS
+        if is_a0p1:
+            if case.n_particles == 10:
+                guide_validation_summary = n10_a0p1_guide_validation_summary
+            elif case.n_particles == 20:
+                guide_validation_summary = n20_a0p1_guide_validation_summary
+            else:
+                raise ValueError(
+                    f"{case.case_id} has no final-matrix contact-guide calibration slot"
+                )
+            if guide_validation_summary is None:
+                raise ValueError(
+                    f"{case.case_id} requires --n{case.n_particles}-a0p1-guide-"
+                    "validation-summary from the completed contact-guide calibration chain"
+                )
+            validated = load_validated_contact_guide(
+                guide_validation_summary,
+                case=case,
+            )
+            guide_family = "contact-corrected-reduced-tg"
+            relative_alpha = validated.relative_alpha
+            contact_beta = validated.contact_beta
+            guide_parameter_source = str(validated.summary_path)
+            guide_parameter_source_sha256 = validated.summary_sha256
+            guide_parameter_source_manifest_sha256 = validated.manifest_sha256
+            guide_parameter_source_identity_fingerprint = validated.identity_fingerprint
     return RowMethod(
         dt=dt,
         walkers=walkers,
         drift_limiter=drift_limiter,
+        guide_family=guide_family,
         relative_alpha=relative_alpha,
+        contact_beta=contact_beta,
+        guide_parameter_source=guide_parameter_source,
+        guide_parameter_source_sha256=guide_parameter_source_sha256,
+        guide_parameter_source_manifest_sha256=(guide_parameter_source_manifest_sha256),
+        guide_parameter_source_identity_fingerprint=(guide_parameter_source_identity_fingerprint),
         initialization_mode=initialization_mode,
         init_width_log_sigma=DEFAULT_INIT_WIDTH_LOG_SIGMA,
         breathing_preburn_steps=preburn_steps,
         breathing_preburn_log_step=DEFAULT_BREATHING_PREBURN_LOG_STEP,
         store_every=_steps_for_tau(STORE_INTERVAL_TAU, dt),
-        pure_fw_lags=tuple(_steps_for_tau(tau, dt) for tau in FW_LAG_TIMES),
+        pure_fw_lags=tuple(_steps_for_tau(tau, dt) for tau in r2_lag_times),
         pure_fw_density_lags=tuple(_steps_for_tau(tau, dt) for tau in DENSITY_FW_LAG_TIMES),
         pure_fw_collection_stride_steps=_steps_for_tau(FW_COLLECTION_INTERVAL_TAU, dt),
         pure_fw_density_collection_stride_steps=_steps_for_tau(
@@ -797,7 +935,15 @@ def _row_method_metadata(method: RowMethod) -> dict[str, float | int | list[int]
         "dt": method.dt,
         "walkers": method.walkers,
         "drift_limiter": method.drift_limiter,
+        "guide_family": method.guide_family,
         "relative_alpha": method.relative_alpha,
+        "contact_beta": method.contact_beta,
+        "guide_parameter_source": method.guide_parameter_source,
+        "guide_parameter_source_sha256": method.guide_parameter_source_sha256,
+        "guide_parameter_source_manifest_sha256": (method.guide_parameter_source_manifest_sha256),
+        "guide_parameter_source_identity_fingerprint": (
+            method.guide_parameter_source_identity_fingerprint
+        ),
         "initialization_mode": method.initialization_mode,
         "store_every": method.store_every,
         "pure_fw_lags": list(method.pure_fw_lags),

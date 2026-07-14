@@ -8,6 +8,8 @@ from hrdmc.io import print_run_summary
 from hrdmc.workflows.dmc.final_matrix import (
     DEFAULT_CASES,
     DEFAULT_OUTPUT_ROOT,
+    DEFAULT_PLATEAU_EQUIVALENCE_CONFIDENCE_LEVEL,
+    DEFAULT_RMS_PLATEAU_RELATIVE_TOLERANCE,
     DEFAULT_SEEDS,
     FinalMatrixConfig,
     run_final_matrix,
@@ -53,10 +55,37 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pure-fw-min-walker-weight-ess", type=float, default=30.0)
     parser.add_argument("--pure-fw-min-source-ancestor-ess", type=float, default=50.0)
     parser.add_argument("--pure-fw-max-source-family-fraction", type=float, default=0.10)
+    parser.add_argument(
+        "--pure-fw-rms-plateau-relative-tolerance",
+        type=float,
+        default=DEFAULT_RMS_PLATEAU_RELATIVE_TOLERANCE,
+        help=(
+            "Practical relative RMS-radius equivalence margin for the paired-seed "
+            "forward-walking lag window."
+        ),
+    )
+    parser.add_argument(
+        "--pure-fw-plateau-equivalence-confidence-level",
+        type=float,
+        default=DEFAULT_PLATEAU_EQUIVALENCE_CONFIDENCE_LEVEL,
+        help="Family-wise confidence level for the paired-lag equivalence bound.",
+    )
     parser.add_argument("--pure-fw-density-plateau-window-lag-count", type=int, default=3)
     parser.add_argument("--parallel-workers", type=int, default=5)
     parser.add_argument("--plot-formats", default="png,pdf")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument(
+        "--n10-a0p1-guide-validation-summary",
+        type=Path,
+        default=None,
+        help=("Validated contact-guide summary required when N10_A0.1 is requested."),
+    )
+    parser.add_argument(
+        "--n20-a0p1-guide-validation-summary",
+        type=Path,
+        default=None,
+        help=("Validated contact-guide summary required when N20_A0.1 is requested."),
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--continue-on-error", action="store_true")

@@ -10,6 +10,7 @@ from hrdmc.artifacts import (
     build_run_provenance,
     config_fingerprint,
     file_sha256,
+    implementation_identity,
     verify_run_manifest,
     write_json,
     write_run_manifest,
@@ -21,7 +22,7 @@ from hrdmc.workflows.dmc.guide_mala_diagnostic import (
 )
 from hrdmc.workflows.dmc.trapped import TrappedCase, parse_case
 
-CONTACT_GUIDE_VALIDATION_SCHEMA_VERSION = "contact_guide_mala_validation_v1"
+CONTACT_GUIDE_VALIDATION_SCHEMA_VERSION = "contact_guide_mala_validation_v2"
 CONTACT_GUIDE_VALIDATION_RUN_NAME = "contact_guide_mala_validation"
 
 
@@ -58,6 +59,7 @@ class ValidatedContactGuideArtifact:
     summary_sha256: str
     manifest_sha256: str
     identity_fingerprint: str
+    source_tree_sha256: str
 
 
 @dataclass(frozen=True)
@@ -258,6 +260,21 @@ def validate_contact_guide_calibrations(
         observed=source_tree_hashes,
         criterion="identical source_tree_sha256",
         passed=source_tree_hashes[0] == source_tree_hashes[1],
+    )
+    current_source_tree = implementation_identity().get("source_tree_sha256")
+    _append_check(
+        checks,
+        name="current_implementation_source_identity",
+        group="contract",
+        observed={
+            "calibrations": source_tree_hashes,
+            "validation": current_source_tree,
+        },
+        criterion="both calibrations equal the validation source_tree_sha256",
+        passed=(
+            isinstance(current_source_tree, str)
+            and all(value == current_source_tree for value in source_tree_hashes)
+        ),
     )
     dependencies = [
         compact.manifest["provenance"].get("dependencies"),
@@ -510,6 +527,14 @@ def load_validated_contact_guide(
     implementation = manifest.get("provenance", {}).get("implementation", {})
     if implementation.get("status") != "identified":
         raise ValueError("contact-guide validation manifest has no identified source tree")
+    source_tree_sha256 = implementation.get("source_tree_sha256")
+    if not isinstance(source_tree_sha256, str) or len(source_tree_sha256) != 64:
+        raise ValueError("contact-guide validation manifest has an invalid source identity")
+    current_implementation = implementation_identity()
+    if current_implementation.get("source_tree_sha256") != source_tree_sha256:
+        raise ValueError(
+            "contact-guide validation was produced by a different scientific source tree"
+        )
 
     payload = json.loads(resolved_path.read_text(encoding="utf-8"))
     if payload.get("schema_version") != CONTACT_GUIDE_VALIDATION_SCHEMA_VERSION:
@@ -522,6 +547,17 @@ def load_validated_contact_guide(
         )
     if payload.get("failed_checks"):
         raise ValueError("contact-guide validation summary contains failed checks")
+    inputs = payload.get("inputs")
+    if not isinstance(inputs, dict):
+        raise ValueError("contact-guide validation summary has no bound calibration inputs")
+    for role in ("compact", "expanded"):
+        input_identity = inputs.get(role)
+        if not isinstance(input_identity, dict):
+            raise ValueError(f"contact-guide validation has no {role} input identity")
+        if input_identity.get("source_tree_sha256") != source_tree_sha256:
+            raise ValueError(
+                f"contact-guide validation {role} input has a different source identity"
+            )
     checks = payload.get("checks")
     if (
         not isinstance(checks, list)
@@ -557,6 +593,7 @@ def load_validated_contact_guide(
                 "manifest_sha256": manifest_sha256,
             }
         ),
+        source_tree_sha256=source_tree_sha256,
     )
 
 

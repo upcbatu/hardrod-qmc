@@ -13,6 +13,7 @@ from scipy.optimize import minimize
 
 from hrdmc.artifacts import (
     build_run_provenance,
+    implementation_identity,
     verify_run_manifest,
     write_json,
     write_run_manifest,
@@ -36,7 +37,7 @@ from hrdmc.workflows.dmc.trapped import (
 )
 
 FloatArray = NDArray[np.float64]
-CONTACT_GUIDE_OPTIMIZATION_SCHEMA_VERSION = "contact_guide_correlated_optimization_v2"
+CONTACT_GUIDE_OPTIMIZATION_SCHEMA_VERSION = "contact_guide_correlated_optimization_v3"
 
 
 @dataclass(frozen=True)
@@ -387,7 +388,7 @@ def optimize_contact_guide_from_sample(
     )
     refined_alpha = float(np.clip(math.exp(refined.x[0]), alpha_low, alpha_high))
     refined_beta = float(np.clip(refined.x[1], 0.0, beta_max))
-    optimum = candidate_metrics(
+    refined_metrics = candidate_metrics(
         sample,
         omega=omega,
         n_particles=n_particles,
@@ -395,6 +396,15 @@ def optimize_contact_guide_from_sample(
         reference_contact_beta=reference_contact_beta,
         relative_alpha=refined_alpha,
         contact_beta=refined_beta,
+    )
+    eligible_candidates = [
+        candidate
+        for candidate in (best, refined_metrics)
+        if candidate["reweight_ess_fraction"] >= min_reweight_ess_fraction
+    ]
+    optimum = min(
+        eligible_candidates or [best, refined_metrics],
+        key=lambda candidate: candidate["local_energy_variance"],
     )
     return (
         rows,
@@ -405,6 +415,8 @@ def optimize_contact_guide_from_sample(
             "grid_row_count": len(rows),
             "refinement_success": bool(refined.success),
             "refinement_message": str(refined.message),
+            "refinement_metrics": refined_metrics,
+            "selected_candidate_source": ("refinement" if optimum is refined_metrics else "grid"),
             "minimum_reweight_ess_fraction": min_reweight_ess_fraction,
             "minimum_reweight_ess_fraction_scope": (
                 "importance-weight overlap heuristic over correlated configurations"
@@ -494,6 +506,11 @@ def load_contact_optimization_candidate(
     implementation = manifest.get("provenance", {}).get("implementation", {})
     if implementation.get("status") != "identified":
         raise ValueError("optimization run manifest has no identified source tree")
+    current_implementation = implementation_identity()
+    if current_implementation.get("source_tree_sha256") != implementation.get("source_tree_sha256"):
+        raise ValueError(
+            "optimization candidate was produced by a different scientific source tree"
+        )
     payload = json.loads(path.read_text(encoding="utf-8"))
     if payload.get("schema_version") != CONTACT_GUIDE_OPTIMIZATION_SCHEMA_VERSION:
         raise ValueError("optimization summary has an unsupported schema")
