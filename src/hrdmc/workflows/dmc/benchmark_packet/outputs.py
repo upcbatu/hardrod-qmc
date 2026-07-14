@@ -140,6 +140,11 @@ def write_benchmark_packet_table(output_dir: Path, payload: dict[str, Any]) -> P
     aggregate_r2 = pure.get("r2_aggregate_plateau_diagnostics", {})
     if not isinstance(aggregate_r2, dict):
         aggregate_r2 = {}
+    aggregate_density = (
+        pure.get("observables", {}).get("density", {}).get("aggregate_plateau_diagnostics", {})
+    )
+    if not isinstance(aggregate_density, dict):
+        aggregate_density = {}
     row = {
         "case_id": payload["case_id"],
         "status": payload["status"],
@@ -163,6 +168,18 @@ def write_benchmark_packet_table(output_dir: Path, payload: dict[str, Any]) -> P
         "r2_aggregate_plateau_status": pure.get("r2_aggregate_plateau_status", ""),
         "r2_aggregate_slope_sigma_ratio": _slope_sigma_ratio(aggregate_r2),
         "r2_aggregate_window_sigma_ratio": _window_sigma_ratio(aggregate_r2),
+        "r2_selected_window_lags": _join_lags(aggregate_r2.get("selected_window_lags", "")),
+        "r2_pooled_ancestor_ess_lower_min": aggregate_r2.get(
+            "selected_window_pooled_ancestor_ess_lower_min",
+            "",
+        ),
+        "density_selected_window_lags": _join_lags(
+            aggregate_density.get("selected_window_lags", "")
+        ),
+        "density_pooled_ancestor_ess_lower_min": aggregate_density.get(
+            "selected_window_pooled_ancestor_ess_lower_min",
+            "",
+        ),
         "r2_seed_plateau_resolved_count": pure.get("r2_seed_plateau_resolved_count", ""),
         "r2_seed_plateau_unresolved_count": pure.get("r2_seed_plateau_unresolved_count", ""),
     }
@@ -189,6 +206,11 @@ def write_benchmark_packet_fw_plateau_table(output_dir: Path, payload: dict[str,
         "slope_pass",
         "window_spread_pass",
         "window_lags",
+        "selected_window_lags",
+        "excluded_unsupported_lags",
+        "aggregate_genealogy_status",
+        "pooled_ancestor_ess_lower_min",
+        "pooled_family_fraction_upper_max",
         "lag_max_block_count",
         "lag_max_weight_ess_min",
         "genealogy_status",
@@ -259,6 +281,11 @@ def write_benchmark_packet_density_fw_table(output_dir: Path, payload: dict[str,
         "slope_pass",
         "window_spread_pass",
         "window_lags",
+        "selected_window_lags",
+        "excluded_unsupported_lags",
+        "aggregate_genealogy_status",
+        "pooled_ancestor_ess_lower_min",
+        "pooled_family_fraction_upper_max",
         "lag_max_block_count",
         "lag_max_weight_ess_min",
         "genealogy_status",
@@ -349,6 +376,7 @@ def _lag_dict_get(values: object, lag: object) -> object:
 
 def _aggregate_r2_row(payload: dict[str, Any]) -> dict[str, Any]:
     pure = payload.get("pure_walking", {})
+    observable = pure.get("observables", {}).get("r2", {})
     diagnostics = pure.get("r2_aggregate_plateau_diagnostics", {})
     if not isinstance(diagnostics, dict) or not diagnostics:
         return {}
@@ -359,6 +387,7 @@ def _aggregate_r2_row(payload: dict[str, Any]) -> dict[str, Any]:
         "r2_plateau_status": pure.get("r2_aggregate_plateau_status", ""),
         "r2_plateau_value": pure.get("r2_aggregate_plateau_value", ""),
         "r2_plateau_stderr": pure.get("r2_aggregate_plateau_stderr", ""),
+        "aggregate_genealogy_status": observable.get("aggregate_genealogy_status", ""),
     }
 
 
@@ -491,24 +520,21 @@ def _seed_energy_stationarity_rows(stationarity: dict[str, Any]) -> list[dict[st
 
 def _aggregate_density_row(payload: dict[str, Any]) -> dict[str, Any]:
     density = payload.get("estimates", {}).get("density", {})
+    observable = payload.get("pure_walking", {}).get("observables", {}).get("density", {})
+    diagnostics = observable.get("aggregate_plateau_diagnostics", {})
+    if not isinstance(diagnostics, dict):
+        diagnostics = {}
     return {
+        **_plateau_diagnostic_row(diagnostics),
         "row_type": "aggregate",
         "seed": "all",
         "density_plateau_status": density.get("status", ""),
         "density_integral": density.get("integral", ""),
         "mixed_density_l2_diagnostic": density.get("mixed_diagnostic_density_l2", ""),
-        "slope_sigma_ratio": "",
-        "window_sigma_ratio": "",
-        "slope_delta": "",
-        "slope_threshold": "",
-        "max_window_delta": "",
-        "min_window_threshold": "",
-        "slope_pass": "",
-        "window_spread_pass": "",
-        "window_lags": "",
         "lag_max_block_count": "",
         "lag_max_weight_ess_min": "",
         "genealogy_status": "",
+        "aggregate_genealogy_status": observable.get("aggregate_genealogy_status", ""),
         "lag_max_source_ancestor_ess_min": "",
         "lag_max_unique_source_ancestor_min": "",
         "lag_max_source_family_fraction_max": "",
@@ -565,6 +591,17 @@ def _plateau_diagnostic_row(diagnostics: dict[str, Any]) -> dict[str, Any]:
         "slope_pass": diagnostics.get("slope_pass", ""),
         "window_spread_pass": diagnostics.get("window_spread_pass", ""),
         "window_lags": _join_lags(diagnostics.get("window_lags", "")),
+        "selected_window_lags": _join_lags(diagnostics.get("selected_window_lags", "")),
+        "excluded_unsupported_lags": _join_lags(diagnostics.get("excluded_unsupported_lags", "")),
+        "aggregate_genealogy_status": "",
+        "pooled_ancestor_ess_lower_min": diagnostics.get(
+            "selected_window_pooled_ancestor_ess_lower_min",
+            "",
+        ),
+        "pooled_family_fraction_upper_max": diagnostics.get(
+            "selected_window_pooled_family_fraction_upper_max",
+            "",
+        ),
         "lag_max_block_count": "",
         "lag_max_weight_ess_min": "",
     }
@@ -579,8 +616,11 @@ def _slope_sigma_ratio(diagnostics: dict[str, Any]) -> object:
 def _window_sigma_ratio(diagnostics: dict[str, Any]) -> object:
     if not isinstance(diagnostics, dict):
         return ""
-    deltas = diagnostics.get("window_delta_by_lag")
-    thresholds = diagnostics.get("window_threshold_by_lag")
+    deltas = diagnostics.get("window_delta_by_lag", diagnostics.get("paired_delta_by_lag"))
+    thresholds = diagnostics.get(
+        "window_threshold_by_lag",
+        diagnostics.get("paired_threshold_by_lag"),
+    )
     if isinstance(deltas, dict) and isinstance(thresholds, dict):
         ratios: list[float] = []
         for lag, delta in deltas.items():

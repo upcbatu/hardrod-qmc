@@ -105,7 +105,7 @@ def run_trapped_tg_anchor(
     )
     seed_summaries = [run.dmc_summary for run in seed_runs]
     seed_payloads = [trapped_tg_seed_payload(run) for run in seed_runs]
-    pure_summary = summarize_pure_seed_payloads(seed_payloads)
+    pure_summary = summarize_pure_seed_payloads(seed_payloads, config=pure_config)
     energy_values = np.asarray([summary.mixed_energy for summary in seed_summaries])
     exact_energy = trapped_tg_energy_total(anchor.n_particles, anchor.omega)
     abs_error = abs(float(np.mean(energy_values)) - exact_energy)

@@ -69,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--homogeneous-samples", type=int, default=6)
     parser.add_argument("--homogeneous-tolerance", type=float, default=1e-7)
     parser.add_argument("--homogeneous-seed", type=int, default=20260511)
-    parser.add_argument("--pure-fw-lags", default="0,10,20")
+    parser.add_argument("--pure-fw-lags", default="0,10,20,30")
     parser.add_argument("--pure-fw-density-lags", default=None)
     parser.add_argument("--pure-fw-observables", default="r2,density")
     parser.add_argument("--pure-fw-min-block-count", type=int, default=20)

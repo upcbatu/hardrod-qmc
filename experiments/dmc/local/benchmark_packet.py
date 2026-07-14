@@ -160,6 +160,16 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("raw_r2", "r2_rb"),
         default="raw_r2",
     )
+    parser.add_argument(
+        "--pure-fw-density-source",
+        choices=("raw_density", "com_rao_blackwell"),
+        default="raw_density",
+    )
+    parser.add_argument(
+        "--pure-fw-density-parity-average",
+        action="store_true",
+        help="Average density bins with their exact trap-parity partners.",
+    )
     parser.add_argument("--pure-fw-block-size-steps", type=int, default=1)
     parser.add_argument("--pure-fw-collection-stride-steps", type=int, default=1)
     parser.add_argument("--pure-fw-density-collection-stride-steps", type=int, default=None)
@@ -247,6 +257,8 @@ def main() -> None:
         lag_steps=_parse_int_tuple(args.pure_fw_lags),
         observables=_parse_str_tuple(args.pure_fw_observables),
         observable_source=args.pure_fw_observable_source,
+        density_source=args.pure_fw_density_source,
+        density_parity_average=args.pure_fw_density_parity_average,
         pair_bin_edges=_pair_edges(args),
         structure_k_values=_parse_float_array(args.pure_fw_k_values),
         min_block_count=args.pure_fw_min_block_count,
@@ -266,6 +278,7 @@ def main() -> None:
         transport_invariant_tests_passed=(
             "lag0_identity",
             "deterministic_parent_map",
+            "composed_parent_map_associativity",
             "weight_gauge_shift_cancellation",
         ),
     )

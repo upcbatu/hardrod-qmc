@@ -6,10 +6,7 @@ import numpy as np
 
 from hrdmc.artifacts import ensure_dir, write_json_atomic
 from hrdmc.estimators.pure.forward_walking import PureWalkingConfig
-from hrdmc.estimators.pure.forward_walking.diagnostics import plateau_summary
 from hrdmc.estimators.pure.forward_walking.results import (
-    GENEALOGY_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
-    GENEALOGY_SOURCE_FAMILY_DOMINANCE,
     PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
     PLATEAU_INSUFFICIENT_BLOCKS,
     PLATEAU_NO_BLOCKS,
@@ -21,16 +18,17 @@ from hrdmc.estimators.pure.forward_walking.results import (
     PURE_STATUS_PLATEAU_UNRESOLVED,
     PURE_STATUS_SCHEMA_INVALID,
     SCHEMA_VALID,
-    LagValue,
 )
 from hrdmc.io.progress import ProgressBar, QueuedProgress
 from hrdmc.runners import run_seed_batch
+from hrdmc.workflows.dmc.benchmark_packet.fw_aggregation import (
+    aggregate_fw_observable_summary,
+)
 from hrdmc.workflows.dmc.benchmark_packet.selection import (
     benchmark_validation_status,
     energy_validation_status,
     pure_fw_validation_status,
     scalar_seed_mean,
-    scalar_seed_stderr,
 )
 from hrdmc.workflows.dmc.collective_rn import CollectiveRNControls
 from hrdmc.workflows.dmc.initial_conditions import InitializationControls
@@ -161,6 +159,8 @@ def summarize_benchmark_packet_case(
         "method": {
             "energy": f"{calculation_name} mixed local energy",
             "coordinate_observables": "transported auxiliary forward walking",
+            "r2": _fw_estimator_label(pure_summary.get("observables", {}), "r2"),
+            "density": _fw_estimator_label(pure_summary.get("observables", {}), "density"),
         },
     }
 
@@ -170,32 +170,47 @@ def summarize_pure_seed_payloads(
     *,
     config: PureWalkingConfig | None = None,
 ) -> dict[str, Any]:
-    observables = {
-        name: summarize_pure_observable(seed_payloads, name)
-        for name in seed_payloads[0]["pure_walking"]["observable_results"]
+    if not seed_payloads:
+        raise ValueError("seed_payloads must contain at least one independent seed")
+    if config is None:
+        first_observables = seed_payloads[0]["pure_walking"]["observable_results"]
+        observable_names = tuple(first_observables)
+        observable_configs = {
+            name: _plateau_config_from_seed_result(result, name)
+            for name, result in first_observables.items()
+        }
+    else:
+        observable_names = config.observables
+        observable_configs = {name: config for name in observable_names}
+    aggregates = {
+        name: aggregate_fw_observable_summary(
+            seed_payloads,
+            observable=name,
+            config=observable_configs[name],
+        )
+        for name in observable_names
     }
-    r2_values: list[float] = []
+    observables = {
+        name: summarize_pure_observable(seed_payloads, name, aggregate=aggregates[name])
+        for name in observable_names
+    }
     r2_stderr_values: list[float] = []
     rms_values: list[float] = []
     schema_statuses: list[str] = []
     plateau_statuses: list[str] = []
     genealogy_statuses: list[str] = []
-    seed_pure_statuses: list[str] = []
     for payload in seed_payloads:
         r2 = payload["pure_walking"]["observable_results"].get("r2", {})
-        seed_pure_statuses.append(str(payload["pure_walking"].get("status", "")))
         schema_statuses.append(str(r2.get("schema_status", "")))
         plateau_statuses.append(str(r2.get("plateau_status", "")))
         genealogy_statuses.append(str(r2.get("genealogy_status", "")))
-        r2_values.append(float(r2.get("plateau_value", float("nan"))))
         r2_stderr_values.append(float(r2.get("plateau_stderr", float("nan"))))
         rms_values.append(float(r2.get("rms_radius", float("nan"))))
-    aggregate = aggregate_r2_plateau_summary(seed_payloads, config=config)
-    aggregate_value = float(aggregate.get("plateau_value", float("nan")))
-    aggregate_stderr = float(aggregate.get("plateau_stderr", float("nan")))
-    seed_r2_stderr = scalar_seed_stderr(r2_values)
-    pure_r2 = aggregate_value if np.isfinite(aggregate_value) else scalar_seed_mean(r2_values)
-    pure_r2_stderr = _max_finite(aggregate_stderr, seed_r2_stderr)
+    aggregate = aggregates.get("r2", {})
+    aggregate_value = _optional_float(aggregate.get("plateau_value"))
+    aggregate_stderr = _optional_float(aggregate.get("plateau_stderr"))
+    pure_r2 = aggregate_value
+    pure_r2_stderr = aggregate_stderr
     rms_radius = (
         float(np.sqrt(pure_r2)) if np.isfinite(pure_r2) and pure_r2 >= 0.0 else float("nan")
     )
@@ -204,21 +219,7 @@ def summarize_pure_seed_payloads(
         if np.isfinite(pure_r2_stderr) and np.isfinite(rms_radius) and rms_radius > 0.0
         else float("nan")
     )
-    status = pure_case_status_from_aggregate(
-        schema_statuses=schema_statuses,
-        seed_pure_statuses=seed_pure_statuses,
-        aggregate_status=str(aggregate.get("plateau_status", "")),
-    )
-    if "r2" in observables:
-        observables["r2"] = {
-            **observables["r2"],
-            "status": status,
-            "decision_level": "seed_aggregated",
-            "aggregate_plateau_status": aggregate.get("plateau_status"),
-            "aggregate_plateau_value": aggregate.get("plateau_value"),
-            "aggregate_plateau_stderr": aggregate.get("plateau_stderr"),
-            "aggregate_plateau_diagnostics": aggregate.get("plateau_diagnostics"),
-        }
+    status = _pure_case_status_from_observables(observables)
     return {
         "status": status,
         "seed_count": len(seed_payloads),
@@ -236,14 +237,14 @@ def summarize_pure_seed_payloads(
         "r2_aggregate_plateau_diagnostics": aggregate.get("plateau_diagnostics"),
         "pure_r2": pure_r2,
         "pure_r2_stderr": pure_r2_stderr,
-        "pure_r2_seed_stderr": seed_r2_stderr,
+        "pure_r2_seed_stderr": aggregate_stderr,
         "pure_r2_aggregate_plateau_stderr": aggregate_stderr,
         "pure_r2_mean_internal_stderr": scalar_seed_mean(r2_stderr_values),
         "rms_radius": rms_radius,
         "rms_radius_stderr": rms_radius_stderr,
         "rms_radius_seed_stderr": (
-            float(0.5 * seed_r2_stderr / rms_radius)
-            if np.isfinite(seed_r2_stderr) and np.isfinite(rms_radius) and rms_radius > 0.0
+            float(0.5 * aggregate_stderr / rms_radius)
+            if np.isfinite(aggregate_stderr) and np.isfinite(rms_radius) and rms_radius > 0.0
             else float("nan")
         ),
         "mean_seed_rms_diagnostic": scalar_seed_mean(rms_values),
@@ -256,111 +257,41 @@ def aggregate_r2_plateau_summary(
     *,
     config: PureWalkingConfig | None = None,
 ) -> dict[str, Any]:
+    """Compatibility wrapper for the workflow-owned generic FW aggregation."""
+
     if not seed_payloads:
-        return {
-            "plateau_status": PLATEAU_NO_BLOCKS,
-            "plateau_value": float("nan"),
-            "plateau_stderr": float("nan"),
-            "plateau_diagnostics": {"reason": "no_seed_payloads"},
-        }
+        return aggregate_fw_observable_summary(
+            seed_payloads,
+            observable="r2",
+            config=PureWalkingConfig(lag_steps=(0,)),
+        )
     first_r2 = seed_payloads[0]["pure_walking"]["observable_results"].get("r2", {})
     if config is None:
         config = _r2_plateau_config_from_seed_result(first_r2)
-    lag_steps = tuple(int(lag) for lag in config.lag_steps)
-    values_by_lag: dict[int, LagValue] = {}
-    stderr_by_lag: dict[int, LagValue] = {}
-    block_count_by_lag: dict[int, int] = {}
-    weight_ess_min_by_lag: dict[int, float] = {}
-    for lag in lag_steps:
-        seed_values: list[float] = []
-        seed_stderrs: list[float] = []
-        block_counts: list[int] = []
-        weight_ess: list[float] = []
-        for payload in seed_payloads:
-            r2 = payload["pure_walking"]["observable_results"].get("r2", {})
-            value = _lag_dict_float(r2.get("values_by_lag", {}), lag)
-            stderr = _lag_dict_float(r2.get("stderr_by_lag", {}), lag)
-            if np.isfinite(value):
-                seed_values.append(value)
-            if np.isfinite(stderr):
-                seed_stderrs.append(stderr)
-            block_count = _lag_dict_int(r2.get("block_count_by_lag", {}), lag)
-            if block_count is not None:
-                block_counts.append(block_count)
-            ess = _lag_dict_float(r2.get("block_weight_ess_min_by_lag", {}), lag)
-            if np.isfinite(ess):
-                weight_ess.append(ess)
-        values = np.asarray(seed_values, dtype=float)
-        stderrs = np.asarray(seed_stderrs, dtype=float)
-        values_by_lag[lag] = float(np.mean(values)) if values.size else float("nan")
-        seed_stderr = (
-            float(np.std(values, ddof=1) / np.sqrt(values.size))
-            if values.size >= 2
-            else float("nan")
-        )
-        internal_stderr = (
-            float(np.sqrt(np.sum(stderrs * stderrs)) / stderrs.size)
-            if stderrs.size
-            else float("nan")
-        )
-        stderr_by_lag[lag] = _max_finite(seed_stderr, internal_stderr)
-        block_count_by_lag[lag] = min(block_counts) if block_counts else 0
-        weight_ess_min_by_lag[lag] = min(weight_ess) if weight_ess else 0.0
-    value, stderr, bracket, plateau_status, diagnostics = plateau_summary(
-        config=config,
+    return aggregate_fw_observable_summary(
+        seed_payloads,
         observable="r2",
-        values_by_lag=values_by_lag,
-        stderr_by_lag=stderr_by_lag,
-        block_count_by_lag=block_count_by_lag,
-        weight_ess_min_by_lag=weight_ess_min_by_lag,
+        config=config,
     )
-    diagnostics = {
-        **diagnostics,
-        "decision_level": "seed_aggregated",
-        "seed_count": len(seed_payloads),
-        "seed_plateau_statuses": [
-            payload["pure_walking"]["observable_results"].get("r2", {}).get("plateau_status", "")
-            for payload in seed_payloads
-        ],
-        "values_by_lag": values_by_lag,
-        "stderr_by_lag": stderr_by_lag,
-    }
-    return {
-        "plateau_status": plateau_status,
-        "plateau_value": float(value) if value is not None else float("nan"),
-        "plateau_stderr": float(stderr) if stderr is not None else float("nan"),
-        "bias_bracket": None if bracket is None else [float(bracket[0]), float(bracket[1])],
-        "plateau_diagnostics": diagnostics,
-    }
-
-
-def pure_case_status_from_aggregate(
-    *,
-    schema_statuses: list[str],
-    seed_pure_statuses: list[str],
-    aggregate_status: str,
-) -> str:
-    if any(status != SCHEMA_VALID for status in schema_statuses):
-        return PURE_STATUS_SCHEMA_INVALID
-    if PURE_STATUS_INSUFFICIENT_SAMPLES in seed_pure_statuses:
-        return PURE_STATUS_INSUFFICIENT_SAMPLES
-    if aggregate_status == PLATEAU_RESOLVED:
-        return PURE_STATUS_ACCEPTED
-    if aggregate_status == PLATEAU_NO_BLOCKS:
-        return PURE_STATUS_NO_BLOCKS
-    if aggregate_status in {
-        PLATEAU_INSUFFICIENT_BLOCKS,
-        PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
-    }:
-        return PURE_STATUS_INSUFFICIENT_SAMPLES
-    return PURE_STATUS_PLATEAU_UNRESOLVED
 
 
 def _r2_plateau_config_from_seed_result(r2: dict[str, Any]) -> PureWalkingConfig:
-    metadata = r2.get("metadata", {})
+    return _plateau_config_from_seed_result(r2, "r2")
+
+
+def _plateau_config_from_seed_result(
+    result: dict[str, Any],
+    observable: str,
+) -> PureWalkingConfig:
+    metadata = result.get("metadata", {})
     return PureWalkingConfig(
-        lag_steps=tuple(int(lag) for lag in r2.get("lag_steps", (0,))),
-        observables=("r2",),
+        lag_steps=tuple(int(lag) for lag in result.get("lag_steps", (0,))),
+        observables=(observable,),
+        density_bin_edges=(
+            np.asarray(metadata.get("bin_edges"), dtype=float)
+            if observable == "density" and metadata.get("bin_edges") is not None
+            else None
+        ),
         min_block_count=int(metadata.get("min_block_count", 30)),
         min_walker_weight_ess=float(metadata.get("min_walker_weight_ess", 30.0)),
         min_source_ancestor_ess=float(metadata.get("min_source_ancestor_ess", 1.0)),
@@ -368,61 +299,39 @@ def _r2_plateau_config_from_seed_result(r2: dict[str, Any]) -> PureWalkingConfig
         plateau_sigma_threshold=float(metadata.get("plateau_sigma_threshold", 1.0)),
         plateau_abs_tolerance=float(metadata.get("plateau_abs_tolerance", 0.0)),
         plateau_window_lag_count=int(metadata.get("plateau_window_lag_count", 4)),
+        density_plateau_relative_l2_tolerance=float(
+            metadata.get("density_plateau_relative_l2_tolerance", 0.03)
+        ),
+        density_expected_particles=(
+            float(metadata["density_expected_particles"])
+            if metadata.get("density_expected_particles") is not None
+            else None
+        ),
+        density_accounting_abs_tolerance=float(
+            metadata.get("density_accounting_abs_tolerance", 5.0e-3)
+        ),
     )
-
-
-def _lag_dict_float(values: Any, lag: int) -> float:
-    if not isinstance(values, dict):
-        return float("nan")
-    value = values.get(lag, values.get(str(lag), float("nan")))
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return float("nan")
-
-
-def _lag_dict_int(values: Any, lag: int) -> int | None:
-    if not isinstance(values, dict):
-        return None
-    value = values.get(lag, values.get(str(lag)))
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _max_finite(*values: float) -> float:
-    finite = [float(value) for value in values if np.isfinite(value)]
-    return max(finite) if finite else float("nan")
 
 
 def summarize_pure_observable(
     seed_payloads: list[dict[str, Any]],
     observable: str,
+    *,
+    aggregate: dict[str, Any],
 ) -> dict[str, Any]:
     results = [
-        payload["pure_walking"]["observable_results"][observable] for payload in seed_payloads
+        payload.get("pure_walking", {}).get("observable_results", {}).get(observable, {})
+        for payload in seed_payloads
     ]
-    values = np.asarray([result["plateau_value"] for result in results], dtype=float)
-    if values.ndim == 1:
-        values = values[:, np.newaxis]
-    finite = np.all(np.isfinite(values), axis=1)
-    finite_values = values[finite]
-    mean_value = (
-        np.mean(finite_values, axis=0)
-        if finite_values.size
-        else np.full(values.shape[1], np.nan, dtype=float)
+    mean_value = np.asarray(aggregate.get("plateau_value"), dtype=float).reshape(-1)
+    stderr_value = np.asarray(aggregate.get("plateau_stderr"), dtype=float).reshape(-1)
+    metadata = next(
+        (result.get("metadata", {}) for result in results if result),
+        {},
     )
-    stderr_value = (
-        np.std(finite_values, axis=0, ddof=1) / np.sqrt(finite_values.shape[0])
-        if finite_values.shape[0] >= 2
-        else np.full(values.shape[1], np.nan, dtype=float)
-    )
-    metadata = results[0].get("metadata", {})
     summary: dict[str, Any] = {
-        "status": _pure_observable_status(results),
+        "status": _aggregate_observable_status(aggregate),
+        "decision_level": "independent_seed_aggregate",
         "plateau_statuses": [result.get("plateau_status") for result in results],
         "schema_statuses": [result.get("schema_status") for result in results],
         "genealogy_statuses": [result.get("genealogy_status") for result in results],
@@ -432,8 +341,12 @@ def summarize_pure_observable(
         "genealogy_diagnostics_by_seed": [
             result.get("genealogy_diagnostics", {}) for result in results
         ],
-        "value": _result_value(mean_value),
-        "stderr": _result_value(stderr_value),
+        "aggregate_plateau_status": aggregate.get("plateau_status"),
+        "aggregate_genealogy_status": aggregate.get("genealogy_status"),
+        "aggregate_schema_status": aggregate.get("schema_status"),
+        "aggregate_plateau_diagnostics": aggregate.get("plateau_diagnostics", {}),
+        "value": _result_value(mean_value, scalar=observable == "r2"),
+        "stderr": _result_value(stderr_value, scalar=observable == "r2"),
         "metadata": metadata,
     }
     if observable in {"density", "pair_distance_density"}:
@@ -448,32 +361,40 @@ def summarize_pure_observable(
     return summary
 
 
-def _pure_observable_status(results: list[dict[str, Any]]) -> str:
-    if any(result.get("schema_status") != SCHEMA_VALID for result in results):
+def _aggregate_observable_status(aggregate: dict[str, Any]) -> str:
+    if aggregate.get("schema_status") != SCHEMA_VALID:
         return PURE_STATUS_SCHEMA_INVALID
-    if any(
-        result.get("genealogy_status")
-        in {
-            GENEALOGY_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
-            GENEALOGY_SOURCE_FAMILY_DOMINANCE,
-        }
-        for result in results
-    ):
-        return PURE_STATUS_INSUFFICIENT_SAMPLES
-    if all(result.get("plateau_status") == PLATEAU_RESOLVED for result in results):
+    plateau_status = aggregate.get("plateau_status")
+    if plateau_status == PLATEAU_RESOLVED:
         return PURE_STATUS_ACCEPTED
-    if any(result.get("plateau_status") == PLATEAU_NO_BLOCKS for result in results):
+    if plateau_status == PLATEAU_NO_BLOCKS:
         return PURE_STATUS_NO_BLOCKS
-    if any(
-        result.get("plateau_status")
-        in {
-            PLATEAU_INSUFFICIENT_BLOCKS,
-            PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
-        }
-        for result in results
-    ):
+    if plateau_status in {
+        PLATEAU_INSUFFICIENT_BLOCKS,
+        PLATEAU_EFFECTIVE_SAMPLE_COUNT_BELOW_MINIMUM,
+    }:
         return PURE_STATUS_INSUFFICIENT_SAMPLES
     return PURE_STATUS_PLATEAU_UNRESOLVED
+
+
+def _pure_case_status_from_observables(observables: dict[str, dict[str, Any]]) -> str:
+    statuses = {str(result.get("status")) for result in observables.values()}
+    for status in (
+        PURE_STATUS_SCHEMA_INVALID,
+        PURE_STATUS_NO_BLOCKS,
+        PURE_STATUS_INSUFFICIENT_SAMPLES,
+        PURE_STATUS_PLATEAU_UNRESOLVED,
+    ):
+        if status in statuses:
+            return status
+    return PURE_STATUS_ACCEPTED if statuses == {PURE_STATUS_ACCEPTED} else "observable_disagreement"
+
+
+def _optional_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float("nan")
 
 
 def estimates(
@@ -498,8 +419,8 @@ def estimates(
         "r2": {
             "value": pure_r2,
             "stderr": pure_summary.get("pure_r2_stderr"),
-            "estimator": "transported auxiliary forward walking",
-            "status": pure_fw_validation_status(pure_summary),
+            "estimator": _fw_estimator_label(observables, "r2"),
+            "status": _observable_status(observables, "r2"),
             "mixed_diagnostic": stationarity.get("r2_radius"),
             "lda_value": lda_rms * lda_rms if np.isfinite(lda_rms) else float("nan"),
             "delta_vs_lda": pure_r2 - lda_rms * lda_rms if np.isfinite(lda_rms) else float("nan"),
@@ -507,15 +428,15 @@ def estimates(
         "rms": {
             "value": pure_rms,
             "stderr": pure_summary.get("rms_radius_stderr"),
-            "estimator": "transported auxiliary forward walking",
-            "status": pure_fw_validation_status(pure_summary),
+            "estimator": _fw_estimator_label(observables, "r2"),
+            "status": _observable_status(observables, "r2"),
             "mixed_diagnostic": stationarity.get("rms_radius"),
             "lda_value": lda_rms,
             "delta_vs_lda": pure_rms - lda_rms if np.isfinite(lda_rms) else float("nan"),
         },
         "density": {
             "status": _observable_status(observables, "density"),
-            "estimator": "transported auxiliary forward walking",
+            "estimator": _fw_estimator_label(observables, "density"),
             "value": observables.get("density", {}).get("value"),
             "stderr": observables.get("density", {}).get("stderr"),
             "x": observables.get("density", {}).get("x"),
@@ -546,8 +467,8 @@ def estimates(
     }
 
 
-def _result_value(value: np.ndarray) -> float | list[float]:
-    if value.shape == (1,):
+def _result_value(value: np.ndarray, *, scalar: bool) -> float | list[float]:
+    if scalar and value.shape == (1,):
         return float(value[0])
     return value.tolist()
 
@@ -556,6 +477,16 @@ def _observable_status(observables: dict[str, Any], name: str) -> str:
     if name not in observables:
         return "not_evaluated_transported_fw_required"
     return str(observables[name].get("status", "not_evaluated"))
+
+
+def _fw_estimator_label(observables: dict[str, Any], name: str) -> str:
+    metadata = observables.get(name, {}).get("metadata", {})
+    if name == "r2" and metadata.get("observable_source") == "r2_rb":
+        return "transported auxiliary forward walking with exact COM Rao-Blackwellization"
+    if name == "density" and metadata.get("density_source") == "com_rao_blackwell":
+        suffix = " and exact parity averaging" if metadata.get("density_parity_average") else ""
+        return f"transported relative-coordinate forward walking with exact COM integration{suffix}"
+    return "transported auxiliary forward walking"
 
 
 def write_seed_payload_checkpoints(
