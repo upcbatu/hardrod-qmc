@@ -23,7 +23,6 @@ production_step_id
 scheduled_move_count
 positions
 local_energy_per_walker
-r2_rb_per_walker
 log_weights_pre_resample
 log_weights_post_resample
 parent_indices
@@ -41,16 +40,18 @@ optional resampling operation. `log_weights_post_resample` defines normalized
 estimator weights for the emitted positions; it is zero after resampling and
 can be nonzero during weighted no-resample windows.
 
-`r2_rb_per_walker` is the optional engine-side center-of-mass Rao-Blackwell
-payload. When present,
+The estimator can derive a center-of-mass Rao-Blackwellized \(R^2\) contribution
+directly from `positions`:
 
 ```text
 r_i = x_i - center - mean_j(x_j - center)
 r2_rb = mean_i r_i^2 + Var(COM)
 ```
 
-The estimator chooses raw or Rao-Blackwellized \(R^2\) while preserving the
-stated center-of-mass convention.
+The trapped density estimator can use the same exact factorization: it
+transports relative positions and convolves them with the known harmonic COM
+ground-state density. This integrates out sampled COM jitter without changing
+the DMC target.
 
 ## Branching and Parent Convention
 
@@ -70,9 +71,12 @@ still followed by the same step-level branching/resampling event and does not
 create a hidden parent-map boundary.
 
 Global log-weight gauge shifts cancel in normalized averages. Lag zero is the
-identity anchor: it is assembled from each step's instantaneous normalized
-weighted observable. Longer lags transport the auxiliary variable through the
-recorded parent indices and use the final post-step weights.
+identity anchor: it is assembled from the instantaneous normalized observable
+at that observable's collection cadence. R2 is collected every event. The
+density direct reference and lag-zero stream share one profile evaluated only
+on `density_collection_stride_steps` events. Longer lags transport the
+auxiliary variable through the recorded parent indices and use the final
+post-step weights.
 
 ## Collection Modes
 
@@ -94,7 +98,17 @@ composed_parent_map_associativity
 
 Reported lagged results additionally need finite block statistics, sufficient
 walker-weight support, sufficient independent source-family support, and
-density accounting when density is requested.
+density accounting when density is requested. Each density lag used in the
+aggregate decision must integrate to the configured particle count within the
+absolute accounting tolerance; a truncated grid therefore fails closed.
+
+For a reported equal-weight average of independent seeds, the benchmark
+workflow evaluates genealogy at that aggregate decision level. Unsupported
+later lags remain diagnostics and do not veto an earlier contiguous lag window
+that retains aggregate source-family support. Publication plateau selection
+requires a prefix of at least three supported positive lags, starting at the
+shortest configured positive lag; support cannot disappear and then re-enter
+the decision window.
 
 ## R2 and RMS Semantics
 
