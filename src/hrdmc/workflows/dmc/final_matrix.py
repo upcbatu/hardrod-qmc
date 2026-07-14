@@ -35,6 +35,8 @@ DEFAULT_INIT_WIDTH_LOG_SIGMA = 0.10
 DEFAULT_BREATHING_PREBURN_STEPS = 1000
 DEFAULT_BREATHING_PREBURN_LOG_STEP = 0.04
 LOCAL_STEP_METHOD = "metropolis"
+PURE_FW_R2_SOURCE = "r2_rb"
+PURE_FW_DENSITY_SOURCE = "com_rao_blackwell"
 
 # The finite-rod N=2 anchor requires a forward-walking projection well beyond
 # the earlier seven-unit ladder. The longest lag is 50 oscillator-time units,
@@ -58,7 +60,7 @@ class FinalMatrixConfig:
     grid_extent: float = 35.0
     excluded_volume_margin: float = 35.0
     n_bins: int = 840
-    max_density_bin_width: float = 0.20
+    max_density_bin_width: float = 0.10
     ess_resample_fraction: float = 0.35
     pure_fw_block_size_steps: int = 1
     pure_fw_min_block_count: int = 20
@@ -431,6 +433,11 @@ def _benchmark_command(
         _format_int_tuple(method.pure_fw_lags),
         "--pure-fw-density-lags",
         _format_int_tuple(method.pure_fw_density_lags),
+        "--pure-fw-observable-source",
+        PURE_FW_R2_SOURCE,
+        "--pure-fw-density-source",
+        PURE_FW_DENSITY_SOURCE,
+        "--pure-fw-density-parity-average",
         "--pure-fw-block-size-steps",
         str(config.pure_fw_block_size_steps),
         "--pure-fw-collection-stride-steps",
@@ -513,6 +520,9 @@ def _write_matrix_manifest(
                 "pure_fw_density_plateau_window_lag_count": (
                     config.pure_fw_density_plateau_window_lag_count
                 ),
+                "pure_fw_r2_source": PURE_FW_R2_SOURCE,
+                "pure_fw_density_source": PURE_FW_DENSITY_SOURCE,
+                "pure_fw_density_parity_average": True,
                 "parallel_workers": config.parallel_workers,
                 "plot_formats": config.plot_formats,
                 "calculation": "metropolis_corrected_drift_diffusion_dmc",
@@ -685,7 +695,9 @@ def _expected_manifest_fields(
         "pure_config.lag_steps": list(method.pure_fw_lags),
         "pure_config.density_lag_steps": list(method.pure_fw_density_lags),
         "pure_config.observables": ["r2", "density"],
-        "pure_config.observable_source": "raw_r2",
+        "pure_config.observable_source": PURE_FW_R2_SOURCE,
+        "pure_config.density_source": PURE_FW_DENSITY_SOURCE,
+        "pure_config.density_parity_average": True,
         "pure_config.block_size_steps": config.pure_fw_block_size_steps,
         "pure_config.collection_stride_steps": method.pure_fw_collection_stride_steps,
         "pure_config.density_collection_stride_steps": (

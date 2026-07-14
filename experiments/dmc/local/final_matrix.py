@@ -44,7 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-density-bin-width",
         type=float,
-        default=0.20,
+        default=0.10,
         help="Largest density-bin width in oscillator units after grid planning.",
     )
     parser.add_argument("--ess-resample-fraction", type=float, default=0.35)
