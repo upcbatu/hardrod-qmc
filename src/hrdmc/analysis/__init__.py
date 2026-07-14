@@ -30,6 +30,14 @@ from hrdmc.analysis.correlated_error import (
     sokal_error_estimate,
     triangulated_error_estimate,
 )
+from hrdmc.analysis.equivalence import (
+    PairwiseEquivalenceBound,
+    PairwiseNormEquivalenceBound,
+    SimultaneousPairwiseEquivalenceResult,
+    SimultaneousPairwiseNormEquivalenceResult,
+    simultaneous_pairwise_equivalence,
+    simultaneous_pairwise_norm_equivalence,
+)
 from hrdmc.analysis.metrics import (
     bias,
     density_l2_error,
@@ -64,7 +72,11 @@ __all__ = [
     "CORRELATED_ERROR_DISAGREEMENT",
     "CORRELATED_ERROR_UNAVAILABLE",
     "CorrelatedErrorEstimate",
+    "PairwiseEquivalenceBound",
+    "PairwiseNormEquivalenceBound",
     "SlopeResult",
+    "SimultaneousPairwiseEquivalenceResult",
+    "SimultaneousPairwiseNormEquivalenceResult",
     "TraceStationarityResult",
     "TriangulatedErrorResult",
     "autocorrelation",
@@ -83,6 +95,8 @@ __all__ = [
     "mean_squared_error",
     "relative_density_l2_error",
     "split_rhat",
+    "simultaneous_pairwise_equivalence",
+    "simultaneous_pairwise_norm_equivalence",
     "sokal_error_estimate",
     "summarize_replicate_metrics",
     "trace_stationarity_diagnostics",
