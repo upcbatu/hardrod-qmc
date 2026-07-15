@@ -132,8 +132,8 @@ evidence:
 - local-step acceptance, invalid-proposal rate, drift scale, and mobility;
 - log-weight span, weight ESS, resampling frequency, and source-family
   genealogy;
-- agreement across independent seeds, including rank-normalized R-hat and an
-  effective sample count;
+- agreement across independent seeds, including the serialized split-R-hat
+  diagnostic and an effective sample count;
 - stable traces after burn-in and conservative correlated-error estimates;
 - a timestep comparison in the same physical parameter region;
 - a walker-population comparison when population sensitivity is plausible;
@@ -156,7 +156,30 @@ collective RN metadata is absent or disabled for an ordinary local-DMC run.
 
 A numerical status is a compact summary of the recorded checks, not a new
 physical quantity. The underlying values, thresholds, traces, and seed results
-remain the evidence used to interpret a row.
+remain the evidence used to interpret a parameter case.
+
+The final-matrix assembly verifies every source manifest before selecting an
+observable. An observable-specific supplement must reproduce the primary
+packet's case, seeds, controls, guide identity, implementation tree, and mixed
+energy. Source statuses are retained even when a later matrix-level assessment
+changes the selected status. Source locators are stored relative to the final
+assembly directory so the result tree remains portable with its bound packets.
+
+For a declared matrix-level energy-stationarity assessment, the slope,
+first/last-quarter, and late-cumulative statistics from every seed form one
+simultaneous family. If there are \(K\) two-sided statistics, the Bonferroni
+critical value at confidence \(1-\alpha\) is
+
+\[
+z_{\mathrm{crit}}=\Phi^{-1}\!\left(1-\frac{\alpha}{2K}\right).
+\]
+
+The first/last-block statistic is retained in each source packet but is not
+counted twice when the four-block construction makes it identical to the
+first/last-quarter statistic. The assembly also requires its configured
+split-R-hat and effective-sample screens. This is an operational simultaneous
+screen, not a proof of stationarity and not a rank-normalized R-hat. A policy
+chosen after inspecting the source matrix is serialized as `retrospective`.
 
 The default population diagnostics are deliberately conservative operational
 screens, not universal constants. Weight-ESS fractions of 0.20 (warning) and
