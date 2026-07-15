@@ -26,7 +26,17 @@ from hrdmc.workflows.dmc.trapped import (
     parse_seeds,
 )
 
-DEFAULT_CASES = "N10_A0,N10_A0.1,N10_A1,N10_A10,N20_A0,N20_A0.1,N20_A1,N20_A10"
+DEFAULT_CASE_ORDER = (
+    "N10_A0",
+    "N10_A0.1",
+    "N10_A1",
+    "N10_A10",
+    "N20_A0",
+    "N20_A0.1",
+    "N20_A1",
+    "N20_A10",
+)
+DEFAULT_CASES = ",".join(DEFAULT_CASE_ORDER)
 DEFAULT_SEEDS = "7001,7002,7003,7004,7005"
 DEFAULT_OUTPUT_ROOT = Path("results/dmc/final_matrix/thesis_5seed")
 
@@ -166,7 +176,7 @@ class _PlannedRow:
 
 
 def run_final_matrix(config: FinalMatrixConfig, *, repo_root: Path) -> FinalMatrixResult:
-    """Plan or dispatch the fixed thesis DMC matrix with verified row reuse."""
+    """Plan or dispatch the fixed thesis DMC matrix with verified case reuse."""
 
     _validate_config(config)
     cases = _parse_cases(config.cases)
@@ -190,10 +200,10 @@ def run_final_matrix(config: FinalMatrixConfig, *, repo_root: Path) -> FinalMatr
         )
         has_existing_artifacts = _has_existing_artifacts(case_output_dir)
         if has_existing_artifacts and not completed and not config.force:
-            details = "; ".join(completion_errors) or "row is not verified complete"
+            details = "; ".join(completion_errors) or "case is not verified complete"
             raise FileExistsError(
-                f"refusing to overwrite existing row {case_id} in {case_output_dir}: "
-                f"{details}. Inspect the row or rerun with --force."
+                f"refusing to overwrite existing case {case_id} in {case_output_dir}: "
+                f"{details}. Inspect the case or rerun with --force."
             )
         plans.append(
             _PlannedRow(
@@ -352,7 +362,7 @@ def _case_grid_plan(
     case_id: str,
     method: RowMethod,
 ) -> dict[str, float | int]:
-    """Plan a finite-support density grid before dispatching one matrix row."""
+    """Plan a finite-support density grid before dispatching one matrix case."""
 
     case = parse_case(case_id)
     minimum_extent = 0.5 * case.n_particles * case.rod_length
@@ -700,7 +710,7 @@ def _verified_completed_row(
     if summary.get("schema_version") != BENCHMARK_PACKET_SCHEMA_VERSION:
         return False, ["benchmark summary has the wrong result schema"]
     if summary.get("case_id") != case_id:
-        return False, ["benchmark summary case does not match the planned row"]
+        return False, ["benchmark summary case does not match the planned case"]
     if summary.get("status") != "accepted":
         return False, [f"benchmark summary scientific status is {summary.get('status')!r}"]
     if summary.get("status") != manifest.get("status"):

@@ -80,7 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Root containing <case>/validation/summary.json artifacts for every "
-            "requested finite-rod row."
+            "requested finite-rod case."
         ),
     )
     parser.add_argument("--dry-run", action="store_true")
