@@ -16,7 +16,13 @@ def draw_energy_stationarity_panel(
 ) -> None:
     stationarity = payload.get("stationarity", {})
     mean_energy = finite_float(stationarity.get("mixed_energy"))
-    trace_drawn = _draw_running_means(ax_trace, stationarity, mean_energy)
+    oscillator_units = payload.get("case_parameterization") == "harmonic_oscillator_units"
+    trace_drawn = _draw_running_means(
+        ax_trace,
+        stationarity,
+        mean_energy,
+        oscillator_units=oscillator_units,
+    )
     if not trace_drawn:
         ax_trace.text(
             0.5,
@@ -33,6 +39,8 @@ def _draw_running_means(
     ax: Any,  # noqa: ANN401
     stationarity: dict[str, Any],
     mean_energy: float,
+    *,
+    oscillator_units: bool,
 ) -> bool:
     paths = stationarity.get("trace_artifacts", [])
     if not isinstance(paths, list):
@@ -77,7 +85,8 @@ def _draw_running_means(
             label="final mean",
         )
     ax.set_title("Energy running means", loc="left", pad=4)
-    ax.set_ylabel(r"$E$")
+    ax.set_ylabel(r"$E/(\hbar\omega)$" if oscillator_units else r"$E$")
+    ax.ticklabel_format(axis="y", style="plain", useOffset=False)
     ax.tick_params(labelbottom=False)
     ax.legend(loc="best", fontsize=7, ncol=2)
     return drawn
@@ -127,8 +136,12 @@ def _draw_block_residuals(
         )
     ax.axhline(0.0, color=tokens.INK, linestyle=(0, (4, 2)), linewidth=0.9)
     ax.set_title("Energy block residuals", loc="left", pad=4)
-    ax.set_xlabel("production time")
-    ax.set_ylabel(r"$E_{\mathrm{block}}-\bar E_{\mathrm{seed}}$")
+    if payload.get("case_parameterization") == "harmonic_oscillator_units":
+        ax.set_xlabel(r"production time $\tau\omega$")
+        ax.set_ylabel(r"$(E_{\mathrm{block}}-\bar E_{\mathrm{seed}})/(\hbar\omega)$")
+    else:
+        ax.set_xlabel("production time")
+        ax.set_ylabel(r"$E_{\mathrm{block}}-\bar E_{\mathrm{seed}}$")
     ax.legend(loc="best", fontsize=7, ncol=3)
 
 

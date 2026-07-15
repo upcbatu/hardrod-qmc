@@ -70,11 +70,16 @@ def draw_fw_lag_panel(ax: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
                 linewidth=1.2,
                 label="plateau",
             )
-    ax.set_title("Transported FW R2 lag ladder")
+    ax.set_title(r"Transported FW $R^2$ lag ladder")
     ax.set_xlabel("lag steps")
-    ax.set_ylabel(r"$R^2$")
-    ax.legend(loc="best", fontsize=8)
-    status_text = f"status={r2.get('plateau_status', 'unknown')}"
+    if payload.get("case_parameterization") == "harmonic_oscillator_units":
+        ax.set_ylabel(r"$R^2/a_{\mathrm{ho}}^2$")
+    else:
+        ax.set_ylabel(r"$R^2$")
+    ax.ticklabel_format(axis="y", style="plain", useOffset=False)
+    ax.legend(loc="upper left", fontsize=8)
+    plateau_status = str(r2.get("plateau_status", "unknown")).replace("_", " ")
+    status_text = f"plateau check: {plateau_status}"
     if selected_lags:
         status_text += "; selected=" + ",".join(str(lag) for lag in sorted(selected_lags))
     relative_bound = finite_float(r2.get("simultaneous_rms_relative_upper_bound"))
@@ -85,14 +90,21 @@ def draw_fw_lag_panel(ax: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
             f" <= margin={100.0 * relative_margin:.3g}%"
         )
     ax.text(
-        0.02,
-        0.04,
+        0.98,
+        -0.23,
         status_text,
         transform=ax.transAxes,
-        ha="left",
-        va="bottom",
-        fontsize=8,
+        ha="right",
+        va="top",
+        fontsize=7.4,
         color=tokens.INK_SOFT,
+        bbox={
+            "boxstyle": "round,pad=0.22",
+            "facecolor": "white",
+            "edgecolor": tokens.INK_FAINT,
+            "alpha": 0.9,
+        },
+        clip_on=False,
     )
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from hrdmc.plotting import tokens
 from hrdmc.plotting.numerics import metric_array
 from hrdmc.plotting.primitives import threshold_lollipop
 
@@ -35,17 +34,6 @@ def draw_chain_panel(ax_rhat: Any, ax_neff: Any, payload: dict[str, Any]) -> Non
             ylabel=r"$N_\mathrm{eff}$",
             title="Effective sample size",
             log_scale=True,
-        )
-        ax_neff.text(
-            0.02,
-            0.08,
-            "log scale; energy often has larger effective sample size",
-            transform=ax_neff.transAxes,
-            ha="left",
-            va="bottom",
-            fontsize=7.2,
-            color=tokens.INK_SOFT,
-            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.75, "pad": 1.5},
         )
     else:
         ax_neff.text(0.5, 0.5, "N_eff unavailable", transform=ax_neff.transAxes, ha="center")

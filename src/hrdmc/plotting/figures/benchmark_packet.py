@@ -45,17 +45,18 @@ def _write_scalar_comparison(
     formats: tuple[str, ...],
 ) -> list[Path]:
     estimates = payload.get("estimates", {})
+    energy_label, r2_label, rms_label = _scalar_ylabels(payload)
     rows = [
-        ("Energy", r"$E$", "energy", estimates.get("energy", {})),
-        (r"$R^2$", r"$R^2$", "r2", estimates.get("r2", {})),
+        ("Energy", energy_label, "energy", estimates.get("energy", {})),
+        (r"$R^2$", r2_label, "r2", estimates.get("r2", {})),
         (
             r"$R_\mathrm{rms}$",
-            r"$R_\mathrm{rms}$",
+            rms_label,
             "rms",
             estimates.get("rms", {}),
         ),
     ]
-    fig, axes = plt.subplots(1, 3, figsize=(10.8, 3.8))
+    fig, axes = plt.subplots(1, 3, figsize=(10.8, 3.8), constrained_layout=False)
     draw_case_header(fig, payload)
     precision_status = _precision_status(payload)
     for ax, (title, ylabel, observable, data) in zip(axes, rows, strict=True):
@@ -102,9 +103,10 @@ def _write_numerical_diagnostics(
     *,
     formats: tuple[str, ...],
 ) -> list[Path]:
-    fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.9))
+    fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.9), constrained_layout=False)
     draw_case_header(fig, payload)
     draw_chain_panel(axes[0], axes[1], payload)
+    fig.subplots_adjust(top=0.82, bottom=0.15, left=0.09, right=0.985, wspace=0.28)
     paths = save_figure(fig, plot_dir / "numerical_diagnostics", formats)
     plt.close(fig)
     return paths
@@ -123,9 +125,11 @@ def _write_energy_stationarity_diagnostics(
         figsize=(8.2, 5.8),
         sharex=False,
         gridspec_kw={"height_ratios": (1.15, 1.0)},
+        constrained_layout=False,
     )
     draw_case_header(fig, payload)
     draw_energy_stationarity_panel(axes[0], axes[1], payload)
+    fig.subplots_adjust(top=0.84, bottom=0.11, left=0.10, right=0.985, hspace=0.30)
     paths = save_figure(fig, plot_dir / "energy_stationarity_diagnostics", formats)
     plt.close(fig)
     return paths
@@ -141,7 +145,7 @@ def _write_fw_lag_diagnostics(
     fig, ax = plt.subplots(figsize=(7.2, 4.1), constrained_layout=False)
     draw_case_header(fig, payload)
     draw_fw_lag_panel(ax, payload)
-    fig.subplots_adjust(top=0.84, bottom=0.14, left=0.11, right=0.985)
+    fig.subplots_adjust(top=0.84, bottom=0.25, left=0.11, right=0.985)
     paths = save_figure(fig, plot_dir / "fw_lag_diagnostics", formats)
     plt.close(fig)
     return paths
@@ -205,7 +209,7 @@ def _write_xy_figure(
     if x is None or y is None:
         return []
     stderr = array_or_none(observable.get("stderr"))
-    fig, ax = plt.subplots(figsize=(6.8, 3.9))
+    fig, ax = plt.subplots(figsize=(6.8, 3.9), constrained_layout=False)
     draw_case_header(fig, payload)
     ax.plot(x, y, marker="o", linewidth=1.8, markersize=3.8)
     if stderr is not None and stderr.shape == y.shape:
@@ -216,6 +220,7 @@ def _write_xy_figure(
     status = str(observable.get("status", ""))
     if status:
         ax.text(0.02, 0.96, status, transform=ax.transAxes, ha="left", va="top", fontsize=8)
+    fig.subplots_adjust(top=0.82, bottom=0.15, left=0.11, right=0.985)
     paths = save_figure(fig, plot_dir / filename, formats)
     plt.close(fig)
     return paths
@@ -229,7 +234,8 @@ def _write_one_page_packet(
     formats: tuple[str, ...],
 ) -> list[Path]:
     estimates = payload.get("estimates", {})
-    fig = plt.figure(figsize=(8.27, 11.69))
+    energy_label, r2_label, rms_label = _scalar_ylabels(payload)
+    fig = plt.figure(figsize=(8.27, 11.69), constrained_layout=False)
     draw_case_header(fig, payload)
     spec = fig.add_gridspec(
         4,
@@ -242,7 +248,7 @@ def _write_one_page_packet(
     draw_scalar_panel(
         scalar_axes[0],
         title="Energy",
-        ylabel=r"$E$",
+        ylabel=energy_label,
         data=estimates.get("energy", {}),
         observable="energy",
         precision_status=_precision_status(payload),
@@ -250,7 +256,7 @@ def _write_one_page_packet(
     draw_scalar_panel(
         scalar_axes[1],
         title=r"$R^2$",
-        ylabel=r"$R^2$",
+        ylabel=r2_label,
         data=estimates.get("r2", {}),
         observable="r2",
         precision_status=_precision_status(payload),
@@ -258,7 +264,7 @@ def _write_one_page_packet(
     draw_scalar_panel(
         scalar_axes[2],
         title=r"$R_\mathrm{rms}$",
-        ylabel=r"$R_\mathrm{rms}$",
+        ylabel=rms_label,
         data=estimates.get("rms", {}),
         observable="rms",
         precision_status=_precision_status(payload),
@@ -284,3 +290,13 @@ def _write_one_page_packet(
 def _precision_status(payload: dict[str, Any]) -> str:
     stationarity = payload.get("stationarity", {})
     return str(stationarity.get("precision_status", payload.get("status", "")))
+
+
+def _scalar_ylabels(payload: dict[str, Any]) -> tuple[str, str, str]:
+    if payload.get("case_parameterization") == "harmonic_oscillator_units":
+        return (
+            r"$E/(\hbar\omega)$",
+            r"$R^2/a_{\mathrm{ho}}^2$",
+            r"$R_\mathrm{rms}/a_{\mathrm{ho}}$",
+        )
+    return r"$E$", r"$R^2$", r"$R_\mathrm{rms}$"

@@ -10,23 +10,23 @@ def draw_case_header(fig: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
     seeds = payload.get("seeds", [])
     seed_text = f"{len(seeds)} seeds" if isinstance(seeds, list) else "seeds unavailable"
     rod_text = (
-        f"A={payload.get('rod_length_ho')}"
+        rf"$a/a_{{\mathrm{{ho}}}}={payload.get('rod_length_ho')}$"
         if payload.get("case_parameterization") == "harmonic_oscillator_units"
         else f"a={payload.get('rod_length', '?')}"
     )
     trap_text = (
-        "HO units"
+        "oscillator units"
         if payload.get("case_parameterization") == "harmonic_oscillator_units"
         else f"omega={payload.get('omega', '?')}"
     )
     text = (
-        f"N={payload.get('n_particles', '?')}  "
-        f"{rod_text}  "
-        f"{trap_text}  "
-        f"dt={controls.get('dt', '?')}  "
-        f"M={controls.get('walkers', '?')}  "
-        f"{seed_text}  "
-        f"prod_tau={controls.get('production_tau', '?')}"
+        f"N={payload.get('n_particles', '?')}  |  "
+        f"{rod_text}  |  "
+        f"{trap_text}  |  "
+        rf"$\Delta\tau\,\omega={controls.get('dt', '?')}$  |  "
+        f"{controls.get('walkers', '?')} walkers  |  "
+        f"{seed_text}  |  "
+        rf"$\tau_{{\mathrm{{prod}}}}\omega={controls.get('production_tau', '?')}$"
     )
     fig.suptitle(
         text,
@@ -34,7 +34,6 @@ def draw_case_header(fig: Any, payload: dict[str, Any]) -> None:  # noqa: ANN401
         y=0.985,
         ha="left",
         va="top",
-        fontsize=6.8,
-        family="monospace",
+        fontsize=7.2,
         color=tokens.INK_SOFT,
     )

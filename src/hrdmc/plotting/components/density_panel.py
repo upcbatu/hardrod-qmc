@@ -20,6 +20,8 @@ def draw_density_panel(
     if x is None or value is None:
         ax.text(0.5, 0.5, "density unavailable", transform=ax.transAxes, ha="center")
         ax.set_axis_off()
+        if residual_ax is not None:
+            residual_ax.set_axis_off()
         return
     stderr = array_or_none(density.get("stderr"))
     lda_x = array_or_none(density.get("lda_x"))

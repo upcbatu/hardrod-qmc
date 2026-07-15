@@ -69,7 +69,13 @@ def save_figure(
     base = Path(base_path)
     base.parent.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
+    manual_layout = fig.get_layout_engine() is None
     for fmt in formats:
+        # Matplotlib can restore the rcParam layout engine after the first
+        # tight-bbox save.  Reassert explicit manual layout before every
+        # format so PNG and PDF render the same geometry without warnings.
+        if manual_layout and hasattr(fig, "set_layout_engine"):
+            fig.set_layout_engine("none")
         suffix = fmt.lower().lstrip(".")
         path = base.parent / f"{base.name}.{suffix}"
         fig.savefig(path)

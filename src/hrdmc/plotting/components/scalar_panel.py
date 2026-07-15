@@ -83,7 +83,7 @@ def _draw_unavailable(ax: Any, title: str, status: str) -> None:  # noqa: ANN401
     ax.text(
         0.5,
         0.5,
-        status or "not_evaluated",
+        (status or "not evaluated").replace("_", " "),
         transform=ax.transAxes,
         ha="center",
         va="center",
