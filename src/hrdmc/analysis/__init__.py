@@ -45,6 +45,7 @@ from hrdmc.analysis.metrics import (
     relative_density_l2_error,
 )
 from hrdmc.analysis.stability import summarize_replicate_metrics
+from hrdmc.analysis.stationarity_matrix import assess_matrix_energy_stationarity
 from hrdmc.analysis.timeseries import (
     AutocorrelationResult,
     SlopeResult,
@@ -80,6 +81,7 @@ __all__ = [
     "TraceStationarityResult",
     "TriangulatedErrorResult",
     "autocorrelation",
+    "assess_matrix_energy_stationarity",
     "bias",
     "blocking_curve",
     "blocking_standard_error",
