@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.stats import chi2
+from scipy.stats import chi2, norm
 
 FloatArray = NDArray[np.float64]
 
@@ -162,6 +162,33 @@ class LeadingModelSensitivity:
 
 
 @dataclass(frozen=True)
+class AbsoluteDifferenceUpperAllowance:
+    """Normal-approximation upper allowance for an absolute estimator difference."""
+
+    absolute_difference_estimate: float
+    comparison_uncertainty: float
+    confidence_level: float
+    normal_quantile: float
+    upper_allowance: float
+
+    def to_dict(self) -> dict[str, float | str]:
+        return {
+            "absolute_difference_estimate": self.absolute_difference_estimate,
+            "comparison_uncertainty": self.comparison_uncertainty,
+            "confidence_level": self.confidence_level,
+            "normal_quantile": self.normal_quantile,
+            "upper_allowance": self.upper_allowance,
+            "allowance_rule": (
+                "absolute_difference_estimate + normal_quantile * comparison_uncertainty"
+            ),
+            "interpretation": (
+                "two-sided normal-approximation upper allowance for the declared "
+                "estimator difference"
+            ),
+        }
+
+
+@dataclass(frozen=True)
 class TimeStepExtrapolation:
     points: tuple[TimeStepPoint, ...]
     leading_linear_fit: WeightedTimeStepFit
@@ -192,14 +219,10 @@ class TimeStepExtrapolation:
             "candidate_zero_step_energy_statistical_stderr": (
                 self.leading_linear_fit.intercept_stderr
             ),
-            "candidate_zero_step_energy_statistical_plus_model_uncertainty": math.hypot(
-                self.leading_linear_fit.intercept_stderr,
-                model_spread,
-            ),
-            "model_spread_systematic_allowance": model_spread,
+            "leading_model_intercept_spread": model_spread,
             "model_spread_interpretation": (
-                "heuristic leading-model systematic allowance, not a statistical "
-                "standard error; the combined uncertainty is also heuristic"
+                "observed leading-model intercept difference; it is neither a "
+                "statistical standard error nor a complete time-step systematic bound"
             ),
             "leading_linear_fit": self.leading_linear_fit.to_dict(),
             "leading_quadratic_fit": self.leading_quadratic_fit.to_dict(),
@@ -220,6 +243,31 @@ class TimeStepExtrapolation:
                 "standard errors; cross-time-step covariance is unavailable and omitted"
             ),
         }
+
+
+def absolute_difference_upper_allowance(
+    absolute_difference_estimate: float,
+    comparison_uncertainty: float,
+    *,
+    confidence_level: float,
+) -> AbsoluteDifferenceUpperAllowance:
+    """Return a conservative two-sided normal allowance for ``|theta_1-theta_2|``."""
+
+    if not math.isfinite(absolute_difference_estimate) or absolute_difference_estimate < 0.0:
+        raise ValueError("absolute_difference_estimate must be finite and nonnegative")
+    if not math.isfinite(comparison_uncertainty) or comparison_uncertainty < 0.0:
+        raise ValueError("comparison_uncertainty must be finite and nonnegative")
+    if not math.isfinite(confidence_level) or not 0.0 < confidence_level < 1.0:
+        raise ValueError("confidence_level must lie strictly between zero and one")
+    normal_quantile = float(norm.ppf(0.5 + 0.5 * confidence_level))
+    upper_allowance = absolute_difference_estimate + normal_quantile * comparison_uncertainty
+    return AbsoluteDifferenceUpperAllowance(
+        absolute_difference_estimate=float(absolute_difference_estimate),
+        comparison_uncertainty=float(comparison_uncertainty),
+        confidence_level=float(confidence_level),
+        normal_quantile=normal_quantile,
+        upper_allowance=float(upper_allowance),
+    )
 
 
 def weighted_leading_time_step_fit(

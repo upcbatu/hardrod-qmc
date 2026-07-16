@@ -9,7 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from hrdmc.analysis.timestep_extrapolation import (
+    LargestTimeStepStability,
+    TimeStepExtrapolation,
     TimeStepPoint,
+    absolute_difference_upper_allowance,
     analyze_time_step_extrapolation,
 )
 from hrdmc.artifacts import (
@@ -25,13 +28,54 @@ from hrdmc.workflows.dmc.benchmark_packet.matrix_assembly import (
     load_final_matrix_energy_selection,
 )
 
-TIMESTEP_EXTRAPOLATION_SCHEMA_VERSION = "dmc_timestep_extrapolation_v3"
+TIMESTEP_EXTRAPOLATION_SCHEMA_VERSION = "dmc_timestep_extrapolation_v4"
 SUPPORTED_INPUTS = {
     ("dmc_benchmark_packet", "dmc_benchmark_packet_v3"),
     ("dmc_trapped_stationarity_grid", "dmc_trapped_stationarity_grid_v2"),
 }
-PUBLICATION_READY_WORKFLOW_STATUSES = {"accepted", "accepted_with_warnings"}
+PUBLICATION_READY_WORKFLOW_STATUSES = {
+    "accepted",
+    "accepted_with_warnings",
+    "accepted_with_model_bound",
+}
 ENERGY_CHAIN_ACCEPTED_STATUSES = {"accepted", "spread_warning"}
+ENERGY_REPORTING_POLICY_TIMINGS = {"prospective", "retrospective"}
+
+
+@dataclass(frozen=True)
+class EnergyReportingResolutionPolicy:
+    """Explicit practical resolution used to qualify time-step model ambiguity."""
+
+    resolution: float
+    confidence_level: float
+    energy_unit: str
+    rationale: str
+    timing: str
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.resolution) or self.resolution <= 0.0:
+            raise ValueError("energy reporting resolution must be finite and positive")
+        if not math.isfinite(self.confidence_level) or not 0.0 < self.confidence_level < 1.0:
+            raise ValueError(
+                "energy reporting confidence level must lie strictly between zero and one"
+            )
+        if not self.energy_unit.strip():
+            raise ValueError("energy reporting resolution unit must be non-empty")
+        if not self.rationale.strip():
+            raise ValueError("energy reporting resolution rationale must be non-empty")
+        if self.timing not in ENERGY_REPORTING_POLICY_TIMINGS:
+            raise ValueError(
+                "energy reporting policy timing must be 'prospective' or 'retrospective'"
+            )
+
+    def to_dict(self) -> dict[str, float | str]:
+        return {
+            "resolution": self.resolution,
+            "confidence_level": self.confidence_level,
+            "energy_unit": self.energy_unit,
+            "rationale": self.rationale,
+            "timing": self.timing,
+        }
 
 
 @dataclass(frozen=True)
@@ -94,6 +138,7 @@ def run_timestep_extrapolation_workflow(
     sensitivity_sigma: float = 2.0,
     fit_alpha: float = 0.05,
     energy_assessment_manifest: Path | None = None,
+    energy_reporting_policy: EnergyReportingResolutionPolicy | None = None,
 ) -> dict[str, Any]:
     """Verify DMC summaries and extrapolate their mixed energy to zero time step."""
 
@@ -151,10 +196,18 @@ def run_timestep_extrapolation_workflow(
     sampling_design = _sampling_design(loaded)
     input_quality = _input_quality(loaded)
     cross_timestep_covariance = _cross_timestep_covariance(loaded)
+    practical_resolution = _practical_resolution_assessment(
+        analysis,
+        policy=energy_reporting_policy,
+        input_quality=input_quality,
+        cross_timestep_covariance=cross_timestep_covariance,
+        energy_semantics=_required_mapping(reference_identity, "energy_semantics"),
+    )
+    model_bound_accepted = practical_resolution["accepted_with_model_bound"] is True
     unresolved_reasons: list[str] = []
     if analysis.classification == "fit_inadequate":
         unresolved_reasons.append("fit_inadequate")
-    elif analysis.classification == "model_sensitive":
+    elif analysis.classification == "model_sensitive" and not model_bound_accepted:
         unresolved_reasons.append("model_sensitive")
     if analysis.fit_window_status != "accepted":
         unresolved_reasons.append("fit_window_unresolved")
@@ -163,7 +216,9 @@ def run_timestep_extrapolation_workflow(
     if cross_timestep_covariance["status"] != "accepted":
         unresolved_reasons.append("cross_timestep_covariance_unresolved")
 
-    if analysis.classification == "fit_inadequate":
+    if model_bound_accepted:
+        workflow_status = "accepted_with_model_bound"
+    elif analysis.classification == "fit_inadequate":
         workflow_status = analysis.classification
     elif analysis.classification == "model_sensitive":
         workflow_status = analysis.classification
@@ -182,6 +237,14 @@ def run_timestep_extrapolation_workflow(
         "status": workflow_status,
         "classification": analysis.classification,
         "unresolved_reasons": unresolved_reasons,
+        "qualified_systematics": (
+            [
+                "leading_model_difference_bounded_below_reporting_resolution",
+                "fit_window_difference_bounded_below_reporting_resolution",
+            ]
+            if model_bound_accepted
+            else []
+        ),
         "diagnostic": "DMC mixed-energy time-step extrapolation",
         "case_id": loaded[0].case_id,
         "identity": reference_identity,
@@ -195,8 +258,15 @@ def run_timestep_extrapolation_workflow(
         "input_quality": input_quality,
         "energy_quality_assessment": energy_quality_assessment,
         "cross_timestep_covariance": cross_timestep_covariance,
+        "energy_reporting_policy": (
+            None if energy_reporting_policy is None else energy_reporting_policy.to_dict()
+        ),
+        "practical_resolution_assessment": practical_resolution,
         "extrapolation": analysis.to_dict(),
         "reference_energy_used_for_model_selection": False,
+        "publication_ready_within_fixed_population_timestep_scope": (
+            workflow_status in PUBLICATION_READY_WORKFLOW_STATUSES
+        ),
         "scientific_scope": (
             "The fit quantifies finite-time-step dependence at fixed case, guide, "
             "source implementation, walker population, initialization, propagator, "
@@ -212,11 +282,26 @@ def run_timestep_extrapolation_workflow(
                 "extrapolated_energy_statistical_stderr": analysis_payload[
                     "candidate_zero_step_energy_statistical_stderr"
                 ],
-                "extrapolated_energy_model_spread_systematic_allowance": (
-                    analysis_payload["model_spread_systematic_allowance"]
+                "extrapolated_energy_leading_model_intercept_spread": analysis_payload[
+                    "leading_model_intercept_spread"
+                ],
+                "uncertainty_component_combination": (
+                    "statistical and systematic components are reported separately; "
+                    "systematic upper allowances are not combined in quadrature"
                 ),
             }
         )
+        if model_bound_accepted:
+            payload.update(
+                {
+                    "extrapolated_energy_model_order_upper_allowance": (
+                        practical_resolution["model_order"]["upper_allowance"]
+                    ),
+                    "extrapolated_energy_fit_window_upper_allowance": (
+                        practical_resolution["fit_window"]["upper_allowance"]
+                    ),
+                }
+            )
     config = {
         "case_id": loaded[0].case_id,
         "identity": reference_identity,
@@ -226,6 +311,9 @@ def run_timestep_extrapolation_workflow(
         "sampling_design": sampling_design,
         "input_quality": input_quality,
         "cross_timestep_covariance": cross_timestep_covariance,
+        "energy_reporting_policy": (
+            None if energy_reporting_policy is None else energy_reporting_policy.to_dict()
+        ),
         "energy_quality_assessment": energy_quality_assessment,
         "inputs": [
             {
@@ -277,6 +365,180 @@ def run_timestep_extrapolation_workflow(
         payload["artifacts"] = artifacts
     payload["workflow_artifacts"] = artifacts
     return payload
+
+
+def _practical_resolution_assessment(
+    analysis: TimeStepExtrapolation,
+    *,
+    policy: EnergyReportingResolutionPolicy | None,
+    input_quality: dict[str, Any],
+    cross_timestep_covariance: dict[str, Any],
+    energy_semantics: dict[str, Any],
+) -> dict[str, Any]:
+    separate_components = (
+        "statistical stderr, model-order upper allowance, and fit-window upper "
+        "allowance are reported separately and are not combined in quadrature"
+    )
+    if policy is None:
+        return {
+            "status": "not_requested",
+            "accepted_with_model_bound": False,
+            "statistical_classification": analysis.classification,
+            "policy": None,
+            "model_order": None,
+            "fit_window": None,
+            "curvature_diagnostic": None,
+            "checks": {},
+            "failed_checks": [],
+            "uncertainty_component_combination": separate_components,
+            "scope": "fixed-walker-population mixed-energy time-step extrapolation",
+        }
+
+    energy_unit = _required_string(energy_semantics, "energy_unit")
+    report_energy_unit = _required_string(energy_semantics, "report_energy_unit")
+    if policy.energy_unit != energy_unit or policy.energy_unit != report_energy_unit:
+        raise ValueError(
+            "energy reporting resolution unit must match the input energy and report units"
+        )
+
+    sensitivity = analysis.leading_model_sensitivity
+    model_order = absolute_difference_upper_allowance(
+        sensitivity.absolute_spread,
+        sensitivity.comparison_uncertainty,
+        confidence_level=policy.confidence_level,
+    ).to_dict()
+    linear_window = _fit_window_upper_allowance(
+        analysis.leading_linear_largest_point_stability,
+        confidence_level=policy.confidence_level,
+    )
+    quadratic_window = _fit_window_upper_allowance(
+        analysis.leading_quadratic_largest_point_stability,
+        confidence_level=policy.confidence_level,
+    )
+    available_window_allowances = [
+        float(value["upper_allowance"])
+        for value in (linear_window, quadratic_window)
+        if value is not None
+    ]
+    fit_window_upper_allowance = (
+        max(available_window_allowances) if available_window_allowances else None
+    )
+    fit_window = {
+        "leading_linear": linear_window,
+        "leading_quadratic": quadratic_window,
+        "selection_rule": "maximum upper allowance across the two leading models",
+        "upper_allowance": fit_window_upper_allowance,
+    }
+    curvature_fit = analysis.curvature_fit
+    curvature_stability = analysis.curvature_largest_point_stability
+    curvature_four_point_unavailable = (
+        curvature_stability is not None
+        and not curvature_stability.available
+        and len(analysis.points) == 4
+    )
+    curvature_window_accepted = (
+        curvature_stability is None
+        or curvature_four_point_unavailable
+        or (
+            curvature_stability.available
+            and curvature_stability.classification == "largest_point_stable"
+        )
+    )
+    curvature_diagnostic = {
+        "fit_available": curvature_fit is not None,
+        "fit_goodness_of_fit_status": (
+            None if curvature_fit is None else curvature_fit.goodness_of_fit_status
+        ),
+        "largest_point_check_available": (
+            None if curvature_stability is None else curvature_stability.available
+        ),
+        "largest_point_classification": (
+            None if curvature_stability is None else curvature_stability.classification
+        ),
+        "four_point_unavailable_allowed": curvature_four_point_unavailable,
+        "interpretation": (
+            "an unavailable curvature leave-largest-time-step-out check is allowed "
+            "only for a four-point fit window; every available check must be stable"
+        ),
+    }
+
+    statistically_resolved_model_difference = (
+        sensitivity.classification == "model_sensitive"
+        and sensitivity.absolute_spread
+        > sensitivity.sensitivity_sigma * sensitivity.comparison_uncertainty
+    )
+    checks = {
+        "analysis_is_model_sensitive": analysis.classification == "model_sensitive",
+        "model_difference_is_statistically_resolved": (statistically_resolved_model_difference),
+        "leading_linear_fit_adequate": (
+            analysis.leading_linear_fit.goodness_of_fit_status == "accepted"
+        ),
+        "leading_quadratic_fit_adequate": (
+            analysis.leading_quadratic_fit.goodness_of_fit_status == "accepted"
+        ),
+        "leading_linear_window_stable": (
+            analysis.leading_linear_largest_point_stability.classification == "largest_point_stable"
+        ),
+        "leading_quadratic_window_stable": (
+            analysis.leading_quadratic_largest_point_stability.classification
+            == "largest_point_stable"
+        ),
+        "curvature_fit_adequate_or_absent": (
+            curvature_fit is None or curvature_fit.goodness_of_fit_status == "accepted"
+        ),
+        "curvature_window_stable_or_four_point_unavailable": curvature_window_accepted,
+        "fit_window_accepted": analysis.fit_window_status == "accepted",
+        "model_order_upper_allowance_within_resolution": (
+            float(model_order["upper_allowance"]) <= policy.resolution
+        ),
+        "fit_window_upper_allowance_within_resolution": (
+            fit_window_upper_allowance is not None
+            and fit_window_upper_allowance <= policy.resolution
+        ),
+        "input_quality_accepted": input_quality["publication_accepted"] is True,
+        "cross_timestep_covariance_accepted": (cross_timestep_covariance["status"] == "accepted"),
+    }
+    accepted = all(checks.values())
+    return {
+        "status": "bounded_below_reporting_resolution" if accepted else "not_bounded",
+        "accepted_with_model_bound": accepted,
+        "statistical_classification": analysis.classification,
+        "policy": policy.to_dict(),
+        "model_order": model_order,
+        "fit_window": fit_window,
+        "curvature_diagnostic": curvature_diagnostic,
+        "checks": checks,
+        "failed_checks": [name for name, passed in checks.items() if not passed],
+        "uncertainty_component_combination": separate_components,
+        "bound_scope": (
+            "declared leading-linear and leading-quadratic models and their "
+            "leave-largest-time-step-out windows; not every possible asymptotic model"
+        ),
+        "scope": "fixed-walker-population mixed-energy time-step extrapolation",
+    }
+
+
+def _fit_window_upper_allowance(
+    stability: LargestTimeStepStability,
+    *,
+    confidence_level: float,
+) -> dict[str, Any] | None:
+    if (
+        not stability.available
+        or stability.absolute_shift is None
+        or stability.comparison_uncertainty is None
+    ):
+        return None
+    allowance = absolute_difference_upper_allowance(
+        stability.absolute_shift,
+        stability.comparison_uncertainty,
+        confidence_level=confidence_level,
+    ).to_dict()
+    return {
+        "model": stability.model,
+        "statistical_classification": stability.classification,
+        **allowance,
+    }
 
 
 def _load_time_step_point(summary_path: Path) -> LoadedTimeStepPoint:
@@ -766,22 +1028,14 @@ def _input_quality(points: Sequence[LoadedTimeStepPoint]) -> dict[str, Any]:
         if row["publication_accepted"] and row["publication_status"] != "accepted"
     ]
     precision_warning_rows = [
-        row
-        for row in rows
-        if row["publication_status"] == "accepted_with_precision_warning"
+        row for row in rows if row["publication_status"] == "accepted_with_precision_warning"
     ]
     retrospective_rows = [
-        row
-        for row in rows
-        if row["publication_status"] == "accepted_with_retrospective_assessment"
+        row for row in rows if row["publication_status"] == "accepted_with_retrospective_assessment"
     ]
     return {
         "status": (
-            "unresolved"
-            if unresolved
-            else "accepted_with_warnings"
-            if warning_rows
-            else "accepted"
+            "unresolved" if unresolved else "accepted_with_warnings" if warning_rows else "accepted"
         ),
         "publication_accepted": not unresolved,
         "publication_accepted_statuses": [
@@ -987,8 +1241,7 @@ def _validate_output_separation(
             or run_dir.is_relative_to(output_dir)
         ):
             raise ValueError(
-                "output_dir must not overlap an input artifact or run directory: "
-                f"{output_dir}"
+                f"output_dir must not overlap an input artifact or run directory: {output_dir}"
             )
 
 
@@ -1039,12 +1292,8 @@ def _write_point_table(
             payload["seeds"] = ",".join(str(seed) for seed in point.seeds)
             payload.update(
                 {
-                    "energy_publication_accepted": point.energy_quality.get(
-                        "publication_accepted"
-                    ),
-                    "energy_publication_status": point.energy_quality.get(
-                        "publication_status"
-                    ),
+                    "energy_publication_accepted": point.energy_quality.get("publication_accepted"),
+                    "energy_publication_status": point.energy_quality.get("publication_status"),
                     "energy_status_basis": point.energy_quality.get("status_basis"),
                     "source_energy_publication_accepted": point.energy_quality.get(
                         "source_publication_accepted"
@@ -1055,9 +1304,9 @@ def _write_point_table(
                     "energy_assessment_manifest_sha256": (
                         point.energy_quality_assessment or {}
                     ).get("assessment_manifest_sha256"),
-                    "energy_assessment_run_id": (
-                        point.energy_quality_assessment or {}
-                    ).get("assessment_run_id"),
+                    "energy_assessment_run_id": (point.energy_quality_assessment or {}).get(
+                        "assessment_run_id"
+                    ),
                 }
             )
             payload.update(point.telemetry)
