@@ -29,6 +29,7 @@ from hrdmc.workflows.dmc.benchmark_packet.matrix_assembly import (
 )
 
 TIMESTEP_EXTRAPOLATION_SCHEMA_VERSION = "dmc_timestep_extrapolation_v4"
+TIMESTEP_EXTRAPOLATION_RUN_NAME = "dmc_timestep_extrapolation"
 SUPPORTED_INPUTS = {
     ("dmc_benchmark_packet", "dmc_benchmark_packet_v3"),
     ("dmc_trapped_stationarity_grid", "dmc_trapped_stationarity_grid_v2"),
@@ -348,7 +349,7 @@ def run_timestep_extrapolation_workflow(
         write_json(summary_path, payload)
         manifest_path = write_run_manifest(
             root,
-            run_name="dmc_timestep_extrapolation",
+            run_name=TIMESTEP_EXTRAPOLATION_RUN_NAME,
             config=config,
             artifacts=[summary_path, table_path],
             schema_version=TIMESTEP_EXTRAPOLATION_SCHEMA_VERSION,
