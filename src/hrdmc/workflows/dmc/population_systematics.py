@@ -33,7 +33,7 @@ from hrdmc.workflows.dmc.benchmark_packet.matrix_assembly import (
 from hrdmc.workflows.dmc.benchmark_packet.selection import energy_validation_status
 from hrdmc.workflows.dmc.trapped import parse_case
 
-POPULATION_SYSTEMATICS_SCHEMA_VERSION = "dmc_population_systematics_v2"
+POPULATION_SYSTEMATICS_SCHEMA_VERSION = "dmc_population_systematics_v3"
 POPULATION_SYSTEMATICS_RUN_NAME = "dmc_population_systematics"
 FIXED_ENERGY_REPORTING_RESOLUTION = 0.01
 FIXED_ENERGY_REPORTING_UNIT = "hbar*Omega"
@@ -109,9 +109,16 @@ def run_population_systematics_workflow(
     confidence_level: float = 0.95,
     fit_alpha: float = 0.05,
     interaction_dt: float | None = None,
+    selected_dt: float | None = None,
     energy_assessment_manifest: Path | None = None,
 ) -> dict[str, Any]:
-    """Assess finite-walker energy sensitivity and one timestep interaction."""
+    """Assess finite-walker energy sensitivity and one timestep interaction.
+
+    When two timestep treatments are supplied, ``selected_dt`` identifies the
+    treatment whose finite-population or population-limit result is being
+    qualified.  The smaller timestep remains the reference treatment for the
+    four-corner interaction; it is not selected implicitly.
+    """
 
     _validate_reporting_policy(
         reporting_resolution=reporting_resolution,
@@ -143,36 +150,56 @@ def run_population_systematics_workflow(
             energy_assessment_manifest=energy_assessment_manifest.resolve(),
         )
     groups = _group_by_timestep(loaded)
-    fine_dt = min(groups)
-    fine_group = groups[fine_dt]
-    _validate_population_group(fine_group, name="fine timestep")
-    fine_analysis = analyze_population_ladder(
-        [item.point for item in fine_group],
-        reporting_resolution=reporting_resolution,
-        confidence_level=confidence_level,
-        fit_alpha=fit_alpha,
-    )
-
-    interaction: TimeStepPopulationInteraction | None = None
-    coarse_dt: float | None = None
     if len(groups) > 2:
         raise ValueError(
-            "population workflow accepts one fine timestep and at most one interaction timestep"
+            "population workflow accepts one reference timestep and at most one coarse timestep"
         )
+    reference_fine_dt = min(groups)
+    coarse_dt = max(groups) if len(groups) == 2 else None
+    if len(groups) == 2 and selected_dt is None:
+        raise ValueError("selected_dt is required when two timestep treatments are supplied")
+    selected_timestep = _resolve_selected_timestep(
+        groups,
+        selected_dt=selected_dt,
+    )
+    selected_dt_basis = (
+        "explicit_selected_dt" if selected_dt is not None else "only_supplied_timestep"
+    )
+    selected_treatment_role = (
+        "reference_fine" if selected_timestep == reference_fine_dt else "coarse"
+    )
+
+    analyses: dict[float, PopulationLadderAssessment] = {}
+    for dt, group in groups.items():
+        role = "reference fine timestep" if dt == reference_fine_dt else "coarse timestep"
+        _validate_population_group(group, name=role)
+        analyses[dt] = analyze_population_ladder(
+            [item.point for item in group],
+            reporting_resolution=reporting_resolution,
+            confidence_level=confidence_level,
+            fit_alpha=fit_alpha,
+        )
+    reference_fine_group = groups[reference_fine_dt]
+    reference_fine_analysis = analyses[reference_fine_dt]
+    coarse_group = None if coarse_dt is None else groups[coarse_dt]
+    coarse_analysis = None if coarse_dt is None else analyses[coarse_dt]
+    selected_analysis = analyses[selected_timestep]
+    selected_walkers = selected_analysis.reference_walkers
+    selected_walkers_basis = "reference_population_of_selected_timestep_ladder"
+
+    interaction: TimeStepPopulationInteraction | None = None
     if len(groups) == 2:
-        available_coarse = max(groups)
+        assert coarse_dt is not None
+        assert coarse_group is not None
         if interaction_dt is not None and not math.isclose(
             interaction_dt,
-            available_coarse,
+            coarse_dt,
             rel_tol=0.0,
             abs_tol=1.0e-15,
         ):
             raise ValueError("interaction_dt does not match the supplied coarse timestep")
-        coarse_dt = available_coarse
-        coarse_group = groups[coarse_dt]
-        _validate_population_group(coarse_group, name="coarse timestep")
-        _validate_cross_timestep_controls(fine_group, coarse_group)
-        fine_pair = _reference_doubling_pair(fine_group)
+        _validate_cross_timestep_controls(reference_fine_group, coarse_group)
+        fine_pair = _reference_doubling_pair(reference_fine_group)
         coarse_pair = _reference_doubling_pair(coarse_group)
         interaction = analyze_timestep_population_interaction(
             [item.point for item in fine_pair],
@@ -184,7 +211,7 @@ def run_population_systematics_workflow(
         raise ValueError("interaction_dt requires a supplied coarse-timestep W/2W pair")
 
     input_quality = _input_quality(loaded)
-    classification = fine_analysis.classification
+    classification = selected_analysis.classification
     unresolved_reasons: list[str] = []
     if not input_quality["publication_accepted"]:
         unresolved_reasons.append("input_quality_unresolved")
@@ -240,7 +267,21 @@ def run_population_systematics_workflow(
     sampling_design = _sampling_design(loaded)
     identity = loaded[0].identity
     identity_fingerprint = config_fingerprint(identity)
-    fine_payload = fine_analysis.to_dict()
+    reference_fine_payload = reference_fine_analysis.to_dict()
+    coarse_payload = None if coarse_analysis is None else coarse_analysis.to_dict()
+    selected_payload = selected_analysis.to_dict()
+    population_bounds = {
+        "reference_fine_last_doubling_upper_allowance": (
+            reference_fine_analysis.last_doubling.upper_allowance
+        ),
+        "coarse_last_doubling_upper_allowance": (
+            None if coarse_analysis is None else coarse_analysis.last_doubling.upper_allowance
+        ),
+        "selected_last_doubling_upper_allowance": (selected_analysis.last_doubling.upper_allowance),
+        "timestep_population_interaction_upper_allowance": (
+            None if interaction is None else interaction.upper_allowance
+        ),
+    }
     payload: dict[str, Any] = {
         "schema_version": POPULATION_SYSTEMATICS_SCHEMA_VERSION,
         "status": status,
@@ -259,8 +300,13 @@ def run_population_systematics_workflow(
         "statistical_method_policy": statistical_method_policy,
         "sampling_design": sampling_design,
         "fit_alpha": fit_alpha,
-        "fine_timestep": fine_dt,
-        "interaction_timestep": coarse_dt,
+        "reference_fine_dt": reference_fine_dt,
+        "coarse_dt": coarse_dt,
+        "selected_dt": selected_timestep,
+        "selected_dt_basis": selected_dt_basis,
+        "selected_treatment_role": selected_treatment_role,
+        "selected_walkers": selected_walkers,
+        "selected_walkers_basis": selected_walkers_basis,
         "timestep_population_interaction_status": (
             "not_assessed"
             if interaction is None
@@ -271,7 +317,10 @@ def run_population_systematics_workflow(
         "input_summaries": [point.to_dict() for point in loaded],
         "input_quality": input_quality,
         "energy_quality_assessment": energy_quality_assessment,
-        "population_ladder": fine_payload,
+        "reference_fine_population_ladder": reference_fine_payload,
+        "coarse_population_ladder": coarse_payload,
+        "selected_population_ladder": selected_payload,
+        "population_bounds": population_bounds,
         "timestep_population_interaction": (None if interaction is None else interaction.to_dict()),
         "publication_ready_within_population_systematic_scope": publication_ready,
         "uncertainty_component_combination": (
@@ -287,22 +336,71 @@ def run_population_systematics_workflow(
         ),
     }
     if publication_ready:
-        payload["population_last_doubling_upper_allowance"] = (
-            fine_analysis.last_doubling.upper_allowance
+        payload["selected_population_last_doubling_upper_allowance"] = (
+            selected_analysis.last_doubling.upper_allowance
         )
         if classification == "accepted_population_limit":
-            assert fine_analysis.inverse_population_fit is not None
-            assert fine_analysis.richardson_window is not None
+            assert selected_analysis.inverse_population_fit is not None
+            assert selected_analysis.richardson_window is not None
+            assert selected_analysis.population_limit_correction is not None
+            correction = selected_analysis.population_limit_correction
             payload.update(
                 {
-                    "population_limit_energy_at_fine_timestep": (
-                        fine_analysis.inverse_population_fit.intercept
+                    "selected_energy_population_basis": ("population_limit_at_selected_timestep"),
+                    "population_limit_energy_at_selected_timestep": (
+                        selected_analysis.inverse_population_fit.intercept
                     ),
                     "population_limit_energy_statistical_stderr": (
-                        fine_analysis.inverse_population_fit.intercept_stderr
+                        selected_analysis.inverse_population_fit.intercept_stderr
                     ),
                     "population_limit_model_window_upper_allowance": (
-                        fine_analysis.richardson_window.upper_allowance
+                        selected_analysis.richardson_window.upper_allowance
+                    ),
+                    "population_limit_correction_at_selected_timestep": correction.value,
+                    "population_limit_correction_statistical_stderr": (
+                        correction.conservative_standard_error
+                    ),
+                    "population_limit_correction_matched_seed_standard_error": (
+                        correction.matched_seed_standard_error
+                    ),
+                    "population_limit_correction_source_run_quadrature_standard_error": (
+                        correction.source_run_quadrature_standard_error
+                    ),
+                    "population_limit_correction_worst_case_arbitrary_covariance_"
+                    "standard_error_envelope": (
+                        correction.worst_case_arbitrary_covariance_standard_error_envelope
+                    ),
+                    "population_limit_correction_basis": (
+                        "E_infinity(selected_dt) - E(selected_dt, selected_walkers)"
+                    ),
+                    "downstream_zero_timestep_population_scope": (
+                        "apply_population_limit_correction_to_selected_finite_population_"
+                        "zero_timestep_energy"
+                    ),
+                }
+            )
+        else:
+            selected_reference_point = _reference_population_point(selected_analysis)
+            payload.update(
+                {
+                    "selected_energy_population_basis": ("finite_population_at_selected_walkers"),
+                    "finite_population_energy_at_selected_timestep": (
+                        selected_reference_point.energy
+                    ),
+                    "finite_population_energy_statistical_stderr": (
+                        selected_reference_point.conservative_stderr
+                    ),
+                    "finite_population_walkers": selected_reference_point.walkers,
+                    "finite_population_energy_basis": (
+                        "selected timestep reference population W; the W-to-2W "
+                        "difference is bounded below the reporting resolution"
+                    ),
+                    "finite_population_w_to_2w_upper_allowance": (
+                        selected_analysis.last_doubling.upper_allowance
+                    ),
+                    "downstream_zero_timestep_population_scope": (
+                        "retain_selected_finite_population_zero_timestep_energy; "
+                        "no infinite-population central value is claimed"
                     ),
                 }
             )
@@ -317,8 +415,13 @@ def run_population_systematics_workflow(
         "statistical_method_policy": statistical_method_policy,
         "sampling_design": sampling_design,
         "fit_alpha": fit_alpha,
-        "fine_timestep": fine_dt,
-        "interaction_timestep": coarse_dt,
+        "reference_fine_dt": reference_fine_dt,
+        "coarse_dt": coarse_dt,
+        "selected_dt": selected_timestep,
+        "selected_dt_basis": selected_dt_basis,
+        "selected_treatment_role": selected_treatment_role,
+        "selected_walkers": selected_walkers,
+        "selected_walkers_basis": selected_walkers_basis,
         "energy_quality_assessment": energy_quality_assessment,
         "inputs": [
             {
@@ -348,9 +451,12 @@ def run_population_systematics_workflow(
         point_table_path = _write_point_table(root, loaded)
         comparison_table_path = _write_comparison_table(
             root,
-            fine_dt=fine_dt,
-            fine_analysis=fine_analysis,
+            reference_fine_dt=reference_fine_dt,
+            reference_fine_analysis=reference_fine_analysis,
             coarse_dt=coarse_dt,
+            coarse_analysis=coarse_analysis,
+            selected_dt=selected_timestep,
+            selected_dt_basis=selected_dt_basis,
             interaction=interaction,
         )
         payload["artifacts"] = {
@@ -985,6 +1091,34 @@ def _group_by_timestep(
     return {dt: sorted(group, key=lambda item: item.point.walkers) for dt, group in groups.items()}
 
 
+def _resolve_selected_timestep(
+    groups: Mapping[float, Sequence[LoadedPopulationPoint]],
+    *,
+    selected_dt: float | None,
+) -> float:
+    if selected_dt is None:
+        if len(groups) != 1:
+            raise ValueError("selected_dt is required when two timestep treatments are supplied")
+        return next(iter(groups))
+    if not math.isfinite(selected_dt) or selected_dt <= 0.0:
+        raise ValueError("selected_dt must be finite and positive")
+    matches = [dt for dt in groups if math.isclose(dt, selected_dt, rel_tol=0.0, abs_tol=1.0e-15)]
+    if len(matches) != 1:
+        raise ValueError("selected_dt must match exactly one supplied timestep treatment")
+    return matches[0]
+
+
+def _reference_population_point(
+    assessment: PopulationLadderAssessment,
+) -> PopulationEnergyPoint:
+    matches = [
+        point for point in assessment.points if point.walkers == assessment.reference_walkers
+    ]
+    if len(matches) != 1:
+        raise ValueError("population ladder does not contain its reference walker point")
+    return matches[0]
+
+
 def _sampling_design(points: Sequence[LoadedPopulationPoint]) -> dict[str, Any]:
     records: list[dict[str, Any]] = []
     trace_spacings: list[float] = []
@@ -1238,16 +1372,24 @@ def _write_point_table(
 def _write_comparison_table(
     output_dir: Path,
     *,
-    fine_dt: float,
-    fine_analysis: PopulationLadderAssessment,
+    reference_fine_dt: float,
+    reference_fine_analysis: PopulationLadderAssessment,
     coarse_dt: float | None,
+    coarse_analysis: PopulationLadderAssessment | None,
+    selected_dt: float,
+    selected_dt_basis: str,
     interaction: TimeStepPopulationInteraction | None,
 ) -> Path:
     path = output_dir / "comparison_table.csv"
     fields = (
         "comparison",
-        "fine_dt",
+        "treatment_role",
+        "timestep",
+        "reference_fine_dt",
         "coarse_dt",
+        "selected_dt",
+        "selected_dt_basis",
+        "is_selected_treatment",
         "first_walkers",
         "second_walkers",
         "mean_difference",
@@ -1260,55 +1402,74 @@ def _write_comparison_table(
         "bounded_below_reporting_resolution",
         "classification",
     )
-    last = fine_analysis.last_doubling
-    rows: list[dict[str, Any]] = [
-        {
-            "comparison": "fine_last_doubling",
-            "fine_dt": fine_dt,
-            "first_walkers": last.first_walkers,
-            "second_walkers": last.second_walkers,
-            "mean_difference": last.mean_difference,
-            "paired_standard_error": last.paired_standard_error,
-            "source_run_quadrature_standard_error": (last.source_run_quadrature_standard_error),
-            "worst_case_arbitrary_covariance_standard_error_envelope": (
-                last.worst_case_arbitrary_covariance_standard_error_envelope
-            ),
-            "conservative_standard_error": last.conservative_standard_error,
-            "upper_allowance": last.upper_allowance,
-            "reporting_resolution": last.reporting_resolution,
-            "bounded_below_reporting_resolution": (last.bounded_below_reporting_resolution),
-            "classification": fine_analysis.classification,
+    rows: list[dict[str, Any]] = []
+    for role, dt, analysis in (
+        ("reference_fine", reference_fine_dt, reference_fine_analysis),
+        ("coarse", coarse_dt, coarse_analysis),
+    ):
+        if dt is None or analysis is None:
+            continue
+        common = {
+            "treatment_role": role,
+            "timestep": dt,
+            "reference_fine_dt": reference_fine_dt,
+            "coarse_dt": coarse_dt,
+            "selected_dt": selected_dt,
+            "selected_dt_basis": selected_dt_basis,
+            "is_selected_treatment": dt == selected_dt,
+            "classification": analysis.classification,
         }
-    ]
-    richardson = fine_analysis.richardson_window
-    if richardson is not None:
+        last = analysis.last_doubling
         rows.append(
             {
-                "comparison": "fine_richardson_window",
-                "fine_dt": fine_dt,
-                "mean_difference": richardson.mean_difference,
-                "paired_standard_error": richardson.paired_standard_error,
-                "source_run_quadrature_standard_error": (
-                    richardson.source_run_quadrature_standard_error
-                ),
+                **common,
+                "comparison": f"{role}_last_doubling",
+                "first_walkers": last.first_walkers,
+                "second_walkers": last.second_walkers,
+                "mean_difference": last.mean_difference,
+                "paired_standard_error": last.paired_standard_error,
+                "source_run_quadrature_standard_error": (last.source_run_quadrature_standard_error),
                 "worst_case_arbitrary_covariance_standard_error_envelope": (
-                    richardson.worst_case_arbitrary_covariance_standard_error_envelope
+                    last.worst_case_arbitrary_covariance_standard_error_envelope
                 ),
-                "conservative_standard_error": richardson.conservative_standard_error,
-                "upper_allowance": richardson.upper_allowance,
-                "reporting_resolution": richardson.reporting_resolution,
-                "bounded_below_reporting_resolution": (
-                    richardson.bounded_below_reporting_resolution
-                ),
-                "classification": fine_analysis.classification,
+                "conservative_standard_error": last.conservative_standard_error,
+                "upper_allowance": last.upper_allowance,
+                "reporting_resolution": last.reporting_resolution,
+                "bounded_below_reporting_resolution": (last.bounded_below_reporting_resolution),
             }
         )
+        richardson = analysis.richardson_window
+        if richardson is not None:
+            rows.append(
+                {
+                    **common,
+                    "comparison": f"{role}_richardson_window",
+                    "mean_difference": richardson.mean_difference,
+                    "paired_standard_error": richardson.paired_standard_error,
+                    "source_run_quadrature_standard_error": (
+                        richardson.source_run_quadrature_standard_error
+                    ),
+                    "worst_case_arbitrary_covariance_standard_error_envelope": (
+                        richardson.worst_case_arbitrary_covariance_standard_error_envelope
+                    ),
+                    "conservative_standard_error": richardson.conservative_standard_error,
+                    "upper_allowance": richardson.upper_allowance,
+                    "reporting_resolution": richardson.reporting_resolution,
+                    "bounded_below_reporting_resolution": (
+                        richardson.bounded_below_reporting_resolution
+                    ),
+                }
+            )
     if interaction is not None:
         rows.append(
             {
                 "comparison": "timestep_population_interaction",
-                "fine_dt": fine_dt,
+                "treatment_role": "cross_timestep",
+                "reference_fine_dt": reference_fine_dt,
                 "coarse_dt": coarse_dt,
+                "selected_dt": selected_dt,
+                "selected_dt_basis": selected_dt_basis,
+                "is_selected_treatment": "",
                 "first_walkers": interaction.fine_timestep_difference.first_walkers,
                 "second_walkers": interaction.fine_timestep_difference.second_walkers,
                 "mean_difference": interaction.interaction_difference,

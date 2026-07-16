@@ -18,7 +18,8 @@ def build_parser() -> argparse.ArgumentParser:
             "Verify manifest-bound DMC mixed-energy summaries and assess a W/2W "
             "or W/2,W,2W walker-population ladder. A coarse-time-step W/2W pair "
             "is required to qualify the timestep-population interaction for "
-            "publication readiness."
+            "publication readiness. When two timesteps are supplied, --selected-dt "
+            "must identify the treatment being qualified."
         )
     )
     parser.add_argument(
@@ -28,8 +29,9 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SUMMARY",
         help=(
             "DMC benchmark-packet or one-case stationarity summary. Supply two or "
-            "three populations at the smallest timestep. Add W/2W at one larger "
-            "timestep to assess the required four-corner interaction."
+            "three populations at the reference timestep. Add W/2W at one larger "
+            "timestep to assess the required four-corner interaction; both timestep "
+            "ladders are analyzed."
         ),
     )
     parser.add_argument(
@@ -64,6 +66,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Larger timestep represented by the second W/2W interaction pair.",
     )
     parser.add_argument(
+        "--selected-dt",
+        type=float,
+        help=(
+            "Timestep treatment whose population bound or population-limit energy "
+            "is qualified. Required when two timesteps are supplied."
+        ),
+    )
+    parser.add_argument(
         "--energy-assessment-manifest",
         type=Path,
         help=(
@@ -95,20 +105,30 @@ def main() -> None:
         confidence_level=args.confidence_level,
         fit_alpha=args.fit_alpha,
         interaction_dt=args.interaction_dt,
+        selected_dt=args.selected_dt,
         energy_assessment_manifest=args.energy_assessment_manifest,
     )
     artifacts = payload["workflow_artifacts"]
     summary = {
         "case": payload["case_id"],
         "classification": payload["classification"],
-        "fine_timestep": payload["fine_timestep"],
-        "last_doubling_upper_allowance": payload["population_ladder"]["last_doubling"][
-            "upper_allowance"
-        ],
+        "selected_dt": payload["selected_dt"],
+        "selected_dt_basis": payload["selected_dt_basis"],
+        "selected_walkers": payload["selected_walkers"],
+        "selected_last_doubling_upper_allowance": payload["selected_population_ladder"][
+            "last_doubling"
+        ]["upper_allowance"],
     }
-    if "population_limit_energy_at_fine_timestep" in payload:
-        summary["population_limit_energy_at_fine_timestep"] = payload[
-            "population_limit_energy_at_fine_timestep"
+    if "population_limit_energy_at_selected_timestep" in payload:
+        summary["population_limit_energy_at_selected_timestep"] = payload[
+            "population_limit_energy_at_selected_timestep"
+        ]
+        summary["population_limit_correction_at_selected_timestep"] = payload[
+            "population_limit_correction_at_selected_timestep"
+        ]
+    if "finite_population_energy_at_selected_timestep" in payload:
+        summary["finite_population_energy_at_selected_timestep"] = payload[
+            "finite_population_energy_at_selected_timestep"
         ]
     print_run_summary(
         run="dmc_population_systematics",

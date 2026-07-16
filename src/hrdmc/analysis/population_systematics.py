@@ -236,12 +236,41 @@ class RichardsonWindowAssessment:
 
 
 @dataclass(frozen=True)
+class PopulationLimitCorrection:
+    reference_walkers: int
+    value: float
+    matched_seed_standard_error: float
+    source_run_quadrature_standard_error: float
+    worst_case_arbitrary_covariance_standard_error_envelope: float
+    conservative_standard_error: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "definition": "E_infinity - E(reference_walkers) at fixed timestep",
+            "reference_walkers": self.reference_walkers,
+            "value": self.value,
+            "matched_seed_standard_error": self.matched_seed_standard_error,
+            "source_run_quadrature_standard_error": (self.source_run_quadrature_standard_error),
+            "worst_case_arbitrary_covariance_standard_error_envelope": (
+                self.worst_case_arbitrary_covariance_standard_error_envelope
+            ),
+            "worst_case_arbitrary_covariance_envelope_role": "diagnostic only",
+            "conservative_standard_error": self.conservative_standard_error,
+            "conservative_standard_error_rule": (
+                "max(matched-seed correction SEM, coefficient-weighted source-run "
+                "quadrature standard error)"
+            ),
+        }
+
+
+@dataclass(frozen=True)
 class PopulationLadderAssessment:
     points: tuple[PopulationEnergyPoint, ...]
     reference_walkers: int
     last_doubling: PopulationDifferenceBound
     inverse_population_fit: InversePopulationFit | None
     richardson_window: RichardsonWindowAssessment | None
+    population_limit_correction: PopulationLimitCorrection | None
     classification: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -258,6 +287,11 @@ class PopulationLadderAssessment:
             "richardson_window": (
                 None if self.richardson_window is None else self.richardson_window.to_dict()
             ),
+            "population_limit_correction": (
+                None
+                if self.population_limit_correction is None
+                else self.population_limit_correction.to_dict()
+            ),
             "uncertainty_component_combination": (
                 "statistical fit errors, last-doubling upper allowance, and "
                 "Richardson-window upper allowance are reported separately"
@@ -271,6 +305,7 @@ class PopulationLadderAssessment:
         if self.classification == "accepted_population_limit":
             assert self.inverse_population_fit is not None
             assert self.richardson_window is not None
+            assert self.population_limit_correction is not None
             payload.update(
                 {
                     "candidate_population_limit_energy_at_fixed_timestep": (
@@ -281,6 +316,12 @@ class PopulationLadderAssessment:
                     ),
                     "candidate_population_limit_model_window_upper_allowance": (
                         self.richardson_window.upper_allowance
+                    ),
+                    "candidate_population_limit_correction_at_reference_population": (
+                        self.population_limit_correction.value
+                    ),
+                    "candidate_population_limit_correction_statistical_stderr": (
+                        self.population_limit_correction.conservative_standard_error
                     ),
                 }
             )
@@ -380,6 +421,7 @@ def analyze_population_ladder(
             last_doubling=last_doubling,
             inverse_population_fit=None,
             richardson_window=None,
+            population_limit_correction=None,
             classification=classification,
         )
 
@@ -394,7 +436,10 @@ def analyze_population_ladder(
         reporting_resolution=reporting_resolution,
         confidence_level=confidence_level,
     )
-    fit = _inverse_population_fit(validated, fit_alpha=fit_alpha)
+    fit, population_limit_correction = _inverse_population_fit(
+        validated,
+        fit_alpha=fit_alpha,
+    )
     richardson = _richardson_window_assessment(
         half,
         reference,
@@ -417,6 +462,7 @@ def analyze_population_ladder(
         last_doubling=last_doubling,
         inverse_population_fit=fit,
         richardson_window=richardson,
+        population_limit_correction=population_limit_correction,
         classification=classification,
     )
 
@@ -599,7 +645,7 @@ def _inverse_population_fit(
     points: tuple[PopulationEnergyPoint, ...],
     *,
     fit_alpha: float,
-) -> InversePopulationFit:
+) -> tuple[InversePopulationFit, PopulationLimitCorrection]:
     populations = np.asarray([point.walkers for point in points], dtype=np.float64)
     seed_energies = np.column_stack([point.seed_energies for point in points])
     run_errors = np.asarray([point.conservative_stderr for point in points], dtype=np.float64)
@@ -621,6 +667,25 @@ def _inverse_population_fit(
         axis=1,
     )
     coefficient_stderr = np.maximum(coefficient_sem, coefficient_source_floors)
+
+    correction_map = coefficient_map[0].copy()
+    correction_map[1] -= 1.0
+    seed_corrections = seed_energies @ correction_map
+    correction_mean = float(np.mean(seed_corrections))
+    expected_correction = float(coefficient_mean[0] - points[1].energy)
+    if not math.isclose(
+        correction_mean,
+        expected_correction,
+        rel_tol=1.0e-12,
+        abs_tol=1.0e-12,
+    ):
+        raise ValueError("population-limit correction disagrees with fitted intercept")
+    correction_seed_sem = float(
+        np.std(seed_corrections, ddof=1) / math.sqrt(float(seed_corrections.size))
+    )
+    correction_source_floor = float(np.sqrt(np.sum((correction_map * run_errors) ** 2)))
+    correction_worst_case_envelope = float(np.sum(np.abs(correction_map) * run_errors))
+    correction_stderr = max(correction_seed_sem, correction_source_floor)
 
     contrast = seed_energies[:, 0] - 3.0 * seed_energies[:, 1] + 2.0 * seed_energies[:, 2]
     contrast_mean = float(np.mean(contrast))
@@ -647,7 +712,7 @@ def _inverse_population_fit(
     else:
         statistic = abs(contrast_mean) / contrast_stderr
         pvalue = float(2.0 * student_t.sf(statistic, df=contrast.size - 1))
-    return InversePopulationFit(
+    fit = InversePopulationFit(
         intercept=float(coefficient_mean[0]),
         slope=float(coefficient_mean[1]),
         intercept_stderr=float(coefficient_stderr[0]),
@@ -677,6 +742,15 @@ def _inverse_population_fit(
             else "residual_statistically_resolved"
         ),
     )
+    correction = PopulationLimitCorrection(
+        reference_walkers=points[1].walkers,
+        value=correction_mean,
+        matched_seed_standard_error=correction_seed_sem,
+        source_run_quadrature_standard_error=correction_source_floor,
+        worst_case_arbitrary_covariance_standard_error_envelope=(correction_worst_case_envelope),
+        conservative_standard_error=correction_stderr,
+    )
+    return fit, correction
 
 
 def _richardson_window_assessment(
