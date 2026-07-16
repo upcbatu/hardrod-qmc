@@ -30,6 +30,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Candidate dmc_benchmark_packet_v3 summary.json.",
     )
     parser.add_argument(
+        "--energy-assessment-manifest",
+        type=Path,
+        help=(
+            "Optional manifest-bound candidate-family energy assessment used only "
+            "to qualify eligible trace-stationarity warnings."
+        ),
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         help="Artifact directory; required unless --no-write is used.",
@@ -72,6 +80,7 @@ def main() -> None:
         args.candidate_summary,
         case_id=args.case,
         output_dir=args.output_dir,
+        energy_assessment_manifest=args.energy_assessment_manifest,
         command=sys.argv,
         write_artifacts=not args.no_write,
         rms_relative_margin=args.rms_relative_margin,

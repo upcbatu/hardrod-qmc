@@ -31,10 +31,13 @@ from hrdmc.workflows.dmc.benchmark_packet.matrix_assembly import (
     FINAL_MATRIX_ASSEMBLY_RUN_NAME,
     FINAL_MATRIX_ASSEMBLY_SCHEMA_VERSION,
 )
+from hrdmc.workflows.dmc.energy_stationarity_assessment import (
+    load_energy_stationarity_selection,
+)
 
 FloatArray = NDArray[np.float64]
 
-FW_SENSITIVITY_SCHEMA_VERSION = "dmc_fw_sensitivity_v2"
+FW_SENSITIVITY_SCHEMA_VERSION = "dmc_fw_sensitivity_v3"
 FW_SENSITIVITY_RUN_NAME = "dmc_fw_sensitivity"
 BENCHMARK_PACKET_SCHEMA_VERSION = "dmc_benchmark_packet_v3"
 ACCEPTED_FW_STATUSES = {"accepted", "accepted_with_warnings"}
@@ -126,6 +129,7 @@ def run_fw_sensitivity_workflow(
     *,
     case_id: str,
     output_dir: Path | None,
+    energy_assessment_manifest: Path | None = None,
     command: list[str] | None = None,
     write_artifacts: bool = True,
     rms_relative_margin: float = 0.001,
@@ -146,6 +150,15 @@ def run_fw_sensitivity_workflow(
     candidate = _load_packet(candidate_summary_path.resolve())
     if candidate.case_id != case_id:
         raise ValueError("candidate summary has the wrong case identity")
+    energy_selection = (
+        None
+        if energy_assessment_manifest is None
+        else load_energy_stationarity_selection(
+            energy_assessment_manifest,
+            case_id=case_id,
+            selected_summary_path=candidate.summary_path,
+        )
+    )
     _validate_anchor_analysis_policy(
         anchors,
         rms_relative_margin=rms_relative_margin,
@@ -158,6 +171,7 @@ def run_fw_sensitivity_workflow(
         anchors,
         candidate,
         sampling_design=sampling_design,
+        energy_selection=energy_selection,
     )
     grid_assessment = _assess_density_grid(anchors.density, candidate)
     plateau_assessment = _assess_plateaus(anchors, candidate)
@@ -232,6 +246,7 @@ def run_fw_sensitivity_workflow(
             "candidate": _treatment_record(candidate),
         },
         "sampling_design": sampling_design,
+        "candidate_energy_assessment": energy_selection,
         "input_quality": {
             "status": "accepted" if input_quality_accepted else "unresolved",
             "reasons": input_reasons,
@@ -267,6 +282,7 @@ def run_fw_sensitivity_workflow(
         "density_relative_l2_margin": density_relative_l2_margin,
         "confidence_level": confidence_level,
         "sampling_design": sampling_design,
+        "candidate_energy_assessment": energy_selection,
         "final_matrix_manifest": {
             "path": str(anchors.assembly_manifest_path),
             "sha256": file_sha256(anchors.assembly_manifest_path),
@@ -287,7 +303,12 @@ def run_fw_sensitivity_workflow(
     if write_artifacts:
         assert output_dir is not None
         root = output_dir.resolve()
-        _validate_output_directory(root, anchors=anchors, candidate=candidate)
+        _validate_output_directory(
+            root,
+            anchors=anchors,
+            candidate=candidate,
+            energy_assessment_manifest=energy_assessment_manifest,
+        )
         ensure_dir(root)
         summary_path = root / "summary.json"
         observable_table_path = root / "observable_comparison.csv"
@@ -455,6 +476,7 @@ def _assess_input_quality(
     candidate: LoadedBenchmarkPacket,
     *,
     sampling_design: Mapping[str, Any],
+    energy_selection: Mapping[str, Any] | None,
 ) -> tuple[list[str], dict[str, Any]]:
     reasons: list[str] = []
     packets = {
@@ -468,12 +490,27 @@ def _assess_input_quality(
     reference = anchors.density
     if anchors.r2.controls != reference.controls:
         reasons.append("anchor sources: fine-timestep treatment controls differ")
-    if candidate.summary.get("status") != "accepted":
-        reasons.append("candidate: benchmark packet status is not accepted")
-    if candidate.summary.get("energy_validation_status") != "accepted":
-        reasons.append("candidate: mixed-energy validation status is not accepted")
+    source_energy_accepted = candidate.summary.get("energy_validation_status") == "accepted"
+    assessed_energy_accepted = (
+        energy_selection is not None
+        and energy_selection.get("publication_accepted") is True
+    )
+    if not source_energy_accepted and not assessed_energy_accepted:
+        reasons.append(
+            "candidate: mixed-energy validation is neither source-accepted nor "
+            "accepted by the declared candidate-family assessment"
+        )
     if candidate.summary.get("pure_fw_validation_status") != "accepted":
         reasons.append("candidate: pure-FW validation status is not accepted")
+    explained_nonaccepted_statuses = {
+        candidate.summary.get("energy_validation_status"),
+        candidate.summary.get("pure_fw_validation_status"),
+    }
+    if (
+        candidate.summary.get("status") != "accepted"
+        and candidate.summary.get("status") not in explained_nonaccepted_statuses
+    ):
+        reasons.append("candidate: benchmark packet has an unrelated nonaccepted status")
     if candidate.dt == reference.dt and candidate.walkers == reference.walkers:
         reasons.append("candidate: timestep and walker treatment is identical to the anchor")
     for label, packet in (("anchor_r2", anchors.r2), ("candidate", candidate)):
@@ -549,6 +586,8 @@ def _assess_input_quality(
             "collection strides are recorded as an estimator sampling design"
         ),
         "sampling_cadence_phase_safe": sampling_design.get("phase_safe") is True,
+        "source_energy_accepted": source_energy_accepted,
+        "candidate_family_energy_assessment_accepted": assessed_energy_accepted,
         "physical_and_estimator_identity_held": not reasons,
     }
     return reasons, checks
@@ -1505,6 +1544,7 @@ def _validate_output_directory(
     *,
     anchors: AnchorSources,
     candidate: LoadedBenchmarkPacket,
+    energy_assessment_manifest: Path | None,
 ) -> None:
     input_directories = {
         anchors.assembly_manifest_path.parent,
@@ -1512,6 +1552,8 @@ def _validate_output_directory(
         anchors.r2.summary_path.parent,
         candidate.summary_path.parent,
     }
+    if energy_assessment_manifest is not None:
+        input_directories.add(energy_assessment_manifest.resolve().parent)
     if root in input_directories:
         raise ValueError("FW sensitivity output directory must not contain an input artifact")
     for name in (
