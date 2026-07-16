@@ -82,6 +82,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--simultaneous-energy-stationarity",
+        action="store_true",
+        help=(
+            "Assess all supplied population-treatment energy traces as one fixed "
+            "95%% Bonferroni family using the population-source Rhat < 1.05 and "
+            "minimum effective samples >= 30 criteria, while retaining every raw "
+            "source classification."
+        ),
+    )
+    parser.add_argument(
         "--no-write",
         action="store_true",
         help="Verify and analyze inputs without writing artifacts.",
@@ -107,6 +117,7 @@ def main() -> None:
         interaction_dt=args.interaction_dt,
         selected_dt=args.selected_dt,
         energy_assessment_manifest=args.energy_assessment_manifest,
+        apply_simultaneous_energy_stationarity=args.simultaneous_energy_stationarity,
     )
     artifacts = payload["workflow_artifacts"]
     summary = {

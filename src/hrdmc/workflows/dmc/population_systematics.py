@@ -11,6 +11,7 @@ from typing import Any
 
 import numpy as np
 
+from hrdmc.analysis import assess_matrix_energy_stationarity
 from hrdmc.analysis.population_systematics import (
     PopulationEnergyPoint,
     PopulationLadderAssessment,
@@ -37,11 +38,19 @@ POPULATION_SYSTEMATICS_SCHEMA_VERSION = "dmc_population_systematics_v3"
 POPULATION_SYSTEMATICS_RUN_NAME = "dmc_population_systematics"
 FIXED_ENERGY_REPORTING_RESOLUTION = 0.01
 FIXED_ENERGY_REPORTING_UNIT = "hbar*Omega"
+FIXED_ENERGY_STATIONARITY_CONFIDENCE_LEVEL = 0.95
+FIXED_ENERGY_STATIONARITY_RHAT_LIMIT = 1.05
+FIXED_ENERGY_STATIONARITY_MIN_EFFECTIVE_SAMPLES = 30.0
 SUPPORTED_INPUTS = {
     ("dmc_benchmark_packet", "dmc_benchmark_packet_v3"),
     ("dmc_trapped_stationarity_grid", "dmc_trapped_stationarity_grid_v2"),
 }
 ENERGY_CHAIN_ACCEPTED_STATUSES = {"accepted", "spread_warning"}
+ENERGY_UNCERTAINTY_ACCEPTED_STATUSES = {
+    "accepted",
+    "conservative_error_inflated",
+    "blocking_plateau_unresolved_correlated_error_available",
+}
 PUBLICATION_READY_STATUSES = {
     "accepted_finite_population_bound",
     "accepted_population_limit",
@@ -67,6 +76,7 @@ class LoadedPopulationPoint:
     energy_status: str
     energy_quality: dict[str, Any]
     energy_quality_assessment: dict[str, Any] | None
+    stationarity: dict[str, Any]
     controls: dict[str, Any]
     manifest_verification_warnings: tuple[str, ...]
     telemetry: dict[str, Any]
@@ -111,6 +121,7 @@ def run_population_systematics_workflow(
     interaction_dt: float | None = None,
     selected_dt: float | None = None,
     energy_assessment_manifest: Path | None = None,
+    apply_simultaneous_energy_stationarity: bool = False,
 ) -> dict[str, Any]:
     """Assess finite-walker energy sensitivity and one timestep interaction.
 
@@ -132,6 +143,10 @@ def run_population_systematics_workflow(
         raise ValueError("population systematics requires at least W and 2W summaries")
     if len(set(resolved_paths)) != len(resolved_paths):
         raise ValueError("population summary paths must be unique")
+    if energy_assessment_manifest is not None and apply_simultaneous_energy_stationarity:
+        raise ValueError(
+            "final-matrix and simultaneous population energy assessments are mutually exclusive"
+        )
     source_artifact_paths = list(resolved_paths)
     if energy_assessment_manifest is not None:
         source_artifact_paths.append(energy_assessment_manifest.resolve())
@@ -144,7 +159,11 @@ def run_population_systematics_workflow(
     _validate_shared_identity(loaded)
     _validate_reporting_unit(loaded[0].identity)
     energy_quality_assessment: dict[str, Any] | None = None
-    if energy_assessment_manifest is not None:
+    if apply_simultaneous_energy_stationarity:
+        loaded, energy_quality_assessment = _apply_simultaneous_energy_stationarity_assessment(
+            loaded
+        )
+    elif energy_assessment_manifest is not None:
         loaded, energy_quality_assessment = _apply_energy_quality_assessment(
             loaded,
             energy_assessment_manifest=energy_assessment_manifest.resolve(),
@@ -162,9 +181,7 @@ def run_population_systematics_workflow(
         groups,
         selected_dt=selected_dt,
     )
-    selected_dt_basis = (
-        "explicit_selected_dt" if selected_dt is not None else "only_supplied_timestep"
-    )
+    selected_dt_basis = "explicit_selected_dt" if len(groups) == 2 else "only_supplied_timestep"
     selected_treatment_role = (
         "reference_fine" if selected_timestep == reference_fine_dt else "coarse"
     )
@@ -586,6 +603,7 @@ def _load_population_point(summary_path: Path) -> LoadedPopulationPoint:
         energy_status=energy_status,
         energy_quality=_energy_input_quality(stationarity, reported_status=energy_status),
         energy_quality_assessment=None,
+        stationarity=stationarity,
         controls=controls,
         manifest_verification_warnings=tuple(warnings),
         telemetry=_point_telemetry(stationarity),
@@ -968,11 +986,140 @@ def _energy_input_quality(
         "method_status": method_status,
         "energy_chain_status": chain_status,
         "precision_status": stationarity.get("precision_status"),
+        "energy_uncertainty_status": stationarity.get("mixed_energy_uncertainty_status"),
         "status_basis": "source_summary",
         "source_publication_accepted": publication_accepted,
         "source_publication_status": publication_status,
         "publication_accepted": publication_accepted,
         "publication_status": publication_status,
+    }
+
+
+def _apply_simultaneous_energy_stationarity_assessment(
+    points: Sequence[LoadedPopulationPoint],
+) -> tuple[list[LoadedPopulationPoint], dict[str, Any]]:
+    treatment_ids = [_population_treatment_id(point) for point in points]
+    if len(set(treatment_ids)) != len(treatment_ids):
+        raise ValueError("population stationarity treatment identities must be unique")
+    raw_assessment = assess_matrix_energy_stationarity(
+        {
+            treatment_id: point.stationarity
+            for treatment_id, point in zip(treatment_ids, points, strict=True)
+        },
+        confidence_level=FIXED_ENERGY_STATIONARITY_CONFIDENCE_LEVEL,
+        rhat_limit=FIXED_ENERGY_STATIONARITY_RHAT_LIMIT,
+        min_effective_samples=FIXED_ENERGY_STATIONARITY_MIN_EFFECTIVE_SAMPLES,
+    )
+    assessment = {
+        **raw_assessment,
+        "assessment_type": "simultaneous_population_energy_stationarity",
+        "treatment_count": raw_assessment["case_count"],
+        "treatments": raw_assessment["cases"],
+    }
+    assessment.pop("case_count")
+    assessment.pop("cases")
+    assessment["policy_timing"] = "retrospective"
+    assessment["scope"] = "supplied_population_treatments"
+    assessment["threshold_basis"] = (
+        "prospective_population_source_rhat_and_effective-sample criteria with "
+        "family-wise directional correction"
+    )
+    treatment_assessments = _required_mapping(assessment, "treatments")
+    updated: list[LoadedPopulationPoint] = []
+    bindings: list[dict[str, Any]] = []
+    for treatment_id, point in zip(treatment_ids, points, strict=True):
+        treatment_assessment = _required_mapping(treatment_assessments, treatment_id)
+        source_quality = point.energy_quality
+        source_already_accepted = source_quality["publication_accepted"]
+        override_eligibility = _trace_stationarity_override_eligibility(source_quality)
+        publication_accepted = treatment_assessment.get("status") == "accepted" and (
+            source_already_accepted or override_eligibility["eligible"]
+        )
+        if publication_accepted and source_already_accepted:
+            publication_status = source_quality["publication_status"]
+        elif publication_accepted:
+            publication_status = "accepted_with_retrospective_assessment"
+        else:
+            publication_status = "unresolved"
+        assessed_quality = {
+            **source_quality,
+            "status_basis": "retrospective_population_stationarity_assessment",
+            "source_publication_accepted": source_quality["publication_accepted"],
+            "source_publication_status": source_quality["publication_status"],
+            "retrospective_override_eligibility": override_eligibility,
+            "publication_accepted": publication_accepted,
+            "publication_status": publication_status,
+        }
+        binding = {
+            "treatment_id": treatment_id,
+            "summary_path": str(point.summary_path),
+            "summary_sha256": point.summary_sha256,
+            "manifest_path": str(point.manifest_path),
+            "manifest_sha256": point.manifest_sha256,
+            "run_id": point.run_id,
+            "bundle_sha256": point.bundle_sha256,
+        }
+        point_assessment = {
+            "assessment_type": assessment["assessment_type"],
+            "assessment_method": assessment["method"],
+            "assessment_scope": assessment["scope"],
+            "policy_timing": assessment["policy_timing"],
+            "threshold_basis": assessment["threshold_basis"],
+            "confidence_level": assessment["confidence_level"],
+            "directional_test_count": assessment["directional_test_count"],
+            "simultaneous_two_sided_critical_z": assessment["simultaneous_two_sided_critical_z"],
+            "rhat_limit": assessment["rhat_limit"],
+            "min_effective_samples": assessment["min_effective_samples"],
+            "source_binding": binding,
+            "source_override_eligibility": override_eligibility,
+            "treatment_assessment": treatment_assessment,
+        }
+        updated.append(
+            replace(
+                point,
+                energy_quality=assessed_quality,
+                energy_quality_assessment=point_assessment,
+            )
+        )
+        bindings.append(binding)
+    return updated, {
+        "assessment_type": assessment["assessment_type"],
+        "verification_scope": "population_workflow_manifest_bound_inputs",
+        "policy_timing": assessment["policy_timing"],
+        "threshold_basis": assessment["threshold_basis"],
+        "assessment_scope": assessment["scope"],
+        "assessment_method": assessment["method"],
+        "input_bindings": bindings,
+        "simultaneous_assessment": assessment,
+    }
+
+
+def _population_treatment_id(point: LoadedPopulationPoint) -> str:
+    return f"dt={point.dt:.17g};walkers={point.point.walkers}"
+
+
+def _trace_stationarity_override_eligibility(
+    source_quality: Mapping[str, Any],
+) -> dict[str, Any]:
+    failures: list[str] = []
+    if source_quality.get("publication_accepted") is True:
+        failures.append("source_already_accepted")
+    if source_quality.get("method_status") != "trace_nonstationary":
+        failures.append("source_method_status_is_not_trace_nonstationary")
+    if source_quality.get("energy_chain_status") != "trace_nonstationary":
+        failures.append("source_energy_chain_status_is_not_trace_nonstationary")
+    if source_quality.get("energy_uncertainty_status") not in (
+        ENERGY_UNCERTAINTY_ACCEPTED_STATUSES
+    ):
+        failures.append("source_energy_uncertainty_is_unresolved")
+    return {
+        "eligible": not failures,
+        "criterion": (
+            "only an unresolved source whose method and energy-chain statuses are "
+            "both trace_nonstationary and whose conservative energy uncertainty is "
+            "available can be reclassified"
+        ),
+        "failures": failures,
     }
 
 
@@ -988,6 +1135,10 @@ def _apply_energy_quality_assessment(
         energy_assessment_manifest,
         case_id=next(iter(case_ids)),
     )
+    assessment = {
+        "assessment_type": "final_matrix_energy_selection",
+        **selection,
+    }
     selected_summary = Path(str(selection["selected_summary_path"])).resolve()
     selected_manifest = Path(str(selection["selected_manifest_path"])).resolve()
     matches = [
@@ -1019,9 +1170,9 @@ def _apply_energy_quality_assessment(
     updated[index] = replace(
         selected,
         energy_quality=assessed_quality,
-        energy_quality_assessment=selection,
+        energy_quality_assessment=assessment,
     )
-    return updated, selection
+    return updated, assessment
 
 
 def _input_quality(points: Sequence[LoadedPopulationPoint]) -> dict[str, Any]:
@@ -1060,9 +1211,10 @@ def _input_quality(points: Sequence[LoadedPopulationPoint]) -> dict[str, Any]:
             row["publication_status"] == "accepted_with_retrospective_assessment" for row in rows
         ),
         "interpretation": (
-            "Energy-specific method failures remain unresolved unless an exact "
-            "manifest-bound matrix assessment selects that source summary. Raw run "
-            "and energy statuses remain recorded for every input."
+            "Energy-specific method failures remain unresolved unless a manifest-bound "
+            "simultaneous population-treatment or final-matrix assessment qualifies "
+            "the exact source summaries. Raw run and energy statuses remain recorded "
+            "for every input."
         ),
     }
 

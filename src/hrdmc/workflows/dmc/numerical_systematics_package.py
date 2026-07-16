@@ -555,6 +555,33 @@ def _validate_cross_lane_identities(loaded: LoadedPackageInputs) -> None:
             _validate_fw_proposal_telemetry(fw, anchor)
         if population is not None and fw is not None:
             _validate_selected_population_fw_treatment(population, fw)
+    _validate_population_assessment_mode_consistency(loaded.population)
+
+
+def _validate_population_assessment_mode_consistency(
+    population: Mapping[str, BoundSystematicAssessment],
+) -> None:
+    modes: dict[str, str] = {}
+    for case_id, assessment in population.items():
+        value = assessment.summary.get("energy_quality_assessment")
+        if value is None:
+            modes[case_id] = "source_summary_only"
+            continue
+        record = _required_mapping(assessment.summary, "energy_quality_assessment")
+        assessment_type = record.get("assessment_type")
+        if assessment_type not in {
+            "simultaneous_population_energy_stationarity",
+            "final_matrix_energy_selection",
+        }:
+            raise ValueError(
+                f"{case_id} population energy stationarity assessment type is unsupported"
+            )
+        modes[case_id] = str(assessment_type)
+    if len(set(modes.values())) > 1:
+        details = ", ".join(f"{case_id}={mode}" for case_id, mode in sorted(modes.items()))
+        raise ValueError(
+            "population cases use inconsistent energy stationarity assessment modes: " + details
+        )
 
 
 def _validate_selected_timestep_population_treatment(
@@ -624,10 +651,200 @@ def _timestep_input_records(
         "dt",
     )
     for summary_record, config_record in zip(summary_inputs, config_inputs, strict=True):
+        _validate_input_identity_record(
+            summary_record,
+            case_id=case_id,
+            lane="timestep",
+            include_walkers=False,
+        )
+        _validate_input_identity_record(
+            config_record,
+            case_id=case_id,
+            lane="timestep manifest",
+            include_walkers=False,
+        )
         for field in identity_fields:
             if summary_record.get(field) != config_record.get(field):
                 raise ValueError(f"{case_id} timestep: input {field} disagrees with its manifest")
     return summary_inputs
+
+
+def _validate_input_identity_record(
+    record: Mapping[str, Any],
+    *,
+    case_id: str,
+    lane: str,
+    include_walkers: bool,
+) -> None:
+    for field in (
+        "summary_path",
+        "summary_sha256",
+        "manifest_path",
+        "manifest_sha256",
+        "run_id",
+        "bundle_sha256",
+    ):
+        value = record.get(field)
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"{case_id} {lane}: input {field} is invalid")
+    _required_positive_float(record.get("dt"), f"{lane} input dt")
+    if include_walkers:
+        _required_positive_int(record.get("walkers"), f"{lane} input walkers")
+
+
+def _validate_population_energy_quality_assessment(
+    value: object,
+    inputs: Sequence[Mapping[str, Any]],
+    *,
+    case_id: str,
+) -> None:
+    if value is None:
+        return
+    if not isinstance(value, dict):
+        raise ValueError(f"{case_id} population: energy quality assessment is invalid")
+    assessment_type = value.get("assessment_type")
+    if assessment_type == "simultaneous_population_energy_stationarity":
+        _validate_simultaneous_population_energy_assessment(value, inputs, case_id=case_id)
+        return
+    if assessment_type == "final_matrix_energy_selection":
+        _validate_final_matrix_population_energy_selection(value, inputs, case_id=case_id)
+        return
+    raise ValueError(f"{case_id} population: energy quality assessment type is unsupported")
+
+
+def _validate_simultaneous_population_energy_assessment(
+    assessment: Mapping[str, Any],
+    inputs: Sequence[Mapping[str, Any]],
+    *,
+    case_id: str,
+) -> None:
+    bindings = assessment.get("input_bindings")
+    simultaneous = _required_mapping(assessment, "simultaneous_assessment")
+    treatments = _required_mapping(simultaneous, "treatments")
+    if (
+        not isinstance(bindings, list)
+        or not all(isinstance(binding, dict) for binding in bindings)
+        or len(bindings) != len(inputs)
+        or simultaneous.get("assessment_type") != "simultaneous_population_energy_stationarity"
+        or simultaneous.get("treatment_count") != len(inputs)
+    ):
+        raise ValueError(
+            f"{case_id} population: simultaneous energy assessment declarations are invalid"
+        )
+    expected_treatment_ids = [
+        _population_treatment_identity(record, case_id=case_id) for record in inputs
+    ]
+    if len(set(expected_treatment_ids)) != len(expected_treatment_ids):
+        raise ValueError(f"{case_id} population: assessment treatment identities are duplicated")
+    if set(treatments) != set(expected_treatment_ids):
+        raise ValueError(f"{case_id} population: assessment treatments disagree with inputs")
+
+    scalar_bindings = {
+        "assessment_method": "method",
+        "assessment_scope": "scope",
+        "policy_timing": "policy_timing",
+        "threshold_basis": "threshold_basis",
+    }
+    numeric_bindings = (
+        "confidence_level",
+        "directional_test_count",
+        "simultaneous_two_sided_critical_z",
+        "rhat_limit",
+        "min_effective_samples",
+    )
+    for treatment_id, source, binding in zip(
+        expected_treatment_ids,
+        inputs,
+        bindings,
+        strict=True,
+    ):
+        expected_binding = {
+            "treatment_id": treatment_id,
+            **{
+                field: source.get(field)
+                for field in (
+                    "summary_path",
+                    "summary_sha256",
+                    "manifest_path",
+                    "manifest_sha256",
+                    "run_id",
+                    "bundle_sha256",
+                )
+            },
+        }
+        if binding != expected_binding:
+            raise ValueError(
+                f"{case_id} population: simultaneous assessment input binding disagrees"
+            )
+        point_assessment = source.get("energy_quality_assessment")
+        if not isinstance(point_assessment, dict):
+            raise ValueError(f"{case_id} population: point energy quality assessment is missing")
+        if (
+            point_assessment.get("assessment_type") != "simultaneous_population_energy_stationarity"
+            or point_assessment.get("source_binding") != binding
+            or point_assessment.get("treatment_assessment") != treatments[treatment_id]
+        ):
+            raise ValueError(f"{case_id} population: point energy quality assessment disagrees")
+        for point_field, simultaneous_field in scalar_bindings.items():
+            if point_assessment.get(point_field) != simultaneous.get(
+                simultaneous_field
+            ) or assessment.get(point_field) != simultaneous.get(simultaneous_field):
+                raise ValueError(
+                    f"{case_id} population: simultaneous assessment {point_field} disagrees"
+                )
+        for field in numeric_bindings:
+            if point_assessment.get(field) != simultaneous.get(field):
+                raise ValueError(f"{case_id} population: simultaneous assessment {field} disagrees")
+
+
+def _validate_final_matrix_population_energy_selection(
+    assessment: Mapping[str, Any],
+    inputs: Sequence[Mapping[str, Any]],
+    *,
+    case_id: str,
+) -> None:
+    expected_fields = {
+        "selected_summary_path": "summary_path",
+        "selected_summary_sha256": "summary_sha256",
+        "selected_manifest_path": "manifest_path",
+        "selected_manifest_sha256": "manifest_sha256",
+        "selected_run_id": "run_id",
+        "selected_bundle_sha256": "bundle_sha256",
+    }
+    matches = [
+        source
+        for source in inputs
+        if all(
+            assessment.get(selected) == source.get(field)
+            for selected, field in expected_fields.items()
+        )
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"{case_id} population: final-matrix energy selection is not bound to one input"
+        )
+    point_assessments = [
+        source.get("energy_quality_assessment")
+        for source in inputs
+        if source.get("energy_quality_assessment") is not None
+    ]
+    if point_assessments != [dict(assessment)]:
+        raise ValueError(f"{case_id} population: final-matrix point energy selection disagrees")
+
+
+def _population_treatment_identity(
+    record: Mapping[str, Any],
+    *,
+    case_id: str,
+) -> str:
+    dt = _required_positive_float(record.get("dt"), "population assessment input dt")
+    walkers = _required_positive_int(
+        record.get("walkers"),
+        "population assessment input walkers",
+    )
+    if not math.isfinite(dt):
+        raise ValueError(f"{case_id} population: assessment input timestep is invalid")
+    return f"dt={dt:.17g};walkers={walkers}"
 
 
 def _validate_population_selected_treatment(
@@ -656,6 +873,10 @@ def _validate_population_selected_treatment(
     ):
         if summary.get(field) != config.get(field):
             raise ValueError(f"{case_id} population: {field} disagrees with its manifest")
+    if summary.get("energy_quality_assessment") != config.get("energy_quality_assessment"):
+        raise ValueError(
+            f"{case_id} population: energy quality assessment disagrees with its manifest"
+        )
     if coarse_dt is None:
         if (
             selected_dt != reference_dt
@@ -706,8 +927,47 @@ def _validate_population_selected_treatment(
         raise ValueError(f"{case_id} population: selected bound is not reproducible")
 
     inputs = summary.get("input_summaries")
-    if not isinstance(inputs, list) or not all(isinstance(item, dict) for item in inputs):
-        raise ValueError(f"{case_id} population: input summaries are invalid")
+    config_inputs = config.get("inputs")
+    if (
+        not isinstance(inputs, list)
+        or not all(isinstance(item, dict) for item in inputs)
+        or not isinstance(config_inputs, list)
+        or not all(isinstance(item, dict) for item in config_inputs)
+        or len(inputs) != len(config_inputs)
+        or not inputs
+    ):
+        raise ValueError(f"{case_id} population: input declarations are invalid")
+    identity_fields = (
+        "summary_path",
+        "summary_sha256",
+        "manifest_path",
+        "manifest_sha256",
+        "run_id",
+        "bundle_sha256",
+        "dt",
+        "walkers",
+    )
+    for summary_record, config_record in zip(inputs, config_inputs, strict=True):
+        _validate_input_identity_record(
+            summary_record,
+            case_id=case_id,
+            lane="population",
+            include_walkers=True,
+        )
+        _validate_input_identity_record(
+            config_record,
+            case_id=case_id,
+            lane="population manifest",
+            include_walkers=True,
+        )
+        for field in identity_fields:
+            if summary_record.get(field) != config_record.get(field):
+                raise ValueError(f"{case_id} population: input {field} disagrees with its manifest")
+    _validate_population_energy_quality_assessment(
+        summary.get("energy_quality_assessment"),
+        inputs,
+        case_id=case_id,
+    )
     supplied_dts = {
         _required_positive_float(item.get("dt"), "population input dt") for item in inputs
     }
