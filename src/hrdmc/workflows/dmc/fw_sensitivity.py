@@ -16,6 +16,7 @@ from hrdmc.analysis.fw_sensitivity import (
     analyze_fw_observable_sensitivity,
     classify_fw_sensitivity_status,
 )
+from hrdmc.analysis.proposal_telemetry import summarize_seed_proposal_telemetry
 from hrdmc.artifacts import (
     build_run_provenance,
     config_fingerprint,
@@ -33,7 +34,7 @@ from hrdmc.workflows.dmc.benchmark_packet.matrix_assembly import (
 
 FloatArray = NDArray[np.float64]
 
-FW_SENSITIVITY_SCHEMA_VERSION = "dmc_fw_sensitivity_v1"
+FW_SENSITIVITY_SCHEMA_VERSION = "dmc_fw_sensitivity_v2"
 FW_SENSITIVITY_RUN_NAME = "dmc_fw_sensitivity"
 BENCHMARK_PACKET_SCHEMA_VERSION = "dmc_benchmark_packet_v3"
 ACCEPTED_FW_STATUSES = {"accepted", "accepted_with_warnings"}
@@ -107,6 +108,18 @@ class AnchorSources:
     r2: LoadedBenchmarkPacket
 
 
+def load_final_matrix_anchor_sources(path: Path, *, case_id: str) -> AnchorSources:
+    """Load one exactly declared density/R2 pair from a final-matrix assembly."""
+
+    return _load_anchor_sources(path, case_id=case_id)
+
+
+def load_manifest_bound_benchmark_packet(summary_path: Path) -> LoadedBenchmarkPacket:
+    """Load one benchmark packet through its exact summary/manifest binding."""
+
+    return _load_packet(summary_path.resolve())
+
+
 def run_fw_sensitivity_workflow(
     final_matrix_manifest_path: Path,
     candidate_summary_path: Path,
@@ -140,7 +153,12 @@ def run_fw_sensitivity_workflow(
         confidence_level=confidence_level,
     )
 
-    input_reasons, input_checks = _assess_input_quality(anchors, candidate)
+    sampling_design = build_fw_sampling_design(anchors, candidate)
+    input_reasons, input_checks = _assess_input_quality(
+        anchors,
+        candidate,
+        sampling_design=sampling_design,
+    )
     grid_assessment = _assess_density_grid(anchors.density, candidate)
     plateau_assessment = _assess_plateaus(anchors, candidate)
     genealogy_assessment = _assess_genealogy(anchors, candidate)
@@ -168,7 +186,7 @@ def run_fw_sensitivity_workflow(
     input_checks["paired_observable_payload_valid"] = (
         None if comparison is None and comparison_error is None else comparison_error is None
     )
-    input_checks["only_timestep_and_walkers_are_treatment_variables"] = not input_reasons
+    input_checks["input_quality_requirements_met"] = not input_reasons
 
     warnings = _verification_warnings(anchors, candidate)
     input_quality_accepted = not input_reasons
@@ -213,6 +231,7 @@ def run_fw_sensitivity_workflow(
             "anchor_r2": _treatment_record(anchors.r2),
             "candidate": _treatment_record(candidate),
         },
+        "sampling_design": sampling_design,
         "input_quality": {
             "status": "accepted" if input_quality_accepted else "unresolved",
             "reasons": input_reasons,
@@ -247,6 +266,7 @@ def run_fw_sensitivity_workflow(
         "rms_relative_margin": rms_relative_margin,
         "density_relative_l2_margin": density_relative_l2_margin,
         "confidence_level": confidence_level,
+        "sampling_design": sampling_design,
         "final_matrix_manifest": {
             "path": str(anchors.assembly_manifest_path),
             "sha256": file_sha256(anchors.assembly_manifest_path),
@@ -415,6 +435,10 @@ def _load_packet(summary_path: Path) -> LoadedBenchmarkPacket:
     for field in ("controls", "pure_config"):
         if summary.get(field) != config.get(field):
             raise ValueError(f"benchmark {field} disagrees with its manifest: {summary_path}")
+    if summary.get("collective_rn_controls") != config.get("collective_rn"):
+        raise ValueError(
+            f"benchmark collective-RN controls disagree with its manifest: {summary_path}"
+        )
     if summary.get("seeds") != config.get("seeds"):
         raise ValueError(f"benchmark seed identities disagree with its manifest: {summary_path}")
     return LoadedBenchmarkPacket(
@@ -429,6 +453,8 @@ def _load_packet(summary_path: Path) -> LoadedBenchmarkPacket:
 def _assess_input_quality(
     anchors: AnchorSources,
     candidate: LoadedBenchmarkPacket,
+    *,
+    sampling_design: Mapping[str, Any],
 ) -> tuple[list[str], dict[str, Any]]:
     reasons: list[str] = []
     packets = {
@@ -497,7 +523,13 @@ def _assess_input_quality(
     if _r2_estimator(candidate) != _r2_estimator(anchors.r2):
         reasons.append("candidate: R2 estimator identity differs from the anchor")
 
-    reasons.extend(_pure_config_identity_reasons(anchors, candidate))
+    reasons.extend(
+        _pure_config_identity_reasons(
+            anchors,
+            candidate,
+            sampling_design=sampling_design,
+        )
+    )
     checks = {
         "same_seed_identities": all(packet.seeds == reference.seeds for packet in packets.values()),
         "same_composed_anchor_treatment": anchors.r2.controls == reference.controls,
@@ -514,9 +546,10 @@ def _assess_input_quality(
         ),
         "block_size_policy": (
             "sliding-window block_size_steps is held at the exact one-event setting; "
-            "physical observation cadence is bound by the collection strides"
+            "collection strides are recorded as an estimator sampling design"
         ),
-        "only_timestep_and_walkers_are_treatment_variables": not reasons,
+        "sampling_cadence_phase_safe": sampling_design.get("phase_safe") is True,
+        "physical_and_estimator_identity_held": not reasons,
     }
     return reasons, checks
 
@@ -524,6 +557,8 @@ def _assess_input_quality(
 def _pure_config_identity_reasons(
     anchors: AnchorSources,
     candidate: LoadedBenchmarkPacket,
+    *,
+    sampling_design: Mapping[str, Any],
 ) -> list[str]:
     reasons: list[str] = []
     shared_fields = (
@@ -545,11 +580,6 @@ def _pure_config_identity_reasons(
             reasons.append(f"anchor sources: shared FW {field} differs")
         if candidate.pure_config.get(field) != anchors.r2.pure_config.get(field):
             reasons.append(f"candidate: FW {field} differs from the R2 anchor")
-    if not _same_float(
-        _stride_tau(anchors.density, "collection_stride_steps"),
-        _stride_tau(anchors.r2, "collection_stride_steps"),
-    ):
-        reasons.append("anchor sources: physical R2 collection stride differs")
     for field in (
         "observable_source",
         "r2_rb_com_variance",
@@ -569,16 +599,10 @@ def _pure_config_identity_reasons(
     ):
         if candidate.pure_config.get(field) != anchors.density.pure_config.get(field):
             reasons.append(f"candidate: density {field} differs from the density anchor")
-    if not _same_float(
-        _stride_tau(candidate, "collection_stride_steps"),
-        _stride_tau(anchors.r2, "collection_stride_steps"),
-    ):
-        reasons.append("candidate: physical R2 collection stride differs from the anchor")
-    if not _same_float(
-        _stride_tau(candidate, "density_collection_stride_steps"),
-        _stride_tau(anchors.density, "density_collection_stride_steps"),
-    ):
-        reasons.append("candidate: physical density collection stride differs from the anchor")
+    if sampling_design.get("phase_safe") is not True:
+        reasons.append(
+            "candidate: collection cadence differs while a scheduled collective move is active"
+        )
     return reasons
 
 
@@ -853,7 +877,7 @@ def _genealogy_record(
         if walker_ess < min_walker_ess:
             reasons.append(f"selected lag {lag} has insufficient walker-weight ESS")
         if block_count < required_blocks:
-            reasons.append(f"selected lag {lag} has insufficient independent blocks")
+            reasons.append(f"selected lag {lag} has insufficient collected source windows")
         pooled_ancestor_values.append(ancestor)
         pooled_family_values.append(family)
         walker_ess_values.append(walker_ess)
@@ -1179,6 +1203,138 @@ def _scientific_identity(
     }
 
 
+def build_fw_sampling_design(
+    anchors: AnchorSources,
+    candidate: LoadedBenchmarkPacket,
+) -> dict[str, Any]:
+    """Derive the collection-cadence design from bound FW treatments."""
+
+    packets = {
+        "anchor_density": anchors.density,
+        "anchor_r2": anchors.r2,
+        "candidate": candidate,
+    }
+    scheduled_move_enabled = {
+        label: packet.summary.get("collective_rn_controls") is not None
+        for label, packet in packets.items()
+    }
+    any_scheduled_move = any(scheduled_move_enabled.values())
+    r2 = _cadence_comparison(anchors.r2, candidate, observable="r2")
+    density = _cadence_comparison(anchors.density, candidate, observable="density")
+    anchor_r2_composition_common = _same_float(
+        _stride_tau(anchors.density, "collection_stride_steps"),
+        _stride_tau(anchors.r2, "collection_stride_steps"),
+    )
+    cadence_varied = bool(
+        r2["status"] == "varied_cadence"
+        or density["status"] == "varied_cadence"
+        or not anchor_r2_composition_common
+    )
+    phase_safe = not any_scheduled_move or not cadence_varied
+    status = (
+        "scheduled_move_phase_unsafe"
+        if not phase_safe
+        else "varied_cadence"
+        if cadence_varied
+        else "common_cadence"
+    )
+    return {
+        "status": status,
+        "phase_safe": phase_safe,
+        "phase_policy": (
+            "scheduled collective moves require exact physical collection cadence"
+            if any_scheduled_move
+            else "ordinary local DMC permits deterministic source-window subsampling"
+        ),
+        "source_phase": "production_event_index_mod_stride_zero",
+        "scheduled_collective_move_enabled": scheduled_move_enabled,
+        "all_treatments_use_ordinary_local_dmc": not any_scheduled_move,
+        "anchor_r2_composition_common_cadence": anchor_r2_composition_common,
+        "r2": r2,
+        "density": density,
+        "interpretation": (
+            "Collection cadence selects transported source windows and changes sampling cost "
+            "and correlation, not the fixed physical-lag estimator. Publication acceptance "
+            "still requires the declared collected-window, plateau, genealogy, and "
+            "independent-seed equivalence checks."
+        ),
+    }
+
+
+def _cadence_comparison(
+    anchor: LoadedBenchmarkPacket,
+    candidate: LoadedBenchmarkPacket,
+    *,
+    observable: str,
+) -> dict[str, Any]:
+    anchor_record = _cadence_record(anchor, observable=observable)
+    candidate_record = _cadence_record(candidate, observable=observable)
+    anchor_tau = float(anchor_record["physical_stride_tau"])
+    candidate_tau = float(candidate_record["physical_stride_tau"])
+    common = _same_float(anchor_tau, candidate_tau)
+    return {
+        "status": "common_cadence" if common else "varied_cadence",
+        "candidate_to_anchor_physical_stride_ratio": candidate_tau / anchor_tau,
+        "anchor": anchor_record,
+        "candidate": candidate_record,
+    }
+
+
+def _cadence_record(packet: LoadedBenchmarkPacket, *, observable: str) -> dict[str, Any]:
+    stride_steps = _observable_stride_steps(packet, observable=observable)
+    try:
+        selected_lags = _selected_window_lags(packet, observable)
+    except ValueError:
+        selected_lags = []
+    support_counts = _source_window_support_counts(
+        packet,
+        observable=observable,
+        step_lags=selected_lags,
+    )
+    return {
+        "stride_steps": stride_steps,
+        "physical_stride_tau": float(stride_steps) * packet.dt,
+        "selected_step_lags": selected_lags,
+        "selected_physical_lags": [float(lag) * packet.dt for lag in selected_lags],
+        "source_window_support_counts_by_step_lag": support_counts,
+        "minimum_selected_source_window_count": min(support_counts.values(), default=0),
+        "required_minimum_source_window_count": packet.pure_config.get("min_block_count"),
+    }
+
+
+def _source_window_support_counts(
+    packet: LoadedBenchmarkPacket,
+    *,
+    observable: str,
+    step_lags: list[int],
+) -> dict[str, int]:
+    if not step_lags:
+        return {}
+    result = _observable_result(packet, observable)
+    diagnostics = _required_mapping(result, "aggregate_plateau_diagnostics")
+    support = _required_mapping(diagnostics, "lag_support")
+    counts: dict[str, int] = {}
+    for lag in step_lags:
+        lag_support = _required_mapping(support, str(lag))
+        value = lag_support.get("min_block_count")
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"{observable} lag {lag} source-window count is invalid")
+        counts[str(lag)] = value
+    return counts
+
+
+def _observable_stride_steps(packet: LoadedBenchmarkPacket, *, observable: str) -> int:
+    field = (
+        "density_collection_stride_steps" if observable == "density" else "collection_stride_steps"
+    )
+    value = packet.pure_config.get(field)
+    if value is None and observable == "density":
+        value = packet.pure_config.get("collection_stride_steps")
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{field} must resolve to a positive integer")
+    return value
+
+
 def _treatment_record(packet: LoadedBenchmarkPacket) -> dict[str, Any]:
     return {
         "dt": packet.dt,
@@ -1189,6 +1345,10 @@ def _treatment_record(packet: LoadedBenchmarkPacket) -> dict[str, Any]:
         "density_collection_stride_tau": _optional_stride_tau(
             packet,
             "density_collection_stride_steps",
+        ),
+        "proposal_telemetry": summarize_seed_proposal_telemetry(
+            packet.summary.get("seed_results"),
+            expected_seed_ids=packet.seeds,
         ),
     }
 

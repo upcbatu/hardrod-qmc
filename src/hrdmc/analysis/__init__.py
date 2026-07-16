@@ -58,6 +58,7 @@ from hrdmc.analysis.metrics import (
     mean_squared_error,
     relative_density_l2_error,
 )
+from hrdmc.analysis.proposal_telemetry import summarize_seed_proposal_telemetry
 from hrdmc.analysis.stability import summarize_replicate_metrics
 from hrdmc.analysis.stationarity_matrix import assess_matrix_energy_stationarity
 from hrdmc.analysis.timeseries import (
@@ -123,6 +124,7 @@ __all__ = [
     "shell_peak_profile",
     "sokal_error_estimate",
     "summarize_replicate_metrics",
+    "summarize_seed_proposal_telemetry",
     "trace_stationarity_diagnostics",
     "trace_stationarity_result_to_dict",
     "triangulated_error_estimate",
