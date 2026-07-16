@@ -46,6 +46,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Goodness-of-fit rejection level applied to declared point errors.",
     )
     parser.add_argument(
+        "--energy-assessment-manifest",
+        type=Path,
+        help=(
+            "Manifest-bound final-matrix assessment selecting one exact input "
+            "summary for energy-quality classification."
+        ),
+    )
+    parser.add_argument(
         "--no-write",
         action="store_true",
         help="Verify and analyze inputs without writing artifacts.",
@@ -67,6 +75,7 @@ def main() -> None:
         write_artifacts=not args.no_write,
         sensitivity_sigma=args.sensitivity_sigma,
         fit_alpha=args.fit_alpha,
+        energy_assessment_manifest=args.energy_assessment_manifest,
     )
     extrapolation = payload["extrapolation"]
     artifacts = payload["workflow_artifacts"]

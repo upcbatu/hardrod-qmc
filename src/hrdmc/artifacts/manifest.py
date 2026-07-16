@@ -347,3 +347,77 @@ def verify_run_manifest(manifest_path: str | Path) -> tuple[bool, list[str]]:
     if expected is not None and manifest.get("bundle_sha256") != expected:
         errors.append("bundle sha256 mismatch")
     return not errors, errors
+
+
+def load_manifest_bound_artifact(
+    manifest_path: str | Path,
+    artifact_path: str | Path,
+    *,
+    allowed_unrelated_artifact_roots: Sequence[str] = (),
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    """Load a manifest after verifying one selected artifact exactly.
+
+    Structural manifest failures and any failure involving the selected artifact
+    remain fatal.  A workflow may explicitly tolerate drift under named,
+    unrelated artifact roots (for example regenerated presentation plots); those
+    failures are returned so that the derived artifact can retain them as
+    provenance warnings.
+    """
+
+    path = Path(manifest_path).resolve()
+    root = path.parent
+    selected = Path(artifact_path).resolve()
+    try:
+        relative_selected = selected.relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ValueError("selected artifact must be inside its run-manifest directory") from exc
+
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    entries_value = manifest.get("artifacts")
+    if not isinstance(entries_value, list):
+        raise ValueError(f"run manifest has no artifact records: {path}")
+    entries = [entry for entry in entries_value if isinstance(entry, dict)]
+    matches = [entry for entry in entries if entry.get("path") == relative_selected]
+    if len(matches) != 1:
+        raise ValueError(f"selected artifact is not uniquely recorded by its manifest: {selected}")
+    entry = matches[0]
+    if not selected.is_file():
+        raise ValueError(f"selected artifact does not exist: {selected}")
+    if entry.get("size_bytes") != selected.stat().st_size:
+        raise ValueError(f"selected artifact size does not match its manifest: {selected}")
+    if entry.get("sha256") != file_sha256(selected):
+        raise ValueError(f"selected artifact digest does not match its manifest: {selected}")
+
+    allowed_roots = set(allowed_unrelated_artifact_roots)
+    if any(
+        not isinstance(value, str)
+        or not value
+        or Path(value).is_absolute()
+        or len(Path(value).parts) != 1
+        or value in {".", ".."}
+        for value in allowed_roots
+    ):
+        raise ValueError("allowed unrelated artifact roots must be simple relative names")
+
+    _, errors = verify_run_manifest(path)
+    tolerated: list[str] = []
+    for error in errors:
+        error_path = _manifest_artifact_error_path(error)
+        if error_path == relative_selected:
+            raise ValueError(f"selected artifact verification failed: {path}: {error}")
+        if (
+            error_path is not None
+            and Path(error_path).parts
+            and Path(error_path).parts[0] in allowed_roots
+        ):
+            tolerated.append(error)
+            continue
+        raise ValueError(f"run manifest verification failed: {path}: {error}")
+    return manifest, tuple(tolerated)
+
+
+def _manifest_artifact_error_path(error: str) -> str | None:
+    for prefix in ("missing artifact: ", "size mismatch: ", "sha256 mismatch: "):
+        if error.startswith(prefix):
+            return error[len(prefix) :]
+    return None

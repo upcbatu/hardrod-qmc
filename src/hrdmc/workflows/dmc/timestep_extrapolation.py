@@ -4,7 +4,7 @@ import csv
 import json
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -17,12 +17,15 @@ from hrdmc.artifacts import (
     config_fingerprint,
     ensure_dir,
     file_sha256,
-    verify_run_manifest,
+    load_manifest_bound_artifact,
     write_json,
     write_run_manifest,
 )
+from hrdmc.workflows.dmc.benchmark_packet.matrix_assembly import (
+    load_final_matrix_energy_selection,
+)
 
-TIMESTEP_EXTRAPOLATION_SCHEMA_VERSION = "dmc_timestep_extrapolation_v2"
+TIMESTEP_EXTRAPOLATION_SCHEMA_VERSION = "dmc_timestep_extrapolation_v3"
 SUPPORTED_INPUTS = {
     ("dmc_benchmark_packet", "dmc_benchmark_packet_v3"),
     ("dmc_trapped_stationarity_grid", "dmc_trapped_stationarity_grid_v2"),
@@ -42,9 +45,12 @@ class LoadedTimeStepPoint:
     manifest_sha256: str
     run_name: str
     result_schema_version: str
+    run_id: str
+    bundle_sha256: str
     run_status: str
     energy_status: str
     energy_quality: dict[str, Any]
+    energy_quality_assessment: dict[str, Any] | None
     seeds: tuple[int, ...]
     manifest_verification_warnings: tuple[str, ...]
     controls: dict[str, Any]
@@ -60,9 +66,12 @@ class LoadedTimeStepPoint:
             "manifest_sha256": self.manifest_sha256,
             "run_name": self.run_name,
             "result_schema_version": self.result_schema_version,
+            "run_id": self.run_id,
+            "bundle_sha256": self.bundle_sha256,
             "run_status": self.run_status,
             "energy_status": self.energy_status,
             "energy_quality": self.energy_quality,
+            "energy_quality_assessment": self.energy_quality_assessment,
             "seeds": list(self.seeds),
             "seed_count": len(self.seeds),
             "manifest_verification": (
@@ -84,6 +93,7 @@ def run_timestep_extrapolation_workflow(
     write_artifacts: bool = True,
     sensitivity_sigma: float = 2.0,
     fit_alpha: float = 0.05,
+    energy_assessment_manifest: Path | None = None,
 ) -> dict[str, Any]:
     """Verify DMC summaries and extrapolate their mixed energy to zero time step."""
 
@@ -96,7 +106,17 @@ def run_timestep_extrapolation_workflow(
         raise ValueError("time-step summary paths must be unique")
     if write_artifacts:
         assert output_dir is not None
-        _validate_output_separation(output_dir.resolve(), resolved_paths)
+        resolved_output = output_dir.resolve()
+        if resolved_output.exists() and (
+            not resolved_output.is_dir() or any(resolved_output.iterdir())
+        ):
+            raise FileExistsError(
+                f"time-step extrapolation output directory is not empty: {resolved_output}"
+            )
+        protected_artifacts = list(resolved_paths)
+        if energy_assessment_manifest is not None:
+            protected_artifacts.append(energy_assessment_manifest.resolve())
+        _validate_output_separation(resolved_output, protected_artifacts)
 
     loaded = [_load_time_step_point(path) for path in resolved_paths]
     reference_identity = loaded[0].identity
@@ -110,6 +130,13 @@ def run_timestep_extrapolation_workflow(
         raise ValueError(
             "time-step summaries do not share the required case, guide, source, "
             f"walker, initialization, and drift identity: {details}"
+        )
+
+    energy_quality_assessment: dict[str, Any] | None = None
+    if energy_assessment_manifest is not None:
+        loaded, energy_quality_assessment = _apply_energy_quality_assessment(
+            loaded,
+            energy_assessment_manifest=energy_assessment_manifest,
         )
 
     loaded.sort(key=lambda item: item.point.dt)
@@ -166,6 +193,7 @@ def run_timestep_extrapolation_workflow(
         "input_control_variation": control_variation,
         "sampling_design": sampling_design,
         "input_quality": input_quality,
+        "energy_quality_assessment": energy_quality_assessment,
         "cross_timestep_covariance": cross_timestep_covariance,
         "extrapolation": analysis.to_dict(),
         "reference_energy_used_for_model_selection": False,
@@ -198,12 +226,15 @@ def run_timestep_extrapolation_workflow(
         "sampling_design": sampling_design,
         "input_quality": input_quality,
         "cross_timestep_covariance": cross_timestep_covariance,
+        "energy_quality_assessment": energy_quality_assessment,
         "inputs": [
             {
                 "summary_path": str(item.summary_path),
                 "summary_sha256": item.summary_sha256,
                 "manifest_path": str(item.manifest_path),
                 "manifest_sha256": item.manifest_sha256,
+                "run_id": item.run_id,
+                "bundle_sha256": item.bundle_sha256,
                 "dt": item.point.dt,
             }
             for item in loaded
@@ -327,9 +358,12 @@ def _load_time_step_point(summary_path: Path) -> LoadedTimeStepPoint:
         manifest_sha256=file_sha256(manifest_path),
         run_name=run_name,
         result_schema_version=result_schema,
+        run_id=_required_string(manifest, "run_id"),
+        bundle_sha256=_required_string(manifest, "bundle_sha256"),
         run_status=_required_string(manifest, "status"),
         energy_status=energy_status,
         energy_quality=_energy_input_quality(stationarity, reported_status=energy_status),
+        energy_quality_assessment=None,
         seeds=seeds,
         manifest_verification_warnings=tuple(warnings),
         controls=controls,
@@ -345,43 +379,14 @@ def _verify_summary_binding(
 ) -> list[str]:
     """Verify the selected summary without rejecting changed unrelated plots."""
 
-    try:
-        relative_summary = summary_path.relative_to(manifest_path.parent).as_posix()
-    except ValueError as exc:
-        raise ValueError("summary must be inside its run-manifest directory") from exc
-    entries_value = manifest.get("artifacts")
-    if not isinstance(entries_value, list):
-        raise ValueError(f"run manifest has no artifact records: {manifest_path}")
-    entries = [entry for entry in entries_value if isinstance(entry, dict)]
-    matches = [entry for entry in entries if entry.get("path") == relative_summary]
-    if len(matches) != 1:
-        raise ValueError(f"summary is not uniquely recorded by its run manifest: {summary_path}")
-    entry = matches[0]
-    if entry.get("size_bytes") != summary_path.stat().st_size:
-        raise ValueError(f"summary size does not match its manifest: {summary_path}")
-    if entry.get("sha256") != file_sha256(summary_path):
-        raise ValueError(f"summary digest does not match its manifest: {summary_path}")
-
-    _, errors = verify_run_manifest(manifest_path)
-    unrelated: list[str] = []
-    for error in errors:
-        artifact_path = _artifact_error_path(error)
-        if (
-            artifact_path is not None
-            and artifact_path != relative_summary
-            and Path(artifact_path).parts[:1] == ("plots",)
-        ):
-            unrelated.append(error)
-            continue
-        raise ValueError(f"run manifest verification failed: {manifest_path}: {error}")
-    return unrelated
-
-
-def _artifact_error_path(error: str) -> str | None:
-    for prefix in ("missing artifact: ", "size mismatch: ", "sha256 mismatch: "):
-        if error.startswith(prefix):
-            return error[len(prefix) :]
-    return None
+    loaded_manifest, warnings = load_manifest_bound_artifact(
+        manifest_path,
+        summary_path,
+        allowed_unrelated_artifact_roots=("plots",),
+    )
+    if loaded_manifest != manifest:
+        raise ValueError(f"run manifest changed while loading: {manifest_path}")
+    return list(warnings)
 
 
 def _case_id(
@@ -760,6 +765,16 @@ def _input_quality(points: Sequence[LoadedTimeStepPoint]) -> dict[str, Any]:
         for row in rows
         if row["publication_accepted"] and row["publication_status"] != "accepted"
     ]
+    precision_warning_rows = [
+        row
+        for row in rows
+        if row["publication_status"] == "accepted_with_precision_warning"
+    ]
+    retrospective_rows = [
+        row
+        for row in rows
+        if row["publication_status"] == "accepted_with_retrospective_assessment"
+    ]
     return {
         "status": (
             "unresolved"
@@ -769,14 +784,21 @@ def _input_quality(points: Sequence[LoadedTimeStepPoint]) -> dict[str, Any]:
             else "accepted"
         ),
         "publication_accepted": not unresolved,
-        "publication_accepted_statuses": ["accepted", "accepted_with_precision_warning"],
+        "publication_accepted_statuses": [
+            "accepted",
+            "accepted_with_precision_warning",
+            "accepted_with_retrospective_assessment",
+        ],
         "points": rows,
         "unresolved_point_count": len(unresolved),
-        "precision_warning_point_count": len(warning_rows),
+        "warning_point_count": len(warning_rows),
+        "precision_warning_point_count": len(precision_warning_rows),
+        "retrospective_assessment_point_count": len(retrospective_rows),
         "interpretation": (
-            "Energy-specific method failures remain unresolved. Precision warnings "
-            "with a valid energy chain and conservative correlated-error estimate "
-            "remain visible but do not veto the mixed-energy extrapolation."
+            "Energy-specific method failures remain unresolved unless an exact "
+            "manifest-bound matrix assessment selects that source summary. Precision "
+            "warnings and retrospective assessment timing remain visible but do not "
+            "veto the mixed-energy extrapolation."
         ),
     }
 
@@ -802,6 +824,15 @@ def _energy_input_quality(
         "method_status": method_status,
         "energy_chain_status": chain_status,
         "precision_status": stationarity.get("precision_status"),
+        "status_basis": "source_summary",
+        "source_publication_accepted": publication_accepted,
+        "source_publication_status": (
+            "accepted_with_precision_warning"
+            if precision_warning
+            else "accepted"
+            if publication_accepted
+            else "unresolved"
+        ),
         "publication_accepted": publication_accepted,
         "publication_status": (
             "accepted_with_precision_warning"
@@ -811,6 +842,56 @@ def _energy_input_quality(
             else "unresolved"
         ),
     }
+
+
+def _apply_energy_quality_assessment(
+    points: Sequence[LoadedTimeStepPoint],
+    *,
+    energy_assessment_manifest: Path,
+) -> tuple[list[LoadedTimeStepPoint], dict[str, Any]]:
+    if not points:
+        raise ValueError("energy assessment requires at least one time-step point")
+    case_ids = {point.case_id for point in points}
+    if len(case_ids) != 1:
+        raise ValueError("energy assessment requires one shared case identity")
+    selection = load_final_matrix_energy_selection(
+        energy_assessment_manifest,
+        case_id=next(iter(case_ids)),
+    )
+    selected_summary = Path(str(selection["selected_summary_path"])).resolve()
+    selected_manifest = Path(str(selection["selected_manifest_path"])).resolve()
+    matches = [
+        index
+        for index, point in enumerate(points)
+        if point.summary_path == selected_summary
+        and point.summary_sha256 == selection["selected_summary_sha256"]
+        and point.manifest_path == selected_manifest
+        and point.manifest_sha256 == selection["selected_manifest_sha256"]
+        and point.run_id == selection["selected_run_id"]
+        and point.bundle_sha256 == selection["selected_bundle_sha256"]
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            "energy assessment must select exactly one input summary by path and digest"
+        )
+    selected_index = matches[0]
+    selected_point = points[selected_index]
+    source_quality = selected_point.energy_quality
+    assessed_quality = {
+        **source_quality,
+        "status_basis": selection["energy_status_basis"],
+        "source_publication_accepted": source_quality["publication_accepted"],
+        "source_publication_status": source_quality["publication_status"],
+        "publication_accepted": selection["publication_accepted"],
+        "publication_status": selection["publication_status"],
+    }
+    updated = list(points)
+    updated[selected_index] = replace(
+        selected_point,
+        energy_quality=assessed_quality,
+        energy_quality_assessment=selection,
+    )
+    return updated, selection
 
 
 def _point_telemetry(stationarity: dict[str, Any]) -> dict[str, Any]:
@@ -894,16 +975,20 @@ def _different_identity_fields(
     )
 
 
-def _validate_output_separation(output_dir: Path, summary_paths: Sequence[Path]) -> None:
-    for summary_path in summary_paths:
-        run_dir = summary_path.parent
+def _validate_output_separation(
+    output_dir: Path,
+    source_artifact_paths: Sequence[Path],
+) -> None:
+    for source_artifact_path in source_artifact_paths:
+        run_dir = source_artifact_path.parent
         if (
             output_dir == run_dir
             or output_dir.is_relative_to(run_dir)
             or run_dir.is_relative_to(output_dir)
         ):
             raise ValueError(
-                f"output_dir must not overlap an input summary or run directory: {output_dir}"
+                "output_dir must not overlap an input artifact or run directory: "
+                f"{output_dir}"
             )
 
 
@@ -919,8 +1004,17 @@ def _write_point_table(
         "case_id",
         "run_name",
         "result_schema_version",
+        "run_id",
+        "bundle_sha256",
         "run_status",
         "energy_status",
+        "energy_publication_accepted",
+        "energy_publication_status",
+        "energy_status_basis",
+        "source_energy_publication_accepted",
+        "source_energy_publication_status",
+        "energy_assessment_manifest_sha256",
+        "energy_assessment_run_id",
         "seed_count",
         "seeds",
         "summary_path",
@@ -943,6 +1037,29 @@ def _write_point_table(
         for point in points:
             payload = point.to_dict()
             payload["seeds"] = ",".join(str(seed) for seed in point.seeds)
+            payload.update(
+                {
+                    "energy_publication_accepted": point.energy_quality.get(
+                        "publication_accepted"
+                    ),
+                    "energy_publication_status": point.energy_quality.get(
+                        "publication_status"
+                    ),
+                    "energy_status_basis": point.energy_quality.get("status_basis"),
+                    "source_energy_publication_accepted": point.energy_quality.get(
+                        "source_publication_accepted"
+                    ),
+                    "source_energy_publication_status": point.energy_quality.get(
+                        "source_publication_status"
+                    ),
+                    "energy_assessment_manifest_sha256": (
+                        point.energy_quality_assessment or {}
+                    ).get("assessment_manifest_sha256"),
+                    "energy_assessment_run_id": (
+                        point.energy_quality_assessment or {}
+                    ).get("assessment_run_id"),
+                }
+            )
             payload.update(point.telemetry)
             writer.writerow({field: payload.get(field, "") for field in fields})
     return path

@@ -14,10 +14,12 @@ from hrdmc.analysis import assess_matrix_energy_stationarity
 from hrdmc.artifacts import (
     build_run_provenance,
     file_sha256,
+    load_manifest_bound_artifact,
     verify_run_manifest,
     write_json,
     write_run_manifest,
 )
+from hrdmc.workflows.dmc.benchmark_packet.selection import energy_validation_status
 from hrdmc.workflows.dmc.final_matrix import DEFAULT_CASE_ORDER
 
 FINAL_MATRIX_ASSEMBLY_SCHEMA_VERSION = "dmc_final_matrix_assembly_v1"
@@ -159,6 +161,174 @@ def _assess_source_matrix_energy(
     assessment["policy_timing"] = "retrospective"
     assessment["scope"] = "canonical_eight_case_final_matrix"
     return assessment
+
+
+def load_final_matrix_energy_selection(
+    assembly_manifest_path: Path,
+    *,
+    case_id: str,
+) -> dict[str, Any]:
+    """Verify and select one matrix-assessed primary energy summary.
+
+    This is deliberately narrower than full final-matrix verification.  It
+    verifies the complete matrix-wide energy assessment and the selected
+    primary summary while retaining regenerated source plots as provenance
+    warnings.  It does not qualify R2, density, or the matrix presentation
+    artifacts beyond the assembly manifest's own exact bindings.
+    """
+
+    path = assembly_manifest_path.resolve()
+    verified, errors = verify_run_manifest(path)
+    if not verified:
+        raise ValueError("energy-assessment manifest verification failed: " + "; ".join(errors))
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    root = path.parent.resolve()
+    if manifest.get("run_name") != FINAL_MATRIX_ASSEMBLY_RUN_NAME:
+        raise ValueError("energy assessment has the wrong artifact owner")
+    if manifest.get("result_schema_version") != FINAL_MATRIX_ASSEMBLY_SCHEMA_VERSION:
+        raise ValueError("energy assessment has the wrong result schema")
+    artifact_paths = {
+        entry.get("path") for entry in manifest.get("artifacts", []) if isinstance(entry, dict)
+    }
+    if artifact_paths != {"final_matrix_summary.json", "final_matrix_table.csv"}:
+        raise ValueError("energy assessment has the wrong artifact set")
+
+    summary_path = root / "final_matrix_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    config = _mapping(manifest.get("config"))
+    if summary.get("schema_version") != FINAL_MATRIX_ASSEMBLY_SCHEMA_VERSION:
+        raise ValueError("energy-assessment summary has the wrong result schema")
+    if summary.get("status") != manifest.get("status"):
+        raise ValueError("energy-assessment summary and manifest statuses disagree")
+    if config.get("case_order") != list(REQUIRED_CASE_ORDER):
+        raise ValueError("energy assessment has the wrong case order")
+    if summary.get("case_order") != config.get("case_order"):
+        raise ValueError("energy-assessment case identities disagree")
+    if case_id not in REQUIRED_CASE_ORDER:
+        raise ValueError(f"energy assessment does not support case {case_id}")
+    if config.get("source_locator_base") != "assembly_directory":
+        raise ValueError("energy assessment has the wrong source locator base")
+    if summary.get("source_locator_base") != "assembly_directory":
+        raise ValueError("energy-assessment summary has the wrong source locator base")
+
+    retrospective_cases = config.get("retrospective_energy_cases")
+    if summary.get("retrospective_energy_cases") != retrospective_cases:
+        raise ValueError("energy-assessment retrospective declarations disagree")
+    if (
+        not isinstance(retrospective_cases, list)
+        or len(retrospective_cases) != len(set(retrospective_cases))
+        or not set(retrospective_cases).issubset(REQUIRED_CASE_ORDER)
+    ):
+        raise ValueError("energy-assessment retrospective cases are invalid")
+    sources = config.get("sources")
+    if not isinstance(sources, dict) or set(sources) != set(REQUIRED_CASE_ORDER):
+        raise ValueError("energy-assessment primary sources are incomplete")
+
+    primary_sources: dict[str, dict[str, Any]] = {}
+    plot_warnings: list[str] = []
+    for source_case in REQUIRED_CASE_ORDER:
+        case_sources = sources.get(source_case)
+        if not isinstance(case_sources, dict):
+            raise ValueError(f"{source_case}: energy-assessment source declaration is invalid")
+        source, warnings = _load_energy_assessment_packet(
+            root,
+            source_case,
+            case_sources.get("primary"),
+        )
+        primary_sources[source_case] = source
+        plot_warnings.extend(f"{source_case}: {warning}" for warning in warnings)
+
+    source_parents = {source["directory"].parent.resolve() for source in primary_sources.values()}
+    if len(source_parents) != 1:
+        raise ValueError("energy-assessment primary sources do not share one source root")
+    expected_source_root = _relative_locator(next(iter(source_parents)), root)
+    if summary.get("source_root") != expected_source_root:
+        raise ValueError("energy-assessment source root disagrees with its sources")
+
+    energy_assessment = _assess_source_matrix_energy(
+        primary_sources,
+        confidence_level=_required_config_float(config, "energy_confidence_level"),
+        rhat_limit=_required_config_float(config, "energy_rhat_limit"),
+        min_effective_samples=_required_config_float(
+            config,
+            "energy_min_effective_samples",
+        ),
+    )
+    if not _semantic_equal(summary.get("energy_stationarity_assessment"), energy_assessment):
+        raise ValueError("energy assessment disagrees with its exact primary summaries")
+
+    rows = summary.get("rows")
+    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+        raise ValueError("energy-assessment rows are invalid")
+    selected_rows = [row for row in rows if row.get("case") == case_id]
+    if len(selected_rows) != 1:
+        raise ValueError(f"energy assessment does not contain one row for {case_id}")
+    row = selected_rows[0]
+    source = primary_sources[case_id]
+    expected_reference = _source_reference(source, reference_root=root)
+    case_source_config = _mapping(_mapping(sources.get(case_id)).get("primary"))
+    if not _semantic_equal(case_source_config, expected_reference):
+        raise ValueError(f"{case_id}: energy-assessment config source locator is invalid")
+    if not _semantic_equal(row.get("primary_source"), expected_reference):
+        raise ValueError(f"{case_id}: selected energy source locator disagrees")
+
+    expected_status = _energy_status_record(
+        case_id,
+        primary_summary=source["summary"],
+        energy_assessment=energy_assessment,
+        retrospective_energy_cases=set(retrospective_cases),
+    )
+    for field, expected in expected_status.items():
+        if not _semantic_equal(row.get(field), expected):
+            raise ValueError(f"{case_id}: selected energy {field} disagrees")
+    source_energy = _mapping(_mapping(source["summary"].get("estimates")).get("energy"))
+    for field, expected in (
+        ("energy", source_energy.get("value")),
+        ("energy_stderr", source_energy.get("stderr")),
+    ):
+        if not _semantic_equal(row.get(field), expected):
+            raise ValueError(f"{case_id}: selected {field} disagrees with its source")
+
+    energy_status = str(expected_status["energy_status"])
+    status_basis = str(expected_status["energy_status_basis"])
+    publication_status = (
+        "accepted_with_retrospective_assessment"
+        if energy_status == "accepted"
+        and status_basis == "retrospective_matrix_stationarity_assessment"
+        else "accepted"
+        if energy_status == "accepted"
+        else "unresolved"
+    )
+    source_manifest = source["manifest"]
+    return {
+        "verification_scope": "energy_assessment_and_selected_primary_summary",
+        "case_id": case_id,
+        "publication_accepted": energy_status == "accepted",
+        "publication_status": publication_status,
+        "energy_status": energy_status,
+        "energy_status_basis": status_basis,
+        "source_energy_status": expected_status["source_energy_status"],
+        "source_energy_stationarity_reason": expected_status[
+            "source_energy_stationarity_reason"
+        ],
+        "policy_timing": energy_assessment.get("policy_timing"),
+        "assessment_scope": energy_assessment.get("scope"),
+        "assessment_method": energy_assessment.get("method"),
+        "case_assessment": _mapping(_mapping(energy_assessment.get("cases")).get(case_id)),
+        "assessment_manifest_path": str(path),
+        "assessment_manifest_sha256": file_sha256(path),
+        "assessment_summary_path": str(summary_path),
+        "assessment_summary_sha256": file_sha256(summary_path),
+        "assessment_run_id": manifest.get("run_id"),
+        "assessment_bundle_sha256": manifest.get("bundle_sha256"),
+        "selected_summary_path": str(source["summary_path"]),
+        "selected_summary_sha256": file_sha256(source["summary_path"]),
+        "selected_manifest_path": str(source["manifest_path"]),
+        "selected_manifest_sha256": file_sha256(source["manifest_path"]),
+        "selected_run_id": source_manifest.get("run_id"),
+        "selected_bundle_sha256": source_manifest.get("bundle_sha256"),
+        "source_plot_artifact_warnings": plot_warnings,
+    }
 
 
 def verify_final_benchmark_matrix_manifest(path: Path) -> tuple[bool, list[str]]:
@@ -336,20 +506,13 @@ def _assemble_row(
     r2 = _mapping(r2_estimates.get("r2"))
     rms = _mapping(r2_estimates.get("rms"))
     density = _mapping(primary_estimates.get("density"))
-    source_energy_status = str(primary_summary.get("energy_validation_status", ""))
-    matrix_energy = _mapping(_mapping(energy_assessment.get("cases")).get(case_id))
-    if matrix_energy.get("status") != "accepted":
-        energy_status = "review"
-        energy_status_basis = "matrix_stationarity_assessment"
-    elif source_energy_status == "accepted":
-        energy_status = "accepted"
-        energy_status_basis = "source_packet"
-    elif case_id in retrospective_energy_cases and matrix_energy.get("status") == "accepted":
-        energy_status = "accepted"
-        energy_status_basis = "retrospective_matrix_stationarity_assessment"
-    else:
-        energy_status = source_energy_status or "review"
-        energy_status_basis = "source_packet"
+    energy_status_record = _energy_status_record(
+        case_id,
+        primary_summary=primary_summary,
+        energy_assessment=energy_assessment,
+        retrospective_energy_cases=retrospective_energy_cases,
+    )
+    energy_status = str(energy_status_record["energy_status"])
     r2_status = str(r2.get("status", "not_evaluated"))
     density_status = str(density.get("status", "not_evaluated"))
     status = "accepted" if energy_status == r2_status == density_status == "accepted" else "review"
@@ -359,12 +522,7 @@ def _assemble_row(
     return {
         "case": case_id,
         "status": status,
-        "energy_status": energy_status,
-        "energy_status_basis": energy_status_basis,
-        "source_energy_status": source_energy_status,
-        "source_energy_stationarity_reason": _mapping(primary_summary.get("stationarity")).get(
-            "stationarity_reason_energy"
-        ),
+        **energy_status_record,
         "r2_status": r2_status,
         "density_status": density_status,
         "guide_family": primary_summary.get("guide_family"),
@@ -417,6 +575,37 @@ def _assemble_row(
     }
 
 
+def _energy_status_record(
+    case_id: str,
+    *,
+    primary_summary: dict[str, Any],
+    energy_assessment: dict[str, Any],
+    retrospective_energy_cases: set[str],
+) -> dict[str, Any]:
+    source_energy_status = str(primary_summary.get("energy_validation_status", ""))
+    matrix_energy = _mapping(_mapping(energy_assessment.get("cases")).get(case_id))
+    if matrix_energy.get("status") != "accepted":
+        energy_status = "review"
+        energy_status_basis = "matrix_stationarity_assessment"
+    elif source_energy_status == "accepted":
+        energy_status = "accepted"
+        energy_status_basis = "source_packet"
+    elif case_id in retrospective_energy_cases:
+        energy_status = "accepted"
+        energy_status_basis = "retrospective_matrix_stationarity_assessment"
+    else:
+        energy_status = source_energy_status or "review"
+        energy_status_basis = "source_packet"
+    return {
+        "energy_status": energy_status,
+        "energy_status_basis": energy_status_basis,
+        "source_energy_status": source_energy_status,
+        "source_energy_stationarity_reason": _mapping(
+            primary_summary.get("stationarity")
+        ).get("stationarity_reason_energy"),
+    }
+
+
 def _load_verified_packet(source_dir: Path) -> dict[str, Any]:
     manifest_path = source_dir / "run_manifest.json"
     summary_path = source_dir / "summary.json"
@@ -448,6 +637,75 @@ def _load_verified_packet(source_dir: Path) -> dict[str, Any]:
         "manifest": manifest,
         "summary": summary,
     }
+
+
+def _load_energy_assessment_packet(
+    reference_root: Path,
+    case_id: str,
+    reference: object,
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    if not isinstance(reference, dict):
+        raise ValueError(f"{case_id}: energy-assessment source reference is invalid")
+    directory = _resolve_reference_path(reference_root, reference.get("directory"))
+    manifest_path = _resolve_reference_path(reference_root, reference.get("manifest_path"))
+    summary_path = _resolve_reference_path(reference_root, reference.get("summary_path"))
+    if manifest_path != directory / "run_manifest.json":
+        raise ValueError(f"{case_id}: energy-assessment manifest path is invalid")
+    if summary_path != directory / "summary.json":
+        raise ValueError(f"{case_id}: energy-assessment summary path is invalid")
+    if not manifest_path.is_file() or file_sha256(manifest_path) != reference.get(
+        "manifest_sha256"
+    ):
+        raise ValueError(f"{case_id}: energy-assessment manifest identity mismatch")
+    manifest, warnings = load_manifest_bound_artifact(
+        manifest_path,
+        summary_path,
+        allowed_unrelated_artifact_roots=("plots",),
+    )
+    if not summary_path.is_file() or file_sha256(summary_path) != reference.get(
+        "summary_sha256"
+    ):
+        raise ValueError(f"{case_id}: energy-assessment summary identity mismatch")
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    if manifest.get("run_name") != "dmc_benchmark_packet":
+        raise ValueError(f"{case_id}: energy-assessment source has the wrong owner")
+    if manifest.get("result_schema_version") not in BENCHMARK_PACKET_SCHEMA_VERSIONS:
+        raise ValueError(f"{case_id}: energy-assessment source has an unsupported schema")
+    if summary.get("schema_version") != manifest.get("result_schema_version"):
+        raise ValueError(f"{case_id}: energy-assessment source schemas disagree")
+    if summary.get("status") != manifest.get("status"):
+        raise ValueError(f"{case_id}: energy-assessment source statuses disagree")
+    config = _mapping(manifest.get("config"))
+    if config.get("case") != case_id or summary.get("case_id") != case_id:
+        raise ValueError(f"{case_id}: energy-assessment source case identity mismatch")
+    stationarity = _mapping(summary.get("stationarity"))
+    declared_energy_status = summary.get("energy_validation_status")
+    recomputed_energy_status = energy_validation_status(stationarity)
+    if declared_energy_status != recomputed_energy_status:
+        raise ValueError(
+            f"{case_id}: energy-assessment source energy status is not reproducible"
+        )
+    estimate_energy_status = _mapping(_mapping(summary.get("estimates")).get("energy")).get(
+        "status"
+    )
+    if estimate_energy_status != declared_energy_status:
+        raise ValueError(
+            f"{case_id}: energy-assessment source estimate status disagrees"
+        )
+    if manifest.get("run_id") != reference.get("run_id"):
+        raise ValueError(f"{case_id}: energy-assessment source run identity mismatch")
+    if manifest.get("bundle_sha256") != reference.get("bundle_sha256"):
+        raise ValueError(f"{case_id}: energy-assessment source bundle identity mismatch")
+    return (
+        {
+            "directory": directory,
+            "manifest_path": manifest_path,
+            "summary_path": summary_path,
+            "manifest": manifest,
+            "summary": summary,
+        },
+        warnings,
+    )
 
 
 def _validate_r2_supplement(primary: dict[str, Any], supplement: dict[str, Any]) -> None:
