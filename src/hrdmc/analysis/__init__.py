@@ -30,6 +30,14 @@ from hrdmc.analysis.correlated_error import (
     sokal_error_estimate,
     triangulated_error_estimate,
 )
+from hrdmc.analysis.density_envelope import (
+    FixedShellCellAverage,
+    ShellPeakProfile,
+    ShellPeriodAverage,
+    fixed_shell_cell_average,
+    shell_peak_profile,
+    unit_mass_shell_average,
+)
 from hrdmc.analysis.equivalence import (
     PairwiseEquivalenceBound,
     PairwiseNormEquivalenceBound,
@@ -37,6 +45,12 @@ from hrdmc.analysis.equivalence import (
     SimultaneousPairwiseNormEquivalenceResult,
     simultaneous_pairwise_equivalence,
     simultaneous_pairwise_norm_equivalence,
+)
+from hrdmc.analysis.fw_sensitivity import (
+    ForwardWalkingSensitivityResult,
+    ShellComparison,
+    analyze_fw_observable_sensitivity,
+    classify_fw_sensitivity_status,
 )
 from hrdmc.analysis.metrics import (
     bias,
@@ -73,6 +87,11 @@ __all__ = [
     "CORRELATED_ERROR_DISAGREEMENT",
     "CORRELATED_ERROR_UNAVAILABLE",
     "CorrelatedErrorEstimate",
+    "FixedShellCellAverage",
+    "ForwardWalkingSensitivityResult",
+    "ShellPeriodAverage",
+    "ShellPeakProfile",
+    "ShellComparison",
     "PairwiseEquivalenceBound",
     "PairwiseNormEquivalenceBound",
     "SlopeResult",
@@ -81,6 +100,7 @@ __all__ = [
     "TraceStationarityResult",
     "TriangulatedErrorResult",
     "autocorrelation",
+    "analyze_fw_observable_sensitivity",
     "assess_matrix_energy_stationarity",
     "bias",
     "blocking_curve",
@@ -90,6 +110,7 @@ __all__ = [
     "detect_blocking_plateau",
     "diagnose_chains",
     "finite_trace",
+    "fixed_shell_cell_average",
     "geyer_error_estimate",
     "hac_flat_top_error_estimate",
     "integrated_autocorrelation_time",
@@ -99,9 +120,12 @@ __all__ = [
     "split_rhat",
     "simultaneous_pairwise_equivalence",
     "simultaneous_pairwise_norm_equivalence",
+    "shell_peak_profile",
     "sokal_error_estimate",
     "summarize_replicate_metrics",
     "trace_stationarity_diagnostics",
     "trace_stationarity_result_to_dict",
     "triangulated_error_estimate",
+    "classify_fw_sensitivity_status",
+    "unit_mass_shell_average",
 ]
