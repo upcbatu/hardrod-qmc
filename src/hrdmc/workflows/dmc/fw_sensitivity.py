@@ -35,7 +35,7 @@ from hrdmc.workflows.dmc.benchmark_packet.matrix_assembly import (
     FINAL_MATRIX_ASSEMBLY_RUN_NAME,
     FINAL_MATRIX_ASSEMBLY_SCHEMA_VERSION,
 )
-from hrdmc.workflows.dmc.energy_stationarity_assessment import (
+from hrdmc.workflows.dmc.systematics.energy_stationarity import (
     load_energy_stationarity_selection,
 )
 

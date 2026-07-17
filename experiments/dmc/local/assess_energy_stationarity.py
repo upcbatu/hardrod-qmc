@@ -6,7 +6,7 @@ from pathlib import Path
 
 from hrdmc.artifacts import repo_root_from
 from hrdmc.io import print_run_summary
-from hrdmc.workflows.dmc.energy_stationarity_assessment import (
+from hrdmc.workflows.dmc.systematics.energy_stationarity import (
     run_energy_stationarity_assessment,
 )
 
