@@ -46,7 +46,7 @@ from hrdmc.workflows.dmc.population_systematics import (
 from hrdmc.workflows.dmc.population_systematics import (
     PUBLICATION_READY_STATUSES as POPULATION_READY_STATUSES,
 )
-from hrdmc.workflows.dmc.timestep_extrapolation import (
+from hrdmc.workflows.dmc.systematics.timestep.workflow import (
     TIMESTEP_EXTRAPOLATION_RUN_NAME,
     TIMESTEP_EXTRAPOLATION_SCHEMA_VERSION,
 )

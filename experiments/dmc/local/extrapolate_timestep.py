@@ -6,7 +6,7 @@ from pathlib import Path
 
 from hrdmc.artifacts import repo_root_from
 from hrdmc.io import print_run_summary
-from hrdmc.workflows.dmc.timestep_extrapolation import (
+from hrdmc.workflows.dmc.systematics.timestep.workflow import (
     EnergyReportingResolutionPolicy,
     run_timestep_extrapolation_workflow,
 )
