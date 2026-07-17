@@ -52,7 +52,7 @@ from hrdmc.workflows.dmc.timestep_extrapolation import (
 )
 from hrdmc.workflows.dmc.trapped import parse_case
 
-NUMERICAL_SYSTEMATICS_PACKAGE_SCHEMA_VERSION = "dmc_numerical_systematics_package_v1"
+NUMERICAL_SYSTEMATICS_PACKAGE_SCHEMA_VERSION = "dmc_numerical_systematics_package_v2"
 NUMERICAL_SYSTEMATICS_PACKAGE_RUN_NAME = "dmc_numerical_systematics_package"
 SYSTEMATIC_LANES = ("timestep", "population", "forward_walking")
 FINITE_CASE_ORDER = tuple(case for case in REQUIRED_CASE_ORDER if not case.endswith("_A0"))
@@ -554,7 +554,7 @@ def _validate_cross_lane_identities(loaded: LoadedPackageInputs) -> None:
                 )
             _validate_fw_proposal_telemetry(fw, anchor)
         if population is not None and fw is not None:
-            _validate_selected_population_fw_treatment(population, fw)
+            _validate_population_fw_treatment_coverage(population, fw)
     _validate_population_assessment_mode_consistency(loaded.population)
 
 
@@ -1092,23 +1092,32 @@ def _validate_population_selected_treatment(
         raise ValueError(f"{case_id} population: publication status has invalid classification")
 
 
-def _validate_selected_population_fw_treatment(
+def _validate_population_fw_treatment_coverage(
     population: BoundSystematicAssessment,
     fw: BoundSystematicAssessment,
 ) -> None:
     case_id = population.case_id
-    selected_dt = _required_positive_float(population.summary.get("selected_dt"), "selected_dt")
     treatments = _required_mapping(fw.summary, "treatments")
     candidate = _required_mapping(treatments, "candidate")
     candidate_dt = _required_positive_float(candidate.get("dt"), "FW candidate dt")
-    if not math.isclose(selected_dt, candidate_dt, rel_tol=0.0, abs_tol=1.0e-15):
-        raise ValueError(
-            f"{case_id}: FW candidate timestep differs from selected population treatment"
+    candidate_walkers = _required_positive_int(candidate.get("walkers"), "FW candidate walkers")
+    inputs = population.summary.get("input_summaries")
+    if not isinstance(inputs, list) or not all(isinstance(record, dict) for record in inputs):
+        raise ValueError(f"{case_id}: population input treatments are invalid")
+    matches = [
+        record
+        for record in inputs
+        if math.isclose(
+            _required_positive_float(record.get("dt"), "population input dt"),
+            candidate_dt,
+            rel_tol=0.0,
+            abs_tol=1.0e-15,
         )
-    selected_walkers = population.summary.get("selected_walkers")
-    if candidate.get("walkers") != selected_walkers:
+        and record.get("walkers") == candidate_walkers
+    ]
+    if len(matches) != 1:
         raise ValueError(
-            f"{case_id}: FW candidate walkers differ from selected population treatment"
+            f"{case_id}: FW candidate treatment is not covered by the population assessment"
         )
 
 
@@ -1316,6 +1325,12 @@ def _build_payload(
             "performed; accepted fine-treatment FW density/R2 sources remain the "
             "reported coordinate estimators after sensitivity qualification."
         ),
+        "fw_treatment_scope": (
+            "The energy population treatment and the FW sensitivity treatment may differ. "
+            "The FW candidate must be one exact (dt, walkers) treatment covered by the "
+            "manifest-bound population assessment; its role is to qualify coordinate "
+            "observables, not to define the energy extrapolation population."
+        ),
         "artifacts": dict(_ARTIFACT_NAMES),
     }
 
@@ -1390,6 +1405,7 @@ def _exact_tg_row(
         "unresolved_reasons": [] if publication_ready else ["exact_tg_anchor_unresolved"],
         "bounded_qualifiers": {},
         "selected_population_treatment": None,
+        "fw_sensitivity_treatment": None,
         "population_energy_semantics": {"status": "exact_tg_anchor"},
         "uncertainty_components": _uncertainty_components(
             raw,
@@ -1539,6 +1555,7 @@ def _finite_case_row(
                 lane: result["source_status"] for lane, result in lane_results.items()
             },
             "selected_population_treatment": _selected_population_treatment(population),
+            "fw_sensitivity_treatment": _fw_sensitivity_treatment(fw_sensitivity),
             "population_energy_semantics": population_energy,
             "unresolved_reasons": unresolved,
             "bounded_qualifiers": {
@@ -1898,6 +1915,7 @@ def _case_status_rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
             telemetry_comparison.get("configuration_esjd_mean")
         )
         selected_population = _mapping(row.get("selected_population_treatment"))
+        fw_treatment = _mapping(row.get("fw_sensitivity_treatment"))
         rows.append(
             {
                 "case": row.get("case"),
@@ -1929,6 +1947,8 @@ def _case_status_rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "selected_population_dt": selected_population.get("selected_dt"),
                 "selected_population_walkers": selected_population.get("walkers"),
                 "selected_population_energy": selected_population.get("energy"),
+                "fw_sensitivity_dt": fw_treatment.get("dt"),
+                "fw_sensitivity_walkers": fw_treatment.get("walkers"),
                 "anchor_acceptance_mean": anchor_telemetry.get("local_acceptance_fraction_mean"),
                 "selected_candidate_acceptance_mean": candidate_telemetry.get(
                     "local_acceptance_fraction_mean"
@@ -2163,6 +2183,23 @@ def _selected_population_treatment(
         "population_limit_correction_statistical_stderr": summary.get(
             "population_limit_correction_statistical_stderr"
         ),
+    }
+
+
+def _fw_sensitivity_treatment(
+    assessment: BoundSystematicAssessment | None,
+) -> dict[str, Any] | None:
+    if assessment is None:
+        return None
+    candidate = _required_mapping(
+        _required_mapping(assessment.summary, "treatments"),
+        "candidate",
+    )
+    return {
+        "dt": _required_positive_float(candidate.get("dt"), "FW candidate dt"),
+        "walkers": _required_positive_int(candidate.get("walkers"), "FW candidate walkers"),
+        "role": "coordinate_observable_sensitivity_treatment",
+        "population_assessment_coverage": "exact_dt_and_walker_treatment",
     }
 
 
