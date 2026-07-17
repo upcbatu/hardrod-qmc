@@ -11,6 +11,10 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from hrdmc.analysis.equivalence import (
+    simultaneous_pairwise_equivalence,
+    simultaneous_pairwise_norm_equivalence,
+)
 from hrdmc.analysis.fw_sensitivity import (
     ForwardWalkingSensitivityResult,
     analyze_fw_observable_sensitivity,
@@ -719,21 +723,43 @@ def _assess_plateaus(anchors: AnchorSources, candidate: LoadedBenchmarkPacket) -
     reasons = [
         f"{label}: {reason}" for label, record in records.items() for reason in record["reasons"]
     ]
+    bridge_equivalence: dict[str, Any] = {}
     for observable, anchor_label in (("density", "anchor_density"), ("r2", "anchor_r2")):
         anchor_record = records[anchor_label]
         candidate_record = records[f"candidate_{observable}"]
         anchor_lags = anchor_record["selected_physical_lags"]
         candidate_requested = candidate_record["requested_physical_lags"]
-        if not _contains_physical_lags(candidate_requested, anchor_lags):
+        contains_anchor_window = _contains_physical_lags(candidate_requested, anchor_lags)
+        if not contains_anchor_window:
             reasons.append(
                 f"candidate_{observable}: requested lags do not contain the anchor plateau window"
             )
-        if not _same_physical_lag_sequence(
-            candidate_record["selected_physical_lags"],
-            anchor_lags,
-        ):
+        same_selected_window = _same_physical_lag_sequence(
+            candidate_record["selected_physical_lags"], anchor_lags
+        )
+        if not contains_anchor_window:
+            bridge = {
+                "status": "anchor_window_unavailable",
+                "equivalent": False,
+                "reason": "candidate requested lags do not contain the anchor window",
+            }
+        elif same_selected_window:
+            bridge = {
+                "status": "not_required",
+                "equivalent": True,
+                "reason": "candidate selected the anchor physical plateau window",
+            }
+        else:
+            bridge = _plateau_bridge_equivalence(
+                candidate,
+                observable,
+                anchor_physical_lags=anchor_lags,
+            )
+        bridge_equivalence[observable] = bridge
+        if bridge.get("equivalent") is not True:
             reasons.append(
-                f"candidate_{observable}: selected physical plateau window differs from anchor"
+                f"candidate_{observable}: selected physical plateau window differs from "
+                "anchor and the combined-window equivalence test is unresolved"
             )
         anchor_terminal = anchor_record["selected_terminal_physical_lag"]
         candidate_terminal = candidate_record["selected_terminal_physical_lag"]
@@ -751,6 +777,7 @@ def _assess_plateaus(anchors: AnchorSources, candidate: LoadedBenchmarkPacket) -
         "resolved": resolved,
         "reasons": reasons,
         "observables": records,
+        "bridge_equivalence": bridge_equivalence,
         "lag_comparison_unit": "1/Omega",
     }
 
@@ -793,6 +820,101 @@ def _plateau_record(packet: LoadedBenchmarkPacket, observable: str) -> dict[str,
         "aggregate_plateau_status": result.get("aggregate_plateau_status"),
         "aggregate_schema_status": result.get("aggregate_schema_status"),
         "decision_level": result.get("decision_level"),
+    }
+
+
+def _plateau_bridge_equivalence(
+    candidate: LoadedBenchmarkPacket,
+    observable: str,
+    *,
+    anchor_physical_lags: list[float],
+) -> dict[str, Any]:
+    selected = _selected_window_lags(candidate, observable)
+    comparison = _matching_step_lags(candidate, observable, anchor_physical_lags)
+    combined = sorted(set([*selected, *comparison]))
+    result = _observable_result(candidate, observable)
+    diagnostics = _required_mapping(result, "aggregate_plateau_diagnostics")
+    support = _required_mapping(diagnostics, "lag_support")
+    unsupported = [
+        lag
+        for lag in combined
+        if not isinstance(support.get(str(lag)), dict)
+        or support[str(lag)].get("supported") is not True
+    ]
+    if unsupported:
+        return {
+            "status": "genealogy_support_unresolved",
+            "equivalent": False,
+            "combined_step_lags": combined,
+            "combined_physical_lags": [float(lag) * candidate.dt for lag in combined],
+            "unsupported_step_lags": unsupported,
+        }
+
+    confidence = _finite_float(
+        candidate.pure_config.get("plateau_equivalence_confidence_level"),
+        "plateau_equivalence_confidence_level",
+    )
+    if observable == "r2":
+        values = _seed_r2_ladder(candidate, step_lags=combined)
+        rms_values = np.sqrt(values)
+        rms_scale = float(np.sqrt(np.mean(values)))
+        relative_margin = _finite_float(
+            candidate.pure_config.get("rms_plateau_relative_tolerance"),
+            "rms_plateau_relative_tolerance",
+        )
+        equivalence = simultaneous_pairwise_equivalence(
+            rms_values,
+            equivalence_margin=relative_margin * rms_scale,
+            confidence_level=confidence,
+        )
+        return {
+            "status": "accepted" if equivalence.equivalent else "unresolved",
+            "equivalent": bool(equivalence.equivalent),
+            "observable": observable,
+            "method": "paired_seed_simultaneous_rms_bridge_equivalence",
+            "combined_step_lags": combined,
+            "combined_physical_lags": [float(lag) * candidate.dt for lag in combined],
+            "anchor_window_step_lags": comparison,
+            "candidate_selected_step_lags": selected,
+            "relative_equivalence_margin": relative_margin,
+            "observed_max_relative_difference": (
+                equivalence.observed_max_difference / rms_scale
+            ),
+            "simultaneous_relative_upper_bound": (
+                equivalence.simultaneous_upper_bound / rms_scale
+            ),
+            "critical_value": equivalence.critical_value,
+            "pair_count": equivalence.pair_count,
+        }
+
+    values = _seed_density_ladder(candidate, step_lags=combined)
+    edges, _ = _density_edges(candidate)
+    scale = np.mean(values, axis=(0, 1))
+    relative_margin = _finite_float(
+        candidate.pure_config.get("density_plateau_relative_l2_tolerance"),
+        "density_plateau_relative_l2_tolerance",
+    )
+    equivalence = simultaneous_pairwise_norm_equivalence(
+        values,
+        feature_weights=np.diff(edges),
+        scale_vector=scale,
+        equivalence_margin=relative_margin,
+        confidence_level=confidence,
+    )
+    return {
+        "status": "accepted" if equivalence.equivalent else "unresolved",
+        "equivalent": bool(equivalence.equivalent),
+        "observable": observable,
+        "method": "paired_seed_simultaneous_density_l2_bridge_equivalence",
+        "combined_step_lags": combined,
+        "combined_physical_lags": [float(lag) * candidate.dt for lag in combined],
+        "anchor_window_step_lags": comparison,
+        "candidate_selected_step_lags": selected,
+        "relative_l2_equivalence_margin": relative_margin,
+        "observed_max_relative_l2": equivalence.observed_max_relative_norm,
+        "simultaneous_relative_l2_upper_bound": equivalence.simultaneous_upper_bound,
+        "critical_value": equivalence.critical_value,
+        "pair_count": equivalence.pair_count,
     }
 
 
@@ -1026,6 +1148,14 @@ def _seed_r2_values(
     step_lags: list[int] | None = None,
 ) -> FloatArray:
     selected_lags = _selected_window_lags(packet, "r2") if step_lags is None else step_lags
+    return np.mean(_seed_r2_ladder(packet, step_lags=selected_lags), axis=1)
+
+
+def _seed_r2_ladder(
+    packet: LoadedBenchmarkPacket,
+    *,
+    step_lags: list[int],
+) -> FloatArray:
     values = []
     for result in _ordered_seed_results(packet):
         observable = _required_mapping(
@@ -1035,9 +1165,9 @@ def _seed_r2_values(
         values_by_lag = _required_mapping(observable, "values_by_lag")
         selected_values = [
             _positive_float(values_by_lag.get(str(lag)), f"R2 value at lag {lag}")
-            for lag in selected_lags
+            for lag in step_lags
         ]
-        values.append(float(np.mean(selected_values)))
+        values.append(selected_values)
     return np.asarray(values, dtype=np.float64)
 
 
@@ -1047,6 +1177,14 @@ def _seed_density_values(
     step_lags: list[int] | None = None,
 ) -> FloatArray:
     selected_lags = _selected_window_lags(packet, "density") if step_lags is None else step_lags
+    return np.mean(_seed_density_ladder(packet, step_lags=selected_lags), axis=1)
+
+
+def _seed_density_ladder(
+    packet: LoadedBenchmarkPacket,
+    *,
+    step_lags: list[int],
+) -> FloatArray:
     rows = []
     for result in _ordered_seed_results(packet):
         observable = _required_mapping(
@@ -1055,12 +1193,12 @@ def _seed_density_values(
         )
         values_by_lag = _required_mapping(observable, "values_by_lag")
         selected_rows = []
-        for lag in selected_lags:
+        for lag in step_lags:
             row = np.asarray(values_by_lag.get(str(lag)), dtype=np.float64)
             if row.ndim != 1 or not np.all(np.isfinite(row)) or np.any(row < 0.0):
                 raise ValueError(f"seed density value at lag {lag} is invalid")
             selected_rows.append(row)
-        rows.append(np.mean(np.asarray(selected_rows, dtype=np.float64), axis=0))
+        rows.append(selected_rows)
     return np.asarray(rows, dtype=np.float64)
 
 
