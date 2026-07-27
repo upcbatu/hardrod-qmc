@@ -25,3 +25,4 @@ data/processed/
 notebooks/
 operator/
 tests/
+tmp/
