@@ -45,6 +45,23 @@ The expected result is
 `rms_radius = 58.85127194991539` with seed standard error
 `0.0007373005273995926` in harmonic-oscillator units.
 
+## VMC sampler choices
+
+`vmc_sampler_choices/N10_A0.json` and `vmc_sampler_choices/N10_A1.json`
+record the proposal controls selected before the final independent-sampler
+validation runs. They contain only the controls consumed by the validation
+runner: the random-walk Metropolis step size and the branching-free MALA time
+step and drift limiter. The walker count is not part of these choices because
+VMC walkers are independent replicas of the same target distribution.
+
+The selected controls are:
+
+```text
+case      RWM step size   MALA time step   MALA drift limiter
+N10_A0    1.6             0.06             umrigar
+N10_A1    0.8             0.04             umrigar
+```
+
 ## Data policy
 
 Tracked files here must be compact, immutable inputs needed for a documented

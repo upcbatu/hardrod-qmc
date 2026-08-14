@@ -154,3 +154,52 @@ prerequisites listed above.
 The two compact extraction tables introduce no new estimates. They select the
 time-step values and proposal telemetry already bound to the manifest-verified
 systematics inputs.
+
+## Re-running the VMC validation
+
+The VMC packet is a bounded method validation rather than a second eight-case
+physics matrix. It uses `N10_A0` as the exact Tonks--Girardeau anchor and
+`N10_A1` as a nonzero-diameter case. For each case, five independent
+random-walk Metropolis chains and five independent branching-free MALA chains
+sample the same guide-squared target. The local and cutoff-extrapolated
+gradient kinetic estimators are compared on paired configurations within each
+random-walk seed. Scalar observables, the density, and the free-gap
+distribution are compared between the two independent sampler groups.
+
+The following commands launch the fixed-seed validation into a new temporary
+directory. Each seed uses 512 independent walkers, 5,000 discarded burn-in
+transitions, and 40,000 production transitions.
+
+```bash
+VMC_REPRO_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/hardrod-vmc-validation.XXXXXX")"
+
+PYTHONPATH=src python3 experiments/vmc/validation_packet.py \
+  --case N10_A0 \
+  --calibration-summary data/vmc_sampler_choices/N10_A0.json \
+  --walkers 512 \
+  --burn-in-steps 5000 \
+  --production-steps 40000 \
+  --block-steps 20 \
+  --parallel-workers 5 \
+  --output-dir "$VMC_REPRO_ROOT/N10_A0"
+
+PYTHONPATH=src python3 experiments/vmc/validation_packet.py \
+  --case N10_A1 \
+  --calibration-summary data/vmc_sampler_choices/N10_A1.json \
+  --guide-validation-summary data/final_matrix_guides/summary.json \
+  --walkers 512 \
+  --burn-in-steps 5000 \
+  --production-steps 40000 \
+  --block-steps 20 \
+  --parallel-workers 5 \
+  --output-dir "$VMC_REPRO_ROOT/N10_A1"
+```
+
+Both recorded packets have status `accepted_with_warnings` and an empty
+`failed_or_unresolved_checks` list. The random-walk kinetic-consistency
+criteria are 0.1161 against a 0.2498 margin for `N10_A0`, and 0.3829 against a
+0.4041 margin for `N10_A1`. The independent sampler comparison is
+`equivalent` for every scalar observable, the density, and the free-gap
+distribution. The warning status records secondary block-spread alerts; the
+required split-Rhat, bulk-ESS, per-seed ESS, and finite-MCSE conditions all
+pass.

@@ -35,6 +35,18 @@ results/**/.matplotlib/
 !results/dmc/systematics/fw_sensitivity_v1/**/*.csv
 !results/figures/final_matrix_density_profiles.pdf
 !results/figures/final_matrix_lda_comparison.pdf
+!results/figures/vmc_N10_A0_density.pdf
+!results/figures/vmc_N10_A1_density.pdf
+
+# Compact VMC evidence. Full estimator block traces remain untracked.
+!results/vmc/validation/N10_A0/summary.json
+!results/vmc/validation/N10_A0/seed_table.csv
+!results/vmc/validation/N10_A0/density_by_seed.csv
+!results/vmc/validation/N10_A0/free_gap_distribution_by_seed.csv
+!results/vmc/validation/N10_A1/summary.json
+!results/vmc/validation/N10_A1/seed_table.csv
+!results/vmc/validation/N10_A1/density_by_seed.csv
+!results/vmc/validation/N10_A1/free_gap_distribution_by_seed.csv
 data/raw/
 data/processed/
 notebooks/

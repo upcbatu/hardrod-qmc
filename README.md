@@ -53,6 +53,21 @@ On success, the command reports an accepted 8/8 matrix. See
 [docs/reproducing.md](docs/reproducing.md) for the complete table, figure, and
 Hellmann--Feynman reproduction chain and for every untracked prerequisite.
 
+## Re-running the VMC validation
+
+The tracked VMC packet checks two outstanding method objectives: consistency
+of local and gradient kinetic-energy estimators, and agreement between an
+independent random-walk Metropolis sampler and the production MALA transition
+with branching disabled. The bounded validation cases are the exact
+Tonks--Girardeau case `N10_A0` and the finite-diameter case `N10_A1`.
+
+Both 512-walker packets are recorded under `results/vmc/validation/` with
+status `accepted_with_warnings`. The warnings are non-blocking time-series
+alerts; all required convergence, estimator-consistency, and sampler-
+equivalence checks pass. The fixed sampler controls are tracked under
+`data/vmc_sampler_choices/`. Exact rerun commands and the interpretation of
+the packet are given in [docs/reproducing.md](docs/reproducing.md).
+
 ## Packages
 
 The source layout has the root `hrdmc` namespace and eleven owner subpackages.

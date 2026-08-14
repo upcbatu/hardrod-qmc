@@ -1,0 +1,20 @@
+{
+  "case_id": "N10_A1",
+  "status": "calibrated",
+  "selected": {
+    "branching_free_mala": {
+      "drift_limiter": "umrigar",
+      "engine_method": "mala",
+      "method": "branching_free_mala",
+      "proposal_parameter": "dt",
+      "proposal_scale": 0.04
+    },
+    "random_walk_metropolis": {
+      "drift_limiter": "none",
+      "engine_method": "rwm",
+      "method": "random_walk_metropolis",
+      "proposal_parameter": "step_size",
+      "proposal_scale": 0.8
+    }
+  }
+}
