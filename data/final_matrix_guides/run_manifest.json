@@ -1,0 +1,14 @@
+{
+  "run_name": "final_matrix_guide_registry",
+  "run_id": "final_matrix_guide_registry_2026-08-14T00:00:00Z_44136fa355b3",
+  "status": "validated",
+  "config_fingerprint": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "config": {},
+  "artifacts": [
+    {
+      "path": "summary.json",
+      "size_bytes": 1991,
+      "sha256": "553d8e5c88a228d4d421b608267f4f11936e7f6b47ecd55fae81a7fd12ad4eb8"
+    }
+  ]
+}
