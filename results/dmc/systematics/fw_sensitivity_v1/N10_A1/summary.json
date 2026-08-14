@@ -1,0 +1,984 @@
+{
+  "artifacts": {
+    "observable_table": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_sensitivity_v1/N10_A1/observable_comparison.csv",
+    "output_dir": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_sensitivity_v1/N10_A1",
+    "run_manifest": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_sensitivity_v1/N10_A1/run_manifest.json",
+    "shell_table": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_sensitivity_v1/N10_A1/shell_comparison.csv",
+    "summary": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_sensitivity_v1/N10_A1/summary.json"
+  },
+  "candidate_energy_assessment": {
+    "assessment_bundle_sha256": "15ac4f5046ffa5d30f4c098f902a6fff58d2c677015509e3afca2ea986d144e2",
+    "assessment_manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_candidate_energy_stationarity_v1/run_manifest.json",
+    "assessment_manifest_sha256": "6c227fffacb6342508c1c4d0e93c87639a104d32e0a13fcacdbdd9beafc16089",
+    "assessment_method": "bonferroni_simultaneous_directional_screen",
+    "assessment_run_id": "dmc_energy_stationarity_assessment_2026-07-17T08:50:29Z_48b1e23e7228",
+    "assessment_scope": "predeclared_forward_walking_candidate_family",
+    "assessment_summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_candidate_energy_stationarity_v1/summary.json",
+    "assessment_summary_sha256": "f547a0004d6814cd0f8206644465ad3d214038a02319b18dbd3fe4ec458e43f3",
+    "case_assessment": {
+      "effective_samples_min": 1399.9473040925095,
+      "failures": [],
+      "invariant_checks": {
+        "base_numerics_valid": true,
+        "density_accounting_clean": true,
+        "directional_statistics_below_simultaneous_limit": true,
+        "effective_samples_above_minimum": true,
+        "population_weights_controlled": true,
+        "rhat_below_limit": true,
+        "valid_finite_clean": true
+      },
+      "maximum_directional_z": 2.3673214308834187,
+      "rhat": 1.0004597263342743,
+      "source_failing_seeds": [
+        7003,
+        7004
+      ],
+      "source_stationarity_reason": "block_drift+spread_warning+trend_detected",
+      "source_stationarity_status": "trace_nonstationary",
+      "spread_warning_count": 2,
+      "status": "accepted"
+    },
+    "case_id": "N10_A1",
+    "policy_timing": "retrospective",
+    "publication_accepted": true,
+    "publication_status": "accepted_with_retrospective_assessment",
+    "source": {
+      "bundle_sha256": "a5d3d614c5527132650096bf6129b96ae4491c17759dc240d42c48da382318ed",
+      "manifest_path": "../fw_sensitivity_candidates_v2/N10_A1/run_manifest.json",
+      "manifest_sha256": "c94b31062c869c333d0564a03761ea0ffe20187fb9496521c3e1eb2d5f6abb1d",
+      "run_id": "dmc_benchmark_packet_2026-07-16T20:56:58Z_abc8c24fed86",
+      "source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+      "summary_path": "../fw_sensitivity_candidates_v2/N10_A1/summary.json",
+      "summary_sha256": "ec923f0398827a459653983da3f0560e6674b7669a41d60ccad2ca16f8d34bd7"
+    },
+    "source_energy_stationarity_reason": "block_drift+spread_warning+trend_detected",
+    "source_energy_status": "trace_nonstationary",
+    "source_override_eligibility": {
+      "criterion": "only trace-stationarity failures with available conservative correlated-energy uncertainty may be reclassified",
+      "eligible": true,
+      "failures": []
+    }
+  },
+  "case_id": "N10_A1",
+  "density_grid": {
+    "anchor_edge_fingerprint": "0bf083b5bbac9971677f2f296505dcfd8501c0b8b9714b20c8e6de4ebd7a3af6",
+    "bin_count": 840,
+    "candidate_edge_fingerprint": "0bf083b5bbac9971677f2f296505dcfd8501c0b8b9714b20c8e6de4ebd7a3af6",
+    "comparison_rule": "exact float-array equality; no interpolation or rebinning",
+    "compatible": true,
+    "reasons": [],
+    "status": "accepted"
+  },
+  "diagnostic": "DMC transported forward-walking timestep/population sensitivity",
+  "genealogy_assessment": {
+    "observables": {
+      "anchor_density": {
+        "aggregate_genealogy_status": "genealogy_support_accepted",
+        "checked_step_lags": [
+          1600,
+          3200,
+          5600
+        ],
+        "comparison_physical_lags": [],
+        "comparison_step_lags": [],
+        "maximum_pooled_family_fraction_upper_bound": 0.011204235678532602,
+        "minimum_block_count": 4730,
+        "minimum_pooled_ancestor_ess_lower_bound": 699.0966683221186,
+        "minimum_walker_weight_ess": 179.20006861472166,
+        "reasons": [],
+        "selected_physical_lags": [
+          2.0,
+          4.0,
+          7.0
+        ],
+        "selected_step_lags": [
+          1600,
+          3200,
+          5600
+        ],
+        "status": "accepted"
+      },
+      "anchor_r2": {
+        "aggregate_genealogy_status": "genealogy_support_accepted",
+        "checked_step_lags": [
+          3200,
+          4800,
+          6400,
+          8000
+        ],
+        "comparison_physical_lags": [],
+        "comparison_step_lags": [],
+        "maximum_pooled_family_fraction_upper_bound": 0.01155061857339407,
+        "minimum_block_count": 9400,
+        "minimum_pooled_ancestor_ess_lower_bound": 670.3885524165411,
+        "minimum_walker_weight_ess": 179.20006861472166,
+        "reasons": [],
+        "selected_physical_lags": [
+          4.0,
+          6.0,
+          8.0,
+          10.0
+        ],
+        "selected_step_lags": [
+          3200,
+          4800,
+          6400,
+          8000
+        ],
+        "status": "accepted"
+      },
+      "candidate_density": {
+        "aggregate_genealogy_status": "genealogy_support_accepted",
+        "checked_step_lags": [
+          200,
+          400,
+          700
+        ],
+        "comparison_physical_lags": [
+          2.0,
+          4.0,
+          7.0
+        ],
+        "comparison_step_lags": [
+          200,
+          400,
+          700
+        ],
+        "maximum_pooled_family_fraction_upper_bound": 0.010982673168232345,
+        "minimum_block_count": 4730,
+        "minimum_pooled_ancestor_ess_lower_bound": 691.6646275693203,
+        "minimum_walker_weight_ess": 179.20129430483925,
+        "reasons": [],
+        "selected_physical_lags": [
+          2.0,
+          4.0,
+          7.0
+        ],
+        "selected_step_lags": [
+          200,
+          400,
+          700
+        ],
+        "status": "accepted"
+      },
+      "candidate_r2": {
+        "aggregate_genealogy_status": "genealogy_support_accepted",
+        "checked_step_lags": [
+          400,
+          600,
+          800,
+          1000
+        ],
+        "comparison_physical_lags": [
+          4.0,
+          6.0,
+          8.0,
+          10.0
+        ],
+        "comparison_step_lags": [
+          400,
+          600,
+          800,
+          1000
+        ],
+        "maximum_pooled_family_fraction_upper_bound": 0.011735697200843845,
+        "minimum_block_count": 9400,
+        "minimum_pooled_ancestor_ess_lower_bound": 658.4293809623067,
+        "minimum_walker_weight_ess": 179.20129430483925,
+        "reasons": [],
+        "selected_physical_lags": [
+          4.0,
+          6.0,
+          8.0,
+          10.0
+        ],
+        "selected_step_lags": [
+          400,
+          600,
+          800,
+          1000
+        ],
+        "status": "accepted"
+      }
+    },
+    "reasons": [],
+    "status": "accepted",
+    "supported": true
+  },
+  "identity": {
+    "candidate_source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+    "case_id": "N10_A1",
+    "coordinate": "q = x/a_ho",
+    "density_estimator": "transported relative-coordinate forward walking with exact COM integration and exact parity averaging",
+    "density_parity_average": true,
+    "density_source": "com_rao_blackwell",
+    "guide_family": "contact-corrected-reduced-tg",
+    "guide_parameters": {
+      "contact_beta": 5.363445591190197e-08,
+      "relative_alpha": 1.6224444406063525,
+      "source_identity_fingerprint": "a93e77ec2c0398d5788d789681532a2445521b2180af7bc8f8bdd99756ae8bfa",
+      "source_manifest_sha256": "2eac6ddea95e290a2df924e110de731a927fa41fb1eb39b18ef664052f7ac5bc",
+      "source_sha256": "8b361d52d1aae4b8f537c7a188d78f484f71c49683b009369a1780ccf96012e7"
+    },
+    "length_unit": "a_ho = sqrt(hbar/(m*Omega))",
+    "n_particles": 10,
+    "r2_estimator": "transported auxiliary forward walking with exact COM Rao-Blackwellization",
+    "r2_source": "r2_rb",
+    "rod_length_ho": 1.0,
+    "seed_ids": [
+      7001,
+      7002,
+      7003,
+      7004,
+      7005
+    ],
+    "source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+    "time_unit": "1/Omega"
+  },
+  "identity_fingerprint": "018111b29bc3f55170a94e21e4955d5fa89f16adf0a625b015fcd261c8c804a0",
+  "input_quality": {
+    "checks": {
+      "block_size_policy": "sliding-window block_size_steps is held at the exact one-event setting; collection strides are recorded as an estimator sampling design",
+      "candidate_family_energy_assessment_accepted": true,
+      "input_quality_requirements_met": true,
+      "paired_observable_payload_valid": true,
+      "physical_and_estimator_identity_held": true,
+      "same_composed_anchor_treatment": true,
+      "same_guide_identity": true,
+      "same_physical_burn_and_production": true,
+      "same_seed_identities": true,
+      "same_source_tree": true,
+      "sampling_cadence_phase_safe": true,
+      "source_energy_accepted": false
+    },
+    "manifest_verification_warnings": [],
+    "reasons": [],
+    "status": "accepted",
+    "warning_policy": "only unrelated artifacts under plots/ may drift"
+  },
+  "observable_comparison": {
+    "density": {
+      "aggregate_relative_l2": 0.0016160033202095054,
+      "condition_count": 2,
+      "confidence_level": 0.95,
+      "critical_value": 2.7764451051977934,
+      "equivalence_margin": 0.03,
+      "equivalent": true,
+      "grid_weighting": "exact histogram bin widths",
+      "observed_max_relative_norm": 0.0017794291113492286,
+      "pair_count": 1,
+      "pairwise_bounds": [
+        {
+          "first_index": 0,
+          "mean_relative_norm": 0.0017794291113492286,
+          "second_index": 1,
+          "standard_error": 0.00014973684300414165,
+          "upper_bound": 0.002195165236175848
+        }
+      ],
+      "replicate_count": 5,
+      "reported_norm": "bin-width-weighted relative L2",
+      "simultaneous_upper_bound": 0.002195165236175848,
+      "weighted_l1_policy": "not reported because the declared sensitivity criterion is L2"
+    },
+    "equivalent": true,
+    "extrapolation_policy": "no binwise density extrapolation; this is a paired sensitivity bound",
+    "fixed_cell_envelope": {
+      "aggregate_relative_l2": 2.7451508704890913e-05,
+      "cell_weighting": "fixed anchor shell-cell widths",
+      "decision_role": "descriptive_only",
+      "maximum_paired_seed_relative_l2": 4.5011417448231974e-05,
+      "mean_paired_seed_relative_l2": 3.8823200397640706e-05,
+      "paired_seed_relative_l2": [
+        4.491875152686584e-05,
+        4.5011417448231974e-05,
+        2.9456718965192273e-05,
+        4.080630143336639e-05,
+        3.3922812614547075e-05
+      ],
+      "reason": "the common shell boundaries are estimated from the same anchor replicates, so an independent-replicate t bound is not claimed"
+    },
+    "held_physical_lag_windows": {
+      "density": {
+        "anchor_step_lags": [
+          1600,
+          3200,
+          5600
+        ],
+        "candidate_step_lags": [
+          200,
+          400,
+          700
+        ],
+        "comparison_rule": "paired values are evaluated at the anchor physical lag window",
+        "physical_lags": [
+          2.0,
+          4.0,
+          7.0
+        ],
+        "unit": "1/Omega"
+      },
+      "r2": {
+        "anchor_step_lags": [
+          3200,
+          4800,
+          6400,
+          8000
+        ],
+        "candidate_step_lags": [
+          400,
+          600,
+          800,
+          1000
+        ],
+        "comparison_rule": "paired values are evaluated at the anchor physical lag window",
+        "physical_lags": [
+          4.0,
+          6.0,
+          8.0,
+          10.0
+        ],
+        "unit": "1/Omega"
+      }
+    },
+    "r2": {
+      "anchor_scale": 21.295950114704294,
+      "condition_count": 2,
+      "confidence_level": 0.95,
+      "critical_value": 2.7764451051977934,
+      "equivalence_margin": 0.04257060427929388,
+      "equivalent": true,
+      "observed_max_difference": 0.0038830507441140584,
+      "pair_count": 1,
+      "pairwise_bounds": [
+        {
+          "first_index": 0,
+          "mean_difference": 0.0038830507441140584,
+          "second_index": 1,
+          "standard_error": 0.000941083180265168,
+          "upper_bound": 0.0064959165335452575
+        }
+      ],
+      "relative_equivalence_margin": 0.001999,
+      "replicate_count": 5,
+      "simultaneous_relative_upper_bound": 0.00030503060434293553,
+      "simultaneous_upper_bound": 0.0064959165335452575
+    },
+    "rms_radius": {
+      "anchor_scale": 4.614753526972409,
+      "condition_count": 2,
+      "confidence_level": 0.95,
+      "critical_value": 2.7764451051977934,
+      "equivalence_margin": 0.004614753526972409,
+      "equivalent": true,
+      "observed_max_difference": 0.00042074331762638196,
+      "pair_count": 1,
+      "pairwise_bounds": [
+        {
+          "first_index": 0,
+          "mean_difference": 0.00042074331762638196,
+          "second_index": 1,
+          "standard_error": 0.00010197267931509466,
+          "upper_bound": 0.0007038648639746809
+        }
+      ],
+      "relative_equivalence_margin": 0.001,
+      "replicate_count": 5,
+      "simultaneous_relative_upper_bound": 0.00015252490948015242,
+      "simultaneous_upper_bound": 0.0007038648639746809
+    },
+    "shell_peaks": {
+      "anchor_envelope": [
+        0.02972890882288008,
+        0.5928220686657555,
+        0.6234182234147224,
+        0.6374888226757534,
+        0.6448193264760043,
+        0.6448193264760014,
+        0.6374888226757598,
+        0.623418223414728,
+        0.5928220686657493,
+        0.029728908822880085
+      ],
+      "anchor_peak_amplitudes": [
+        1.041693925803313,
+        1.193703873203012,
+        1.2637266918215435,
+        1.3200565218041944,
+        1.3292387542731297,
+        1.3292387542731297,
+        1.3200565218041944,
+        1.2637266918215435,
+        1.193703873203012,
+        1.041693925803313
+      ],
+      "anchor_peak_positions": [
+        -7.294398092967819,
+        -5.578069129916569,
+        -3.957091775923722,
+        -2.3361144219308727,
+        -0.8104886769964263,
+        0.810488676996421,
+        2.3361144219308674,
+        3.9570917759237147,
+        5.578069129916564,
+        7.294398092967818
+      ],
+      "boundaries": [
+        -40.047675804529206,
+        -6.410383364438835,
+        -4.72353658046086,
+        -3.119476958137692,
+        -1.5508220038395661,
+        5.6889637160861796e-15,
+        1.5508220038395846,
+        3.1194769581376947,
+        4.7235365804608485,
+        6.410383364438841,
+        40.047675804529206
+      ],
+      "candidate_envelope": [
+        0.029726208616922115,
+        0.5928271140707523,
+        0.6234430665628811,
+        0.6375063752577791,
+        0.6448289555350569,
+        0.6448289555350547,
+        0.6375063752577849,
+        0.6234430665628867,
+        0.5928271140707473,
+        0.029726208616921938
+      ],
+      "candidate_peak_amplitudes": [
+        1.0393716595790614,
+        1.1923259397346666,
+        1.2631680419439812,
+        1.319409871982218,
+        1.3286311713053591,
+        1.3286311713053591,
+        1.319409871982218,
+        1.2631680419439812,
+        1.1923259397346666,
+        1.0393716595790614
+      ],
+      "candidate_peak_positions": [
+        -7.294398092967819,
+        -5.578069129916569,
+        -3.8617401668653173,
+        -2.3361144219308727,
+        -0.8104886769964263,
+        0.810488676996421,
+        2.3361144219308674,
+        3.861740166865312,
+        5.578069129916564,
+        7.294398092967818
+      ],
+      "cell_count": 10,
+      "cell_definition": "fixed unit-mass cells from the anchor density",
+      "cell_scope": "all N cells on the exact common histogram grid",
+      "centers": [
+        -23.22902958448402,
+        -5.5669599724498475,
+        -3.9215067692992758,
+        -2.335149480988629,
+        -0.7754110019197802,
+        0.7754110019197952,
+        2.3351494809886395,
+        3.9215067692992713,
+        5.566959972449845,
+        23.229029584484024
+      ],
+      "decision_role": "descriptive only; exact-grid paired density L2 carries the vector observable equivalence decision",
+      "maximum_absolute_peak_amplitude_relative_difference": 0.002229317236788964,
+      "maximum_absolute_peak_position_shift_in_cell_widths": 0.059443930718925723,
+      "peak_amplitude_relative_difference": [
+        -0.002229317236788964,
+        -0.0011543344201842324,
+        -0.00044206542536268334,
+        -0.0004898652529609587,
+        -0.00045709092201631725,
+        -0.00045709092201631725,
+        -0.0004898652529609587,
+        -0.00044206542536268334,
+        -0.0011543344201842324,
+        -0.002229317236788964
+      ],
+      "peak_position_shift_in_cell_widths": [
+        0.0,
+        0.0,
+        0.059443930718925723,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.05944393071892514,
+        0.0,
+        0.0
+      ],
+      "tail_cell_caveat": "the first and last cells terminate at finite histogram edges and their averaged values are grid-truncation diagnostics",
+      "tail_cell_indices": [
+        0,
+        9
+      ]
+    }
+  },
+  "plateau_assessment": {
+    "bridge_equivalence": {
+      "density": {
+        "equivalent": true,
+        "reason": "candidate selected the anchor physical plateau window",
+        "status": "not_required"
+      },
+      "r2": {
+        "equivalent": true,
+        "reason": "candidate selected the anchor physical plateau window",
+        "status": "not_required"
+      }
+    },
+    "lag_comparison_unit": "1/Omega",
+    "observables": {
+      "anchor_density": {
+        "aggregate_plateau_status": "plateau_resolved",
+        "aggregate_schema_status": "schema_valid",
+        "decision_level": "independent_seed_aggregate",
+        "reasons": [],
+        "requested_physical_lags": [
+          0.0,
+          2.0,
+          4.0,
+          7.0
+        ],
+        "requested_step_lags": [
+          0,
+          1600,
+          3200,
+          5600
+        ],
+        "selected_physical_lags": [
+          2.0,
+          4.0,
+          7.0
+        ],
+        "selected_step_lags": [
+          1600,
+          3200,
+          5600
+        ],
+        "selected_terminal_physical_lag": 7.0,
+        "status": "accepted"
+      },
+      "anchor_r2": {
+        "aggregate_plateau_status": "plateau_resolved",
+        "aggregate_schema_status": "schema_valid",
+        "decision_level": "independent_seed_aggregate",
+        "reasons": [],
+        "requested_physical_lags": [
+          0.0,
+          4.0,
+          6.0,
+          8.0,
+          10.0
+        ],
+        "requested_step_lags": [
+          0,
+          3200,
+          4800,
+          6400,
+          8000
+        ],
+        "selected_physical_lags": [
+          4.0,
+          6.0,
+          8.0,
+          10.0
+        ],
+        "selected_step_lags": [
+          3200,
+          4800,
+          6400,
+          8000
+        ],
+        "selected_terminal_physical_lag": 10.0,
+        "status": "accepted"
+      },
+      "candidate_density": {
+        "aggregate_plateau_status": "plateau_resolved",
+        "aggregate_schema_status": "schema_valid",
+        "decision_level": "independent_seed_aggregate",
+        "reasons": [],
+        "requested_physical_lags": [
+          0.0,
+          2.0,
+          4.0,
+          7.0
+        ],
+        "requested_step_lags": [
+          0,
+          200,
+          400,
+          700
+        ],
+        "selected_physical_lags": [
+          2.0,
+          4.0,
+          7.0
+        ],
+        "selected_step_lags": [
+          200,
+          400,
+          700
+        ],
+        "selected_terminal_physical_lag": 7.0,
+        "status": "accepted"
+      },
+      "candidate_r2": {
+        "aggregate_plateau_status": "plateau_resolved",
+        "aggregate_schema_status": "schema_valid",
+        "decision_level": "independent_seed_aggregate",
+        "reasons": [],
+        "requested_physical_lags": [
+          0.0,
+          4.0,
+          6.0,
+          8.0,
+          10.0
+        ],
+        "requested_step_lags": [
+          0,
+          400,
+          600,
+          800,
+          1000
+        ],
+        "selected_physical_lags": [
+          4.0,
+          6.0,
+          8.0,
+          10.0
+        ],
+        "selected_step_lags": [
+          400,
+          600,
+          800,
+          1000
+        ],
+        "selected_terminal_physical_lag": 10.0,
+        "status": "accepted"
+      }
+    },
+    "reasons": [],
+    "resolved": true,
+    "status": "accepted"
+  },
+  "publication_ready_within_fw_sensitivity_scope": true,
+  "qualified_systematics": {
+    "forward_walking_timestep_population_sensitivity": "accepted"
+  },
+  "sampling_design": {
+    "all_treatments_use_ordinary_local_dmc": true,
+    "anchor_r2_composition_common_cadence": true,
+    "density": {
+      "anchor": {
+        "minimum_selected_source_window_count": 4730,
+        "physical_stride_tau": 0.1,
+        "required_minimum_source_window_count": 20,
+        "selected_physical_lags": [
+          2.0,
+          4.0,
+          7.0
+        ],
+        "selected_step_lags": [
+          1600,
+          3200,
+          5600
+        ],
+        "source_window_support_counts_by_step_lag": {
+          "1600": 4780,
+          "3200": 4760,
+          "5600": 4730
+        },
+        "stride_steps": 80
+      },
+      "candidate": {
+        "minimum_selected_source_window_count": 4730,
+        "physical_stride_tau": 0.1,
+        "required_minimum_source_window_count": 20,
+        "selected_physical_lags": [
+          2.0,
+          4.0,
+          7.0
+        ],
+        "selected_step_lags": [
+          200,
+          400,
+          700
+        ],
+        "source_window_support_counts_by_step_lag": {
+          "200": 4780,
+          "400": 4760,
+          "700": 4730
+        },
+        "stride_steps": 10
+      },
+      "candidate_to_anchor_physical_stride_ratio": 1.0,
+      "status": "common_cadence"
+    },
+    "interpretation": "Collection cadence selects transported source windows and changes sampling cost and correlation, not the fixed physical-lag estimator. Publication acceptance still requires the declared collected-window, plateau, genealogy, and independent-seed equivalence checks.",
+    "phase_policy": "ordinary local DMC permits deterministic source-window subsampling",
+    "phase_safe": true,
+    "r2": {
+      "anchor": {
+        "minimum_selected_source_window_count": 9400,
+        "physical_stride_tau": 0.05,
+        "required_minimum_source_window_count": 20,
+        "selected_physical_lags": [
+          4.0,
+          6.0,
+          8.0,
+          10.0
+        ],
+        "selected_step_lags": [
+          3200,
+          4800,
+          6400,
+          8000
+        ],
+        "source_window_support_counts_by_step_lag": {
+          "3200": 9520,
+          "4800": 9480,
+          "6400": 9440,
+          "8000": 9400
+        },
+        "stride_steps": 40
+      },
+      "candidate": {
+        "minimum_selected_source_window_count": 9400,
+        "physical_stride_tau": 0.05,
+        "required_minimum_source_window_count": 20,
+        "selected_physical_lags": [
+          4.0,
+          6.0,
+          8.0,
+          10.0
+        ],
+        "selected_step_lags": [
+          400,
+          600,
+          800,
+          1000
+        ],
+        "source_window_support_counts_by_step_lag": {
+          "1000": 9400,
+          "400": 9520,
+          "600": 9480,
+          "800": 9440
+        },
+        "stride_steps": 5
+      },
+      "candidate_to_anchor_physical_stride_ratio": 1.0,
+      "status": "common_cadence"
+    },
+    "scheduled_collective_move_enabled": {
+      "anchor_density": false,
+      "anchor_r2": false,
+      "candidate": false
+    },
+    "source_phase": "production_event_index_mod_stride_zero",
+    "status": "common_cadence"
+  },
+  "schema_version": "dmc_fw_sensitivity_v3",
+  "scientific_scope": "Paired seed-level sensitivity of transported pure R2/RMS and density to the candidate timestep/population treatment. Density is compared on one exact common grid. The fixed anchor shell-cell envelope and shell peaks are descriptive diagnostics; no binwise zero-timestep or infinite-population extrapolation is performed.",
+  "status": "accepted",
+  "treatments": {
+    "anchor_density": {
+      "burn_tau": 60.0,
+      "density_collection_stride_tau": 0.1,
+      "dt": 0.00125,
+      "production_tau": 480.0,
+      "proposal_telemetry": {
+        "configuration_esjd_mean": 0.012447118001745586,
+        "configuration_esjd_mean_seed_max": 0.012447557119901658,
+        "configuration_esjd_mean_seed_min": 0.01244680089824232,
+        "coverage_rule": "acceptance and configuration ESJD require one finite value for every declared seed",
+        "duplicate_seed_ids": [],
+        "expected_seed_ids": [
+          7001,
+          7002,
+          7003,
+          7004,
+          7005
+        ],
+        "invalid_proposal_fraction_max": 0.0029296875,
+        "invalid_proposal_fraction_max_seed_max": 0.0029296875,
+        "invalid_proposal_fraction_max_seed_min": 0.00244140625,
+        "invalid_seed_identity_count": 0,
+        "local_acceptance_fraction_mean": 0.9884170989990235,
+        "local_acceptance_fraction_mean_seed_max": 0.9884274088541666,
+        "local_acceptance_fraction_mean_seed_min": 0.9884098205566405,
+        "metric_seed_counts": {
+          "configuration_esjd_mean": 5,
+          "invalid_proposal_fraction_max": 5,
+          "local_acceptance_fraction_mean": 5,
+          "metropolis_rejection_fraction_max": 5,
+          "r2_esjd_mean": 5,
+          "weighted_free_gap_esjd_mean": 5
+        },
+        "metropolis_rejection_fraction_max": 0.01572265625,
+        "metropolis_rejection_fraction_max_seed_max": 0.01572265625,
+        "metropolis_rejection_fraction_max_seed_min": 0.0150390625,
+        "missing_required_metric_seed_ids": {
+          "configuration_esjd_mean": [],
+          "local_acceptance_fraction_mean": []
+        },
+        "missing_seed_ids": [],
+        "r2_esjd_mean": 0.010543285886914186,
+        "r2_esjd_mean_seed_max": 0.01054486038155558,
+        "r2_esjd_mean_seed_min": 0.010542178759955292,
+        "recorded_seed_ids": [
+          7001,
+          7002,
+          7003,
+          7004,
+          7005
+        ],
+        "reduction": "unweighted seed mean for mean metrics; maximum across per-seed maxima for max metrics; observed seed range retained separately",
+        "seed_count": 5,
+        "source": "per-seed DMC proposal metadata",
+        "status": "available",
+        "unexpected_seed_ids": [],
+        "weighted_free_gap_esjd_mean": 1.5007087511003237e-05,
+        "weighted_free_gap_esjd_mean_seed_max": 1.5009034807492326e-05,
+        "weighted_free_gap_esjd_mean_seed_min": 1.5005468629895278e-05
+      },
+      "r2_collection_stride_tau": 0.05,
+      "walkers": 512
+    },
+    "anchor_r2": {
+      "burn_tau": 60.0,
+      "density_collection_stride_tau": 0.1,
+      "dt": 0.00125,
+      "production_tau": 480.0,
+      "proposal_telemetry": {
+        "configuration_esjd_mean": 0.012447118001745586,
+        "configuration_esjd_mean_seed_max": 0.012447557119901658,
+        "configuration_esjd_mean_seed_min": 0.01244680089824232,
+        "coverage_rule": "acceptance and configuration ESJD require one finite value for every declared seed",
+        "duplicate_seed_ids": [],
+        "expected_seed_ids": [
+          7001,
+          7002,
+          7003,
+          7004,
+          7005
+        ],
+        "invalid_proposal_fraction_max": 0.0029296875,
+        "invalid_proposal_fraction_max_seed_max": 0.0029296875,
+        "invalid_proposal_fraction_max_seed_min": 0.00244140625,
+        "invalid_seed_identity_count": 0,
+        "local_acceptance_fraction_mean": 0.9884170989990235,
+        "local_acceptance_fraction_mean_seed_max": 0.9884274088541666,
+        "local_acceptance_fraction_mean_seed_min": 0.9884098205566405,
+        "metric_seed_counts": {
+          "configuration_esjd_mean": 5,
+          "invalid_proposal_fraction_max": 5,
+          "local_acceptance_fraction_mean": 5,
+          "metropolis_rejection_fraction_max": 5,
+          "r2_esjd_mean": 5,
+          "weighted_free_gap_esjd_mean": 5
+        },
+        "metropolis_rejection_fraction_max": 0.01572265625,
+        "metropolis_rejection_fraction_max_seed_max": 0.01572265625,
+        "metropolis_rejection_fraction_max_seed_min": 0.0150390625,
+        "missing_required_metric_seed_ids": {
+          "configuration_esjd_mean": [],
+          "local_acceptance_fraction_mean": []
+        },
+        "missing_seed_ids": [],
+        "r2_esjd_mean": 0.010543285886914186,
+        "r2_esjd_mean_seed_max": 0.01054486038155558,
+        "r2_esjd_mean_seed_min": 0.010542178759955292,
+        "recorded_seed_ids": [
+          7001,
+          7002,
+          7003,
+          7004,
+          7005
+        ],
+        "reduction": "unweighted seed mean for mean metrics; maximum across per-seed maxima for max metrics; observed seed range retained separately",
+        "seed_count": 5,
+        "source": "per-seed DMC proposal metadata",
+        "status": "available",
+        "unexpected_seed_ids": [],
+        "weighted_free_gap_esjd_mean": 1.5007087511003237e-05,
+        "weighted_free_gap_esjd_mean_seed_max": 1.5009034807492326e-05,
+        "weighted_free_gap_esjd_mean_seed_min": 1.5005468629895278e-05
+      },
+      "r2_collection_stride_tau": 0.05,
+      "walkers": 512
+    },
+    "candidate": {
+      "burn_tau": 60.0,
+      "density_collection_stride_tau": 0.1,
+      "dt": 0.01,
+      "production_tau": 480.0,
+      "proposal_telemetry": {
+        "configuration_esjd_mean": 0.08924148704824801,
+        "configuration_esjd_mean_seed_max": 0.08925544344559523,
+        "configuration_esjd_mean_seed_min": 0.08922211580488149,
+        "coverage_rule": "acceptance and configuration ESJD require one finite value for every declared seed",
+        "duplicate_seed_ids": [],
+        "expected_seed_ids": [
+          7001,
+          7002,
+          7003,
+          7004,
+          7005
+        ],
+        "invalid_proposal_fraction_max": 0.0498046875,
+        "invalid_proposal_fraction_max_seed_max": 0.0498046875,
+        "invalid_proposal_fraction_max_seed_min": 0.0458984375,
+        "invalid_seed_identity_count": 0,
+        "local_acceptance_fraction_mean": 0.8635626708984375,
+        "local_acceptance_fraction_mean_seed_max": 0.863660400390625,
+        "local_acceptance_fraction_mean_seed_min": 0.8635003255208333,
+        "metric_seed_counts": {
+          "configuration_esjd_mean": 5,
+          "invalid_proposal_fraction_max": 5,
+          "local_acceptance_fraction_mean": 5,
+          "metropolis_rejection_fraction_max": 5,
+          "r2_esjd_mean": 5,
+          "weighted_free_gap_esjd_mean": 5
+        },
+        "metropolis_rejection_fraction_max": 0.158203125,
+        "metropolis_rejection_fraction_max_seed_max": 0.158203125,
+        "metropolis_rejection_fraction_max_seed_min": 0.1513671875,
+        "missing_required_metric_seed_ids": {
+          "configuration_esjd_mean": [],
+          "local_acceptance_fraction_mean": []
+        },
+        "missing_seed_ids": [],
+        "r2_esjd_mean": 0.07457544711166848,
+        "r2_esjd_mean_seed_max": 0.07460720866952676,
+        "r2_esjd_mean_seed_min": 0.07456488196226053,
+        "recorded_seed_ids": [
+          7001,
+          7002,
+          7003,
+          7004,
+          7005
+        ],
+        "reduction": "unweighted seed mean for mean metrics; maximum across per-seed maxima for max metrics; observed seed range retained separately",
+        "seed_count": 5,
+        "source": "per-seed DMC proposal metadata",
+        "status": "available",
+        "unexpected_seed_ids": [],
+        "weighted_free_gap_esjd_mean": 0.00010605756069128013,
+        "weighted_free_gap_esjd_mean_seed_max": 0.00010610008245687315,
+        "weighted_free_gap_esjd_mean_seed_min": 0.00010602855831598536
+      },
+      "r2_collection_stride_tau": 0.05,
+      "walkers": 512
+    }
+  },
+  "unresolved_reasons": []
+}

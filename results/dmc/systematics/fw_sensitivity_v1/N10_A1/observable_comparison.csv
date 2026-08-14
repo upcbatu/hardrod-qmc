@@ -1,0 +1,5 @@
+observable,metric,observed,simultaneous_upper_bound,equivalence_margin,equivalent
+r2,paired_absolute_difference,0.0038830507441140584,0.0064959165335452575,0.04257060427929388,True
+rms_radius,paired_absolute_difference,0.00042074331762638196,0.0007038648639746809,0.004614753526972409,True
+density,paired_bin_width_weighted_relative_l2,0.0017794291113492286,0.002195165236175848,0.03,True
+fixed_cell_envelope,descriptive_aggregate_cell_width_weighted_relative_l2,2.7451508704890913e-05,,,

@@ -31,9 +31,11 @@ Install `.[dmc,dev]` instead when developing the repository.
 
 ## Reproducing the eight-case result
 
-The following command reassembles the eight thesis cases from the archived
-result bundle. The simulation bundle is not tracked, so a clean clone must
-first receive the directory
+The compact summaries and final figures are tracked under `results/`; their
+scope is described in [results/README.md](results/README.md). The following
+command reassembles the eight thesis cases from the archived result bundle.
+The full simulation bundle is not tracked, so a clean clone must first receive
+the directory
 `results/dmc/final_matrix/thesis_5seed_all_optimized_v1/` and its
 `thesis_5seed_all_optimized_v1_supplement/N20_A10_r2_tau15` supplement.
 

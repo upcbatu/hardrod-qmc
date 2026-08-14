@@ -1,0 +1,305 @@
+{
+  "artifacts": [
+    {
+      "path": "summary.json",
+      "sha256": "5094049883108fbb51af035f2c11a7a95ad10fcd5ef99f901c40755852c75d3e",
+      "size_bytes": 32760
+    },
+    {
+      "path": "observable_comparison.csv",
+      "sha256": "974e299f4d56cd5bb9e393153c28ad838a863d363c3ae09fb8c3140af562854c",
+      "size_bytes": 493
+    },
+    {
+      "path": "shell_comparison.csv",
+      "sha256": "954840a18bfce931af4fd1df65f393c8800d8873d1e4a95490d226394968bfb1",
+      "size_bytes": 2254
+    }
+  ],
+  "bundle_sha256": "fb11c99967080e3427a2e079acc229cacb8253adf87a46a7379acb6b71cb3975",
+  "config": {
+    "anchor_density": {
+      "bundle_sha256": "a31b01bc7677555c3e4698cf1358ed5e22329441ba365a4d79a92c96b2fe25d1",
+      "dt": 0.0025,
+      "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A0.1/run_manifest.json",
+      "manifest_sha256": "29e4a8d0b16f1bddc618fa752314df71fe32441d8bc8cd36eb280e2ad4c8e53a",
+      "run_id": "dmc_benchmark_packet_2026-07-14T20:18:56Z_f82b9e31a0e9",
+      "source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+      "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A0.1/summary.json",
+      "summary_sha256": "c02f14e5db7b0d309a8f59af5e8c1e42b47827784468807f0bf4b1ed2444ea7b",
+      "walkers": 256
+    },
+    "anchor_r2": {
+      "bundle_sha256": "a31b01bc7677555c3e4698cf1358ed5e22329441ba365a4d79a92c96b2fe25d1",
+      "dt": 0.0025,
+      "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A0.1/run_manifest.json",
+      "manifest_sha256": "29e4a8d0b16f1bddc618fa752314df71fe32441d8bc8cd36eb280e2ad4c8e53a",
+      "run_id": "dmc_benchmark_packet_2026-07-14T20:18:56Z_f82b9e31a0e9",
+      "source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+      "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A0.1/summary.json",
+      "summary_sha256": "c02f14e5db7b0d309a8f59af5e8c1e42b47827784468807f0bf4b1ed2444ea7b",
+      "walkers": 256
+    },
+    "candidate": {
+      "bundle_sha256": "ee6c0290fa46a1ab06c8b3d1a6659020a5a3b754a37c7f2e0cc95ec1523c7870",
+      "dt": 0.04,
+      "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_sensitivity_candidates_v2/N10_A0.1/run_manifest.json",
+      "manifest_sha256": "59559a96832f5122ef415781a252c0238ddc9b016c73b466f8cb6230e468f2c9",
+      "run_id": "dmc_benchmark_packet_2026-07-16T20:50:58Z_8e4de1a8c7ed",
+      "source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+      "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_sensitivity_candidates_v2/N10_A0.1/summary.json",
+      "summary_sha256": "8c79819c0ab57212d593fd16177b4e82b65e10d26494ba0d4e9e36ac33b0a72a",
+      "walkers": 256
+    },
+    "candidate_energy_assessment": {
+      "assessment_bundle_sha256": "15ac4f5046ffa5d30f4c098f902a6fff58d2c677015509e3afca2ea986d144e2",
+      "assessment_manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_candidate_energy_stationarity_v1/run_manifest.json",
+      "assessment_manifest_sha256": "6c227fffacb6342508c1c4d0e93c87639a104d32e0a13fcacdbdd9beafc16089",
+      "assessment_method": "bonferroni_simultaneous_directional_screen",
+      "assessment_run_id": "dmc_energy_stationarity_assessment_2026-07-17T08:50:29Z_48b1e23e7228",
+      "assessment_scope": "predeclared_forward_walking_candidate_family",
+      "assessment_summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_candidate_energy_stationarity_v1/summary.json",
+      "assessment_summary_sha256": "f547a0004d6814cd0f8206644465ad3d214038a02319b18dbd3fe4ec458e43f3",
+      "case_assessment": {
+        "effective_samples_min": 695.2606584296856,
+        "failures": [],
+        "invariant_checks": {
+          "base_numerics_valid": true,
+          "density_accounting_clean": true,
+          "directional_statistics_below_simultaneous_limit": true,
+          "effective_samples_above_minimum": true,
+          "population_weights_controlled": true,
+          "rhat_below_limit": true,
+          "valid_finite_clean": true
+        },
+        "maximum_directional_z": 1.6432343715804942,
+        "rhat": 1.0014751952008072,
+        "source_failing_seeds": [
+          7001,
+          7003,
+          7004,
+          7005
+        ],
+        "source_stationarity_reason": "spread_warning",
+        "source_stationarity_status": "spread_warning",
+        "spread_warning_count": 4,
+        "status": "accepted"
+      },
+      "case_id": "N10_A0.1",
+      "policy_timing": "retrospective",
+      "publication_accepted": true,
+      "publication_status": "accepted",
+      "source": {
+        "bundle_sha256": "ee6c0290fa46a1ab06c8b3d1a6659020a5a3b754a37c7f2e0cc95ec1523c7870",
+        "manifest_path": "../fw_sensitivity_candidates_v2/N10_A0.1/run_manifest.json",
+        "manifest_sha256": "59559a96832f5122ef415781a252c0238ddc9b016c73b466f8cb6230e468f2c9",
+        "run_id": "dmc_benchmark_packet_2026-07-16T20:50:58Z_8e4de1a8c7ed",
+        "source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+        "summary_path": "../fw_sensitivity_candidates_v2/N10_A0.1/summary.json",
+        "summary_sha256": "8c79819c0ab57212d593fd16177b4e82b65e10d26494ba0d4e9e36ac33b0a72a"
+      },
+      "source_energy_stationarity_reason": "spread_warning",
+      "source_energy_status": "accepted",
+      "source_override_eligibility": {
+        "criterion": "only trace-stationarity failures with available conservative correlated-energy uncertainty may be reclassified",
+        "eligible": false,
+        "failures": [
+          "source_already_accepted",
+          "source_energy_status_is_not_trace_nonstationary",
+          "source_energy_chain_status_is_not_trace_nonstationary"
+        ]
+      }
+    },
+    "case_id": "N10_A0.1",
+    "confidence_level": 0.95,
+    "density_relative_l2_margin": 0.03,
+    "final_matrix_manifest": {
+      "bundle_sha256": "8f6dd517dd6d1cb97b87c58297f1d94773174c1e4b94e79bf8e13302d25a8e3b",
+      "path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/run_manifest.json",
+      "run_id": "dmc_final_matrix_assembly_2026-07-15T10:47:01Z_f295addf0a1a",
+      "sha256": "7e5038095da52b337f4a787069cabb1135ff41987d70b5c525dc6bee5f5d7e95"
+    },
+    "identity": {
+      "candidate_source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+      "case_id": "N10_A0.1",
+      "coordinate": "q = x/a_ho",
+      "density_estimator": "transported relative-coordinate forward walking with exact COM integration and exact parity averaging",
+      "density_parity_average": true,
+      "density_source": "com_rao_blackwell",
+      "guide_family": "contact-corrected-reduced-tg",
+      "guide_parameters": {
+        "contact_beta": 5.363445591190197e-08,
+        "relative_alpha": 1.0637325870622627,
+        "source_identity_fingerprint": "1421cdde9fc1174259a7901677173265f91eaab309e26e687a4cbc8dfe3d2435",
+        "source_manifest_sha256": "0073d4388dc3d4011ef1f78c033bacebf63d492e82683f658711671c0218999d",
+        "source_sha256": "05b4a161ead98ec6e537c6d066fd2e4d121a353d6b425f4c155e32465756ff7b"
+      },
+      "length_unit": "a_ho = sqrt(hbar/(m*Omega))",
+      "n_particles": 10,
+      "r2_estimator": "transported auxiliary forward walking with exact COM Rao-Blackwellization",
+      "r2_source": "r2_rb",
+      "rod_length_ho": 0.1,
+      "seed_ids": [
+        7001,
+        7002,
+        7003,
+        7004,
+        7005
+      ],
+      "source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+      "time_unit": "1/Omega"
+    },
+    "identity_fingerprint": "7cd3927f652aabaf945144cb101e5ee77103d1e96849da0588a2148720b8d52d",
+    "rms_relative_margin": 0.001,
+    "sampling_design": {
+      "all_treatments_use_ordinary_local_dmc": true,
+      "anchor_r2_composition_common_cadence": true,
+      "density": {
+        "anchor": {
+          "minimum_selected_source_window_count": 4730,
+          "physical_stride_tau": 0.1,
+          "required_minimum_source_window_count": 20,
+          "selected_physical_lags": [
+            2.0,
+            4.0,
+            7.0
+          ],
+          "selected_step_lags": [
+            800,
+            1600,
+            2800
+          ],
+          "source_window_support_counts_by_step_lag": {
+            "1600": 4760,
+            "2800": 4730,
+            "800": 4780
+          },
+          "stride_steps": 40
+        },
+        "candidate": {
+          "minimum_selected_source_window_count": 5913,
+          "physical_stride_tau": 0.08,
+          "required_minimum_source_window_count": 20,
+          "selected_physical_lags": [
+            2.0,
+            4.0,
+            7.0
+          ],
+          "selected_step_lags": [
+            50,
+            100,
+            175
+          ],
+          "source_window_support_counts_by_step_lag": {
+            "100": 5950,
+            "175": 5913,
+            "50": 5975
+          },
+          "stride_steps": 2
+        },
+        "candidate_to_anchor_physical_stride_ratio": 0.7999999999999999,
+        "status": "varied_cadence"
+      },
+      "interpretation": "Collection cadence selects transported source windows and changes sampling cost and correlation, not the fixed physical-lag estimator. Publication acceptance still requires the declared collected-window, plateau, genealogy, and independent-seed equivalence checks.",
+      "phase_policy": "ordinary local DMC permits deterministic source-window subsampling",
+      "phase_safe": true,
+      "r2": {
+        "anchor": {
+          "minimum_selected_source_window_count": 8600,
+          "physical_stride_tau": 0.05,
+          "required_minimum_source_window_count": 20,
+          "selected_physical_lags": [
+            20.0,
+            30.0,
+            40.0,
+            50.0
+          ],
+          "selected_step_lags": [
+            8000,
+            12000,
+            16000,
+            20000
+          ],
+          "source_window_support_counts_by_step_lag": {
+            "12000": 9000,
+            "16000": 8800,
+            "20000": 8600,
+            "8000": 9200
+          },
+          "stride_steps": 20
+        },
+        "candidate": {
+          "minimum_selected_source_window_count": 10750,
+          "physical_stride_tau": 0.04,
+          "required_minimum_source_window_count": 20,
+          "selected_physical_lags": [
+            20.0,
+            30.0,
+            40.0,
+            50.0
+          ],
+          "selected_step_lags": [
+            500,
+            750,
+            1000,
+            1250
+          ],
+          "source_window_support_counts_by_step_lag": {
+            "1000": 11000,
+            "1250": 10750,
+            "500": 11500,
+            "750": 11250
+          },
+          "stride_steps": 1
+        },
+        "candidate_to_anchor_physical_stride_ratio": 0.7999999999999999,
+        "status": "varied_cadence"
+      },
+      "scheduled_collective_move_enabled": {
+        "anchor_density": false,
+        "anchor_r2": false,
+        "candidate": false
+      },
+      "source_phase": "production_event_index_mod_stride_zero",
+      "status": "varied_cadence"
+    }
+  },
+  "config_fingerprint": "1f731fc1cac93a02eb47668d4b10eeaa2871607db22df3ed2c823569e401f232",
+  "provenance": {
+    "command": [
+      "experiments/dmc/local/assess_fw_sensitivity.py",
+      "--final-matrix-manifest",
+      "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/run_manifest.json",
+      "--case",
+      "N10_A0.1",
+      "--candidate-summary",
+      "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_sensitivity_candidates_v2/N10_A0.1/summary.json",
+      "--energy-assessment-manifest",
+      "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_candidate_energy_stationarity_v1/run_manifest.json",
+      "--output-dir",
+      "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/fw_sensitivity_v1/N10_A0.1"
+    ],
+    "created_utc": "2026-07-17T08:50:30Z",
+    "dependencies": {
+      "matplotlib": "3.10.8",
+      "numba": "0.65.1",
+      "numpy": "2.4.2",
+      "scipy": "1.17.1",
+      "tqdm": "4.67.3"
+    },
+    "implementation": {
+      "git_revision": "e730fa8a1e98978a39f727842abf0650eeb5854d",
+      "git_status": "clean",
+      "source_file_count": 211,
+      "source_tree_sha256": "a62ae7a14ac3ec00fb6497ce7851e8c67d79bbccb7740a507da32ecd379fb422",
+      "status": "identified"
+    },
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "python_version": "3.12.10"
+  },
+  "result_schema_version": "dmc_fw_sensitivity_v3",
+  "run_id": "dmc_fw_sensitivity_2026-07-17T08:50:30Z_1f731fc1cac9",
+  "run_name": "dmc_fw_sensitivity",
+  "schema_version": "hrdmc_run_manifest_v2",
+  "status": "accepted"
+}

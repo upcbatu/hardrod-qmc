@@ -1,0 +1,1167 @@
+{
+  "artifacts": {
+    "output_dir": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_extrapolation_v4/N10_A10_dt002_window",
+    "point_table": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_extrapolation_v4/N10_A10_dt002_window/point_table.csv",
+    "run_manifest": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_extrapolation_v4/N10_A10_dt002_window/run_manifest.json",
+    "summary": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_extrapolation_v4/N10_A10_dt002_window/summary.json"
+  },
+  "case_id": "N10_A10",
+  "classification": "model_sensitive",
+  "cross_timestep_covariance": {
+    "method": "diagonal weighted least squares",
+    "overlapping_pair_count": 0,
+    "pairwise_seed_overlap": [
+      {
+        "first_dt": 0.000125,
+        "overlap_count": 0,
+        "overlap_seeds": [],
+        "second_dt": 0.00025
+      },
+      {
+        "first_dt": 0.000125,
+        "overlap_count": 0,
+        "overlap_seeds": [],
+        "second_dt": 0.0005
+      },
+      {
+        "first_dt": 0.000125,
+        "overlap_count": 0,
+        "overlap_seeds": [],
+        "second_dt": 0.001
+      },
+      {
+        "first_dt": 0.000125,
+        "overlap_count": 0,
+        "overlap_seeds": [],
+        "second_dt": 0.002
+      },
+      {
+        "first_dt": 0.00025,
+        "overlap_count": 0,
+        "overlap_seeds": [],
+        "second_dt": 0.0005
+      },
+      {
+        "first_dt": 0.00025,
+        "overlap_count": 0,
+        "overlap_seeds": [],
+        "second_dt": 0.001
+      },
+      {
+        "first_dt": 0.00025,
+        "overlap_count": 0,
+        "overlap_seeds": [],
+        "second_dt": 0.002
+      },
+      {
+        "first_dt": 0.0005,
+        "overlap_count": 0,
+        "overlap_seeds": [],
+        "second_dt": 0.001
+      },
+      {
+        "first_dt": 0.0005,
+        "overlap_count": 0,
+        "overlap_seeds": [],
+        "second_dt": 0.002
+      },
+      {
+        "first_dt": 0.001,
+        "overlap_count": 0,
+        "overlap_seeds": [],
+        "second_dt": 0.002
+      }
+    ],
+    "publication_requirement": "Disjoint seed sets are required because cross-time-step covariance is not estimated by this summary-level analysis.",
+    "status": "accepted"
+  },
+  "diagnostic": "DMC mixed-energy time-step extrapolation",
+  "energy_quality_assessment": {
+    "assessment_bundle_sha256": "8f6dd517dd6d1cb97b87c58297f1d94773174c1e4b94e79bf8e13302d25a8e3b",
+    "assessment_manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/run_manifest.json",
+    "assessment_manifest_sha256": "7e5038095da52b337f4a787069cabb1135ff41987d70b5c525dc6bee5f5d7e95",
+    "assessment_method": "bonferroni_simultaneous_directional_screen",
+    "assessment_run_id": "dmc_final_matrix_assembly_2026-07-15T10:47:01Z_f295addf0a1a",
+    "assessment_scope": "canonical_eight_case_final_matrix",
+    "assessment_summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/final_matrix_summary.json",
+    "assessment_summary_sha256": "964b49832af2a4282bf4ac9cca38b694c7d49315ab1316afaee8e806607ba10a",
+    "case_assessment": {
+      "effective_samples_min": 5181.353655185296,
+      "failures": [],
+      "invariant_checks": {
+        "base_numerics_valid": true,
+        "density_accounting_clean": true,
+        "directional_statistics_below_simultaneous_limit": true,
+        "effective_samples_above_minimum": true,
+        "population_weights_controlled": true,
+        "rhat_below_limit": true,
+        "valid_finite_clean": true
+      },
+      "maximum_directional_z": 0.8056016480309666,
+      "rhat": 1.0000961481745796,
+      "source_failing_seeds": [
+        7002,
+        7003
+      ],
+      "source_stationarity_reason": "spread_warning",
+      "source_stationarity_status": "spread_warning",
+      "spread_warning_count": 2,
+      "status": "accepted"
+    },
+    "case_id": "N10_A10",
+    "energy_status": "accepted",
+    "energy_status_basis": "source_packet",
+    "policy_timing": "retrospective",
+    "publication_accepted": true,
+    "publication_status": "accepted",
+    "selected_bundle_sha256": "c0adf118f0ab28bda595d98b0d19e243fcd37fdca5d291fee747f7a9a09d00c7",
+    "selected_manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/run_manifest.json",
+    "selected_manifest_sha256": "9a0464f84df98ccad33902c64b2ae44c114bdb1be6dbcfd2e481b40afec8693d",
+    "selected_run_id": "dmc_benchmark_packet_2026-07-15T00:14:04Z_777f2ddc71f2",
+    "selected_summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/summary.json",
+    "selected_summary_sha256": "6d0eca6456ef1fdc184e6d88e203f63fca921510ce5c852f3f8bd36963b01ca1",
+    "source_energy_stationarity_reason": "spread_warning",
+    "source_energy_status": "accepted",
+    "source_plot_artifact_warnings": [
+      "N20_A10: size mismatch: plots/scalar_comparison.png",
+      "N20_A10: sha256 mismatch: plots/scalar_comparison.png",
+      "N20_A10: size mismatch: plots/scalar_comparison.pdf",
+      "N20_A10: sha256 mismatch: plots/scalar_comparison.pdf",
+      "N20_A10: size mismatch: plots/density_comparison.pdf",
+      "N20_A10: sha256 mismatch: plots/density_comparison.pdf",
+      "N20_A10: size mismatch: plots/numerical_diagnostics.png",
+      "N20_A10: sha256 mismatch: plots/numerical_diagnostics.png",
+      "N20_A10: size mismatch: plots/numerical_diagnostics.pdf",
+      "N20_A10: sha256 mismatch: plots/numerical_diagnostics.pdf",
+      "N20_A10: size mismatch: plots/energy_stationarity_diagnostics.png",
+      "N20_A10: sha256 mismatch: plots/energy_stationarity_diagnostics.png",
+      "N20_A10: size mismatch: plots/energy_stationarity_diagnostics.pdf",
+      "N20_A10: sha256 mismatch: plots/energy_stationarity_diagnostics.pdf",
+      "N20_A10: size mismatch: plots/fw_lag_diagnostics.png",
+      "N20_A10: sha256 mismatch: plots/fw_lag_diagnostics.png",
+      "N20_A10: size mismatch: plots/fw_lag_diagnostics.pdf",
+      "N20_A10: sha256 mismatch: plots/fw_lag_diagnostics.pdf",
+      "N20_A10: size mismatch: plots/benchmark_packet_one_page.png",
+      "N20_A10: sha256 mismatch: plots/benchmark_packet_one_page.png",
+      "N20_A10: size mismatch: plots/benchmark_packet_one_page.pdf",
+      "N20_A10: sha256 mismatch: plots/benchmark_packet_one_page.pdf"
+    ],
+    "verification_scope": "energy_assessment_and_selected_primary_summary"
+  },
+  "energy_reporting_policy": {
+    "confidence_level": 0.95,
+    "energy_unit": "hbar*Omega",
+    "rationale": "thesis scalar-energy reporting resolution",
+    "resolution": 0.01,
+    "timing": "retrospective"
+  },
+  "extrapolated_energy": 4535.877048702799,
+  "extrapolated_energy_fit_window_upper_allowance": 0.0008228936527793214,
+  "extrapolated_energy_leading_model_intercept_spread": 0.0012305814434512286,
+  "extrapolated_energy_model_order_upper_allowance": 0.002096348967250015,
+  "extrapolated_energy_statistical_stderr": 0.0010160000649844937,
+  "extrapolation": {
+    "candidate_zero_step_energy": 4535.877048702799,
+    "candidate_zero_step_energy_statistical_stderr": 0.0010160000649844937,
+    "classification": "model_sensitive",
+    "competing_leading_model": "leading_quadratic",
+    "competing_leading_model_basis": "E(dt) = E0 + c2 * dt**2",
+    "curvature_fit": {
+      "basis_powers": [
+        0,
+        1,
+        2
+      ],
+      "chi_squared": 1.3462778348211,
+      "coefficients": [
+        4535.8771242972625,
+        -8.944189911521438,
+        390.65982579570897
+      ],
+      "covariance": [
+        [
+          2.0973615671161312e-06,
+          -0.009790264741208771,
+          5.504290710859996
+        ],
+        [
+          -0.009790264741208773,
+          67.03996503786443,
+          -40690.44874068743
+        ],
+        [
+          5.504290710859997,
+          -40690.44874068743,
+          28445274.27252845
+        ]
+      ],
+      "covariance_scale": 1.0,
+      "covariance_scale_rule": "max(1, chi_squared / degrees_of_freedom)",
+      "degrees_of_freedom": 2,
+      "formal_covariance": [
+        [
+          2.0973615671161312e-06,
+          -0.009790264741208771,
+          5.504290710859996
+        ],
+        [
+          -0.009790264741208773,
+          67.03996503786443,
+          -40690.44874068743
+        ],
+        [
+          5.504290710859997,
+          -40690.44874068743,
+          28445274.27252845
+        ]
+      ],
+      "formal_intercept_stderr": 0.0014482270426684246,
+      "formal_parameter_stderr": [
+        0.0014482270426684246,
+        8.187793661168095,
+        5333.411129148816
+      ],
+      "goodness_of_fit_alpha": 0.05,
+      "goodness_of_fit_pvalue": 0.5101048850688357,
+      "goodness_of_fit_status": "accepted",
+      "goodness_of_fit_uses_declared_errors": true,
+      "intercept": 4535.8771242972625,
+      "intercept_stderr": 0.0014482270426684246,
+      "intercept_weight_sum": 1.0000000000000002,
+      "intercept_weights": [
+        1.2781996453973854,
+        -0.0005892186217825431,
+        -0.12836392505199432,
+        -0.2030473149539865,
+        0.05380081323037819
+      ],
+      "model": "curvature",
+      "parameter_stderr": [
+        0.0014482270426684246,
+        8.187793661168095,
+        5333.411129148816
+      ],
+      "point_count": 5,
+      "polynomial_convention": "E(dt) = sum_j coefficients[j] * dt**basis_powers[j]",
+      "reduced_chi_squared": 0.67313891741055,
+      "weighted_design_condition_number": 33.9525238691773
+    },
+    "curvature_model_role": "E(dt) = E0 + c1 * dt + c2 * dt**2; range diagnostic only",
+    "fit_alpha": 0.05,
+    "fit_window_status": "accepted",
+    "largest_point_leave_one_out": {
+      "curvature": {
+        "absolute_shift": 0.0010713965812101378,
+        "available": true,
+        "classification": "largest_point_stable",
+        "comparison_uncertainty": 0.002014407100282208,
+        "comparison_uncertainty_source": "exact diagonal-WLS estimator-difference propagation",
+        "full_intercept": 4535.8771242972625,
+        "leave_one_out_intercept": 4535.876052900681,
+        "model": "curvature",
+        "reason": null,
+        "reduced_fit_goodness_of_fit_pvalue": 0.30244205490590936,
+        "reduced_fit_goodness_of_fit_status": "accepted",
+        "removed_dt": 0.002,
+        "sensitivity_sigma": 2.0
+      },
+      "leading_linear": {
+        "absolute_shift": 8.656224326841766e-05,
+        "available": true,
+        "classification": "largest_point_stable",
+        "comparison_uncertainty": 0.0003756861938887612,
+        "comparison_uncertainty_source": "exact diagonal-WLS estimator-difference propagation",
+        "full_intercept": 4535.877048702799,
+        "leave_one_out_intercept": 4535.877135265042,
+        "model": "leading_linear",
+        "reason": null,
+        "reduced_fit_goodness_of_fit_pvalue": 0.5224234019756873,
+        "reduced_fit_goodness_of_fit_status": "accepted",
+        "removed_dt": 0.002,
+        "sensitivity_sigma": 2.0
+      },
+      "leading_quadratic": {
+        "absolute_shift": 0.0002528631475797738,
+        "available": true,
+        "classification": "largest_point_stable",
+        "comparison_uncertainty": 0.0002081253206109357,
+        "comparison_uncertainty_source": "exact diagonal-WLS estimator-difference propagation",
+        "full_intercept": 4535.875818121355,
+        "leave_one_out_intercept": 4535.876070984503,
+        "model": "leading_quadratic",
+        "reason": null,
+        "reduced_fit_goodness_of_fit_pvalue": 0.5875889032783876,
+        "reduced_fit_goodness_of_fit_status": "accepted",
+        "removed_dt": 0.002,
+        "sensitivity_sigma": 2.0
+      }
+    },
+    "leading_linear_fit": {
+      "basis_powers": [
+        0,
+        1
+      ],
+      "chi_squared": 1.3516430524658611,
+      "coefficients": [
+        4535.877048702799,
+        -8.385358118785364
+      ],
+      "covariance": [
+        [
+          1.0322561320484956e-06,
+          -0.0019164767482276034
+        ],
+        [
+          -0.0019164767482276034,
+          8.833016394815283
+        ]
+      ],
+      "covariance_scale": 1.0,
+      "covariance_scale_rule": "max(1, chi_squared / degrees_of_freedom)",
+      "degrees_of_freedom": 3,
+      "formal_covariance": [
+        [
+          1.0322561320484956e-06,
+          -0.0019164767482276034
+        ],
+        [
+          -0.0019164767482276034,
+          8.833016394815283
+        ]
+      ],
+      "formal_intercept_stderr": 0.0010160000649844937,
+      "formal_parameter_stderr": [
+        0.0010160000649844937,
+        2.9720390971209114
+      ],
+      "goodness_of_fit_alpha": 0.05,
+      "goodness_of_fit_pvalue": 0.7169079595065762,
+      "goodness_of_fit_status": "accepted",
+      "goodness_of_fit_uses_declared_errors": true,
+      "intercept": 4535.877048702799,
+      "intercept_stderr": 0.0010160000649844937,
+      "intercept_weight_sum": 1.0000000000000004,
+      "intercept_weights": [
+        1.0559007576014365,
+        0.052682661922926595,
+        0.006683000954846197,
+        -0.08203308030008367,
+        -0.03323334017912527
+      ],
+      "model": "leading_linear",
+      "parameter_stderr": [
+        0.0010160000649844937,
+        2.9720390971209114
+      ],
+      "point_count": 5,
+      "polynomial_convention": "E(dt) = sum_j coefficients[j] * dt**basis_powers[j]",
+      "reduced_chi_squared": 0.45054768415528706,
+      "weighted_design_condition_number": 7.661395227330436
+    },
+    "leading_linear_vs_leading_quadratic": {
+      "absolute_spread": 0.0012305814434512286,
+      "classification": "model_sensitive",
+      "comparison_uncertainty": 0.00044172624121047654,
+      "comparison_uncertainty_source": "exact diagonal-WLS estimator-difference propagation",
+      "linear_intercept": 4535.877048702799,
+      "quadratic_intercept": 4535.875818121355,
+      "reason": "leading-model intercept spread exceeds declared-error uncertainty",
+      "relative_spread": 2.7129955910139994e-07,
+      "sensitivity_sigma": 2.0
+    },
+    "leading_model_intercept_spread": 0.0012305814434512286,
+    "leading_quadratic_fit": {
+      "basis_powers": [
+        0,
+        2
+      ],
+      "chi_squared": 2.5395739995751367,
+      "coefficients": [
+        4535.875818121355,
+        -5038.088547151379
+      ],
+      "covariance": [
+        [
+          6.676280693611789e-07,
+          -0.43798961975941614
+        ],
+        [
+          -0.43798961975941614,
+          3747877.4617849207
+        ]
+      ],
+      "covariance_scale": 1.0,
+      "covariance_scale_rule": "max(1, chi_squared / degrees_of_freedom)",
+      "degrees_of_freedom": 3,
+      "formal_covariance": [
+        [
+          6.676280693611789e-07,
+          -0.43798961975941614
+        ],
+        [
+          -0.43798961975941614,
+          3747877.4617849207
+        ]
+      ],
+      "formal_intercept_stderr": 0.0008170851053355329,
+      "formal_parameter_stderr": [
+        0.0008170851053355329,
+        1935.9435585225415
+      ],
+      "goodness_of_fit_alpha": 0.05,
+      "goodness_of_fit_pvalue": 0.46818160923608254,
+      "goodness_of_fit_status": "accepted",
+      "goodness_of_fit_uses_declared_errors": true,
+      "intercept": 4535.875818121355,
+      "intercept_stderr": 0.0008170851053355329,
+      "intercept_weight_sum": 1.0000000000000002,
+      "intercept_weights": [
+        0.8801890771279661,
+        0.06097996252528875,
+        0.050393147095155626,
+        0.021304580589367655,
+        -0.012866767337777897
+      ],
+      "model": "leading_quadratic",
+      "parameter_stderr": [
+        0.0008170851053355329,
+        1935.9435585225415
+      ],
+      "point_count": 5,
+      "polynomial_convention": "E(dt) = sum_j coefficients[j] * dt**basis_powers[j]",
+      "reduced_chi_squared": 0.8465246665250455,
+      "weighted_design_condition_number": 9.871441160849301
+    },
+    "model_selection_uses_reference_energy": false,
+    "model_spread_interpretation": "observed leading-model intercept difference; it is neither a statistical standard error nor a complete time-step systematic bound",
+    "point_count": 5,
+    "points": [
+      {
+        "conservative_stderr": 0.0008664468559287866,
+        "dt": 0.000125,
+        "energy": 4535.876057509662,
+        "label": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/summary.json"
+      },
+      {
+        "conservative_stderr": 0.0032402795361554065,
+        "dt": 0.00025,
+        "energy": 4535.872614905047,
+        "label": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.00025_seeds10201_10203_tau60/summary.json"
+      },
+      {
+        "conservative_stderr": 0.0033279914456901816,
+        "dt": 0.0005,
+        "energy": 4535.875535079065,
+        "label": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.0005_seeds10211_10213_tau60/summary.json"
+      },
+      {
+        "conservative_stderr": 0.003283112832196426,
+        "dt": 0.001,
+        "energy": 4535.867417966264,
+        "label": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.001_seeds10221_10223_tau60/summary.json"
+      },
+      {
+        "conservative_stderr": 0.009180072156523974,
+        "dt": 0.002,
+        "energy": 4535.861995674296,
+        "label": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/calibration/acceptance_dmc_ladder_v1/N10_A10/dt_0.002_seeds8204_8206_tau20/summary.json"
+      }
+    ],
+    "reference_model": "leading_linear",
+    "reference_model_basis": "E(dt) = E0 + c1 * dt",
+    "uncertainty_assumption": "diagonal weighted least squares uses the input conservative standard errors; cross-time-step covariance is unavailable and omitted"
+  },
+  "fit_alpha": 0.05,
+  "identity": {
+    "case_id": "N10_A10",
+    "case_parameterization": "harmonic_oscillator_units",
+    "collective_rn": null,
+    "drift_limiter": "umrigar",
+    "energy_semantics": {
+      "energy_coordinate": "E_tilde = E/(hbar*Omega)",
+      "energy_unit": "hbar*Omega",
+      "estimator": "mixed_local_energy",
+      "report_energy_unit": "hbar*Omega"
+    },
+    "guide_family": "contact-corrected-reduced-tg",
+    "guide_parameters": {
+      "contact_beta": 5.363445591190197e-08,
+      "relative_alpha": 5.5908651157560385,
+      "source": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/calibration/final_matrix_guides_v1/N10_A10/validation/summary.json",
+      "source_identity_fingerprint": "18049da1d1f42484e3d69cf538454e2d79a1e3bec5d1c6be3d3e0ef3f46ed4ce",
+      "source_manifest_sha256": "188cf32f793e568f4b37c47cb86f7562a9411ca0bad0e6f5291d890fc45857d4",
+      "source_sha256": "edfe49c2a960aa8f58e4eb40a59a93a13275cc0036a504557670559f657296c9"
+    },
+    "implementation_source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+    "initialization": {
+      "breathing_preburn_log_step": 0.04,
+      "breathing_preburn_steps": 0,
+      "init_width_log_sigma": 0.1,
+      "mode": "lda-rms-lattice"
+    },
+    "local_step_method": "metropolis",
+    "population_control": {
+      "ess_resample_fraction": 0.35
+    },
+    "response_lambda": null,
+    "walkers": 256
+  },
+  "identity_fingerprint": "e8e91e478f321d7d7fd2477bd9e771f447584067d1e01afee6dae07e986d3953",
+  "input_control_variation": {
+    "burn_tau": [
+      60.0,
+      5.0
+    ],
+    "dt": [
+      0.000125,
+      0.00025,
+      0.0005,
+      0.001,
+      0.002
+    ],
+    "energy_statuses": [
+      "accepted",
+      "blocking_plateau_unresolved_correlated_error_available",
+      "energy_accepted_mixed_coordinate_diagnostic_unresolved"
+    ],
+    "grid_extent": [
+      178.871
+    ],
+    "n_bins": [
+      3579
+    ],
+    "production_tau": [
+      480.0,
+      60.0,
+      20.0
+    ],
+    "run_statuses": [
+      "accepted",
+      "accepted_with_warnings"
+    ],
+    "seed_sets": [
+      [
+        7001,
+        7002,
+        7003,
+        7004,
+        7005
+      ],
+      [
+        10201,
+        10202,
+        10203
+      ],
+      [
+        10211,
+        10212,
+        10213
+      ],
+      [
+        10221,
+        10222,
+        10223
+      ],
+      [
+        8204,
+        8205,
+        8206
+      ]
+    ],
+    "store_every": [
+      200,
+      100,
+      50,
+      25,
+      10
+    ]
+  },
+  "input_quality": {
+    "interpretation": "Energy-specific method failures remain unresolved unless an exact manifest-bound matrix assessment selects that source summary. Precision warnings and retrospective assessment timing remain visible but do not veto the mixed-energy extrapolation.",
+    "points": [
+      {
+        "energy_chain_status": "spread_warning",
+        "energy_status": "accepted",
+        "method_status": "accepted",
+        "precision_status": "accepted",
+        "publication_accepted": true,
+        "publication_status": "accepted",
+        "run_status": "accepted",
+        "source_publication_accepted": true,
+        "source_publication_status": "accepted_with_precision_warning",
+        "status_basis": "source_packet",
+        "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/summary.json",
+        "validation_passed": true
+      },
+      {
+        "energy_chain_status": "spread_warning",
+        "energy_status": "blocking_plateau_unresolved_correlated_error_available",
+        "method_status": "accepted",
+        "precision_status": "blocking_plateau_unresolved_correlated_error_available",
+        "publication_accepted": true,
+        "publication_status": "accepted_with_precision_warning",
+        "run_status": "accepted_with_warnings",
+        "source_publication_accepted": true,
+        "source_publication_status": "accepted_with_precision_warning",
+        "status_basis": "source_summary",
+        "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.00025_seeds10201_10203_tau60/summary.json",
+        "validation_passed": true
+      },
+      {
+        "energy_chain_status": "spread_warning",
+        "energy_status": "blocking_plateau_unresolved_correlated_error_available",
+        "method_status": "accepted",
+        "precision_status": "blocking_plateau_unresolved_correlated_error_available",
+        "publication_accepted": true,
+        "publication_status": "accepted_with_precision_warning",
+        "run_status": "accepted_with_warnings",
+        "source_publication_accepted": true,
+        "source_publication_status": "accepted_with_precision_warning",
+        "status_basis": "source_summary",
+        "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.0005_seeds10211_10213_tau60/summary.json",
+        "validation_passed": true
+      },
+      {
+        "energy_chain_status": "spread_warning",
+        "energy_status": "energy_accepted_mixed_coordinate_diagnostic_unresolved",
+        "method_status": "accepted",
+        "precision_status": "accepted",
+        "publication_accepted": true,
+        "publication_status": "accepted_with_precision_warning",
+        "run_status": "accepted_with_warnings",
+        "source_publication_accepted": true,
+        "source_publication_status": "accepted_with_precision_warning",
+        "status_basis": "source_summary",
+        "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.001_seeds10221_10223_tau60/summary.json",
+        "validation_passed": true
+      },
+      {
+        "energy_chain_status": "spread_warning",
+        "energy_status": "blocking_plateau_unresolved_correlated_error_available",
+        "method_status": "accepted",
+        "precision_status": "blocking_plateau_unresolved_correlated_error_available",
+        "publication_accepted": true,
+        "publication_status": "accepted_with_precision_warning",
+        "run_status": "accepted_with_warnings",
+        "source_publication_accepted": true,
+        "source_publication_status": "accepted_with_precision_warning",
+        "status_basis": "source_summary",
+        "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/calibration/acceptance_dmc_ladder_v1/N10_A10/dt_0.002_seeds8204_8206_tau20/summary.json",
+        "validation_passed": true
+      }
+    ],
+    "precision_warning_point_count": 4,
+    "publication_accepted": true,
+    "publication_accepted_statuses": [
+      "accepted",
+      "accepted_with_precision_warning",
+      "accepted_with_retrospective_assessment"
+    ],
+    "retrospective_assessment_point_count": 0,
+    "status": "accepted_with_warnings",
+    "unresolved_point_count": 0,
+    "warning_point_count": 4
+  },
+  "input_summaries": [
+    {
+      "bundle_sha256": "c0adf118f0ab28bda595d98b0d19e243fcd37fdca5d291fee747f7a9a09d00c7",
+      "case_id": "N10_A10",
+      "conservative_stderr": 0.0008664468559287866,
+      "controls": {
+        "burn_in_steps": 480000,
+        "burn_tau": 60.0,
+        "contact_beta": 5.363445591190197e-08,
+        "drift_limiter": "umrigar",
+        "dt": 0.000125,
+        "grid_extent": 178.871,
+        "local_step_method": "metropolis",
+        "n_bins": 3579,
+        "production_steps": 3840000,
+        "production_tau": 480.0,
+        "relative_alpha": 5.5908651157560385,
+        "store_every": 200,
+        "walkers": 256
+      },
+      "dt": 0.000125,
+      "energy": 4535.876057509662,
+      "energy_quality": {
+        "energy_chain_status": "spread_warning",
+        "method_status": "accepted",
+        "precision_status": "accepted",
+        "publication_accepted": true,
+        "publication_status": "accepted",
+        "source_publication_accepted": true,
+        "source_publication_status": "accepted_with_precision_warning",
+        "status_basis": "source_packet",
+        "validation_passed": true
+      },
+      "energy_quality_assessment": {
+        "assessment_bundle_sha256": "8f6dd517dd6d1cb97b87c58297f1d94773174c1e4b94e79bf8e13302d25a8e3b",
+        "assessment_manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/run_manifest.json",
+        "assessment_manifest_sha256": "7e5038095da52b337f4a787069cabb1135ff41987d70b5c525dc6bee5f5d7e95",
+        "assessment_method": "bonferroni_simultaneous_directional_screen",
+        "assessment_run_id": "dmc_final_matrix_assembly_2026-07-15T10:47:01Z_f295addf0a1a",
+        "assessment_scope": "canonical_eight_case_final_matrix",
+        "assessment_summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/final_matrix_summary.json",
+        "assessment_summary_sha256": "964b49832af2a4282bf4ac9cca38b694c7d49315ab1316afaee8e806607ba10a",
+        "case_assessment": {
+          "effective_samples_min": 5181.353655185296,
+          "failures": [],
+          "invariant_checks": {
+            "base_numerics_valid": true,
+            "density_accounting_clean": true,
+            "directional_statistics_below_simultaneous_limit": true,
+            "effective_samples_above_minimum": true,
+            "population_weights_controlled": true,
+            "rhat_below_limit": true,
+            "valid_finite_clean": true
+          },
+          "maximum_directional_z": 0.8056016480309666,
+          "rhat": 1.0000961481745796,
+          "source_failing_seeds": [
+            7002,
+            7003
+          ],
+          "source_stationarity_reason": "spread_warning",
+          "source_stationarity_status": "spread_warning",
+          "spread_warning_count": 2,
+          "status": "accepted"
+        },
+        "case_id": "N10_A10",
+        "energy_status": "accepted",
+        "energy_status_basis": "source_packet",
+        "policy_timing": "retrospective",
+        "publication_accepted": true,
+        "publication_status": "accepted",
+        "selected_bundle_sha256": "c0adf118f0ab28bda595d98b0d19e243fcd37fdca5d291fee747f7a9a09d00c7",
+        "selected_manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/run_manifest.json",
+        "selected_manifest_sha256": "9a0464f84df98ccad33902c64b2ae44c114bdb1be6dbcfd2e481b40afec8693d",
+        "selected_run_id": "dmc_benchmark_packet_2026-07-15T00:14:04Z_777f2ddc71f2",
+        "selected_summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/summary.json",
+        "selected_summary_sha256": "6d0eca6456ef1fdc184e6d88e203f63fca921510ce5c852f3f8bd36963b01ca1",
+        "source_energy_stationarity_reason": "spread_warning",
+        "source_energy_status": "accepted",
+        "source_plot_artifact_warnings": [
+          "N20_A10: size mismatch: plots/scalar_comparison.png",
+          "N20_A10: sha256 mismatch: plots/scalar_comparison.png",
+          "N20_A10: size mismatch: plots/scalar_comparison.pdf",
+          "N20_A10: sha256 mismatch: plots/scalar_comparison.pdf",
+          "N20_A10: size mismatch: plots/density_comparison.pdf",
+          "N20_A10: sha256 mismatch: plots/density_comparison.pdf",
+          "N20_A10: size mismatch: plots/numerical_diagnostics.png",
+          "N20_A10: sha256 mismatch: plots/numerical_diagnostics.png",
+          "N20_A10: size mismatch: plots/numerical_diagnostics.pdf",
+          "N20_A10: sha256 mismatch: plots/numerical_diagnostics.pdf",
+          "N20_A10: size mismatch: plots/energy_stationarity_diagnostics.png",
+          "N20_A10: sha256 mismatch: plots/energy_stationarity_diagnostics.png",
+          "N20_A10: size mismatch: plots/energy_stationarity_diagnostics.pdf",
+          "N20_A10: sha256 mismatch: plots/energy_stationarity_diagnostics.pdf",
+          "N20_A10: size mismatch: plots/fw_lag_diagnostics.png",
+          "N20_A10: sha256 mismatch: plots/fw_lag_diagnostics.png",
+          "N20_A10: size mismatch: plots/fw_lag_diagnostics.pdf",
+          "N20_A10: sha256 mismatch: plots/fw_lag_diagnostics.pdf",
+          "N20_A10: size mismatch: plots/benchmark_packet_one_page.png",
+          "N20_A10: sha256 mismatch: plots/benchmark_packet_one_page.png",
+          "N20_A10: size mismatch: plots/benchmark_packet_one_page.pdf",
+          "N20_A10: sha256 mismatch: plots/benchmark_packet_one_page.pdf"
+        ],
+        "verification_scope": "energy_assessment_and_selected_primary_summary"
+      },
+      "energy_status": "accepted",
+      "label": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/summary.json",
+      "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/run_manifest.json",
+      "manifest_sha256": "9a0464f84df98ccad33902c64b2ae44c114bdb1be6dbcfd2e481b40afec8693d",
+      "manifest_verification": "verified",
+      "manifest_verification_warnings": [],
+      "result_schema_version": "dmc_benchmark_packet_v3",
+      "run_id": "dmc_benchmark_packet_2026-07-15T00:14:04Z_777f2ddc71f2",
+      "run_name": "dmc_benchmark_packet",
+      "run_status": "accepted",
+      "seed_count": 5,
+      "seeds": [
+        7001,
+        7002,
+        7003,
+        7004,
+        7005
+      ],
+      "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/summary.json",
+      "summary_sha256": "6d0eca6456ef1fdc184e6d88e203f63fca921510ce5c852f3f8bd36963b01ca1",
+      "telemetry": {
+        "configuration_esjd_mean": 0.0012498438477219246,
+        "invalid_proposal_fraction_max": 0.0005859375,
+        "local_acceptance_fraction_mean": 0.9970085386149089,
+        "log_weight_span_max": 6.860550675631528,
+        "metropolis_rejection_fraction_max": 0.0040625,
+        "neff_energy": 5181.353655185296,
+        "population_weight_status": "accepted",
+        "rhat_energy": 1.0000961481745796
+      }
+    },
+    {
+      "bundle_sha256": "c18ec337cc854867454e1a241e8a2236e7a782570073775efed78e29f20cf830",
+      "case_id": "N10_A10",
+      "conservative_stderr": 0.0032402795361554065,
+      "controls": {
+        "burn_in_steps": 20000,
+        "burn_tau": 5.0,
+        "contact_beta": 5.363445591190197e-08,
+        "drift_limiter": "umrigar",
+        "dt": 0.00025,
+        "grid_extent": 178.871,
+        "local_step_method": "metropolis",
+        "n_bins": 3579,
+        "production_steps": 240000,
+        "production_tau": 60.0,
+        "relative_alpha": 5.5908651157560385,
+        "store_every": 100,
+        "walkers": 256
+      },
+      "dt": 0.00025,
+      "energy": 4535.872614905047,
+      "energy_quality": {
+        "energy_chain_status": "spread_warning",
+        "method_status": "accepted",
+        "precision_status": "blocking_plateau_unresolved_correlated_error_available",
+        "publication_accepted": true,
+        "publication_status": "accepted_with_precision_warning",
+        "source_publication_accepted": true,
+        "source_publication_status": "accepted_with_precision_warning",
+        "status_basis": "source_summary",
+        "validation_passed": true
+      },
+      "energy_quality_assessment": null,
+      "energy_status": "blocking_plateau_unresolved_correlated_error_available",
+      "label": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.00025_seeds10201_10203_tau60/summary.json",
+      "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.00025_seeds10201_10203_tau60/run_manifest.json",
+      "manifest_sha256": "5a9778b8d99418bf39571a9c3471fc3aabce973ce0164561f5c0fabf122ff84e",
+      "manifest_verification": "verified",
+      "manifest_verification_warnings": [],
+      "result_schema_version": "dmc_trapped_stationarity_grid_v2",
+      "run_id": "dmc_trapped_stationarity_grid_2026-07-16T10:39:19Z_c8f157a20b0d",
+      "run_name": "dmc_trapped_stationarity_grid",
+      "run_status": "accepted_with_warnings",
+      "seed_count": 3,
+      "seeds": [
+        10201,
+        10202,
+        10203
+      ],
+      "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.00025_seeds10201_10203_tau60/summary.json",
+      "summary_sha256": "851acd11d03006895c926cfb3d2fe5b70933b96aaa2342e1827d472a789b5966",
+      "telemetry": {
+        "configuration_esjd_mean": 0.002495086756505659,
+        "invalid_proposal_fraction_max": 0.0012109375,
+        "local_acceptance_fraction_mean": 0.9927451605902778,
+        "log_weight_span_max": 6.4751609067647085,
+        "metropolis_rejection_fraction_max": 0.0090234375,
+        "neff_energy": 541.1869427729594,
+        "population_weight_status": "accepted",
+        "rhat_energy": 1.0011485555060962
+      }
+    },
+    {
+      "bundle_sha256": "2e9935d81e9470cf9d50e57fc53163618ff457171ce8203b69a026e813eede95",
+      "case_id": "N10_A10",
+      "conservative_stderr": 0.0033279914456901816,
+      "controls": {
+        "burn_in_steps": 10000,
+        "burn_tau": 5.0,
+        "contact_beta": 5.363445591190197e-08,
+        "drift_limiter": "umrigar",
+        "dt": 0.0005,
+        "grid_extent": 178.871,
+        "local_step_method": "metropolis",
+        "n_bins": 3579,
+        "production_steps": 120000,
+        "production_tau": 60.0,
+        "relative_alpha": 5.5908651157560385,
+        "store_every": 50,
+        "walkers": 256
+      },
+      "dt": 0.0005,
+      "energy": 4535.875535079065,
+      "energy_quality": {
+        "energy_chain_status": "spread_warning",
+        "method_status": "accepted",
+        "precision_status": "blocking_plateau_unresolved_correlated_error_available",
+        "publication_accepted": true,
+        "publication_status": "accepted_with_precision_warning",
+        "source_publication_accepted": true,
+        "source_publication_status": "accepted_with_precision_warning",
+        "status_basis": "source_summary",
+        "validation_passed": true
+      },
+      "energy_quality_assessment": null,
+      "energy_status": "blocking_plateau_unresolved_correlated_error_available",
+      "label": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.0005_seeds10211_10213_tau60/summary.json",
+      "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.0005_seeds10211_10213_tau60/run_manifest.json",
+      "manifest_sha256": "4ff5f68be22bb8abfc3162f98a61593269caa1e020e4bc6987b3ff56d7f2756b",
+      "manifest_verification": "verified",
+      "manifest_verification_warnings": [],
+      "result_schema_version": "dmc_trapped_stationarity_grid_v2",
+      "run_id": "dmc_trapped_stationarity_grid_2026-07-16T10:41:45Z_f46d86070077",
+      "run_name": "dmc_trapped_stationarity_grid",
+      "run_status": "accepted_with_warnings",
+      "seed_count": 3,
+      "seeds": [
+        10211,
+        10212,
+        10213
+      ],
+      "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.0005_seeds10211_10213_tau60/summary.json",
+      "summary_sha256": "7412462642ffd4a020ddb004e513f3adb86a1b40defd0c02c966099160400e18",
+      "telemetry": {
+        "configuration_esjd_mean": 0.00496116925202015,
+        "invalid_proposal_fraction_max": 0.00328125,
+        "local_acceptance_fraction_mean": 0.9827760525173611,
+        "log_weight_span_max": 6.95576563811332,
+        "metropolis_rejection_fraction_max": 0.020234375,
+        "neff_energy": 571.0794666355719,
+        "population_weight_status": "accepted",
+        "rhat_energy": 1.0014431297960344
+      }
+    },
+    {
+      "bundle_sha256": "1e849db320b1ad71ae31d79961281f759722a72f313d14fa68f829000f7eeba3",
+      "case_id": "N10_A10",
+      "conservative_stderr": 0.003283112832196426,
+      "controls": {
+        "burn_in_steps": 5000,
+        "burn_tau": 5.0,
+        "contact_beta": 5.363445591190197e-08,
+        "drift_limiter": "umrigar",
+        "dt": 0.001,
+        "grid_extent": 178.871,
+        "local_step_method": "metropolis",
+        "n_bins": 3579,
+        "production_steps": 60000,
+        "production_tau": 60.0,
+        "relative_alpha": 5.5908651157560385,
+        "store_every": 25,
+        "walkers": 256
+      },
+      "dt": 0.001,
+      "energy": 4535.867417966264,
+      "energy_quality": {
+        "energy_chain_status": "spread_warning",
+        "method_status": "accepted",
+        "precision_status": "accepted",
+        "publication_accepted": true,
+        "publication_status": "accepted_with_precision_warning",
+        "source_publication_accepted": true,
+        "source_publication_status": "accepted_with_precision_warning",
+        "status_basis": "source_summary",
+        "validation_passed": true
+      },
+      "energy_quality_assessment": null,
+      "energy_status": "energy_accepted_mixed_coordinate_diagnostic_unresolved",
+      "label": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.001_seeds10221_10223_tau60/summary.json",
+      "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.001_seeds10221_10223_tau60/run_manifest.json",
+      "manifest_sha256": "f6bd2c00cd468f0766e68e83b62de68d8c39ca858f2333e14051d34bc0a9a49f",
+      "manifest_verification": "verified",
+      "manifest_verification_warnings": [],
+      "result_schema_version": "dmc_trapped_stationarity_grid_v2",
+      "run_id": "dmc_trapped_stationarity_grid_2026-07-16T10:43:21Z_1b9a5d0c1c52",
+      "run_name": "dmc_trapped_stationarity_grid",
+      "run_status": "accepted_with_warnings",
+      "seed_count": 3,
+      "seeds": [
+        10221,
+        10222,
+        10223
+      ],
+      "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N10_A10/dt_0.001_seeds10221_10223_tau60/summary.json",
+      "summary_sha256": "0c74c00b010389ea9eed571d67c1d7bf46f4c50831c5889d4a627d465a3779f0",
+      "telemetry": {
+        "configuration_esjd_mean": 0.009763507301852577,
+        "invalid_proposal_fraction_max": 0.00875,
+        "local_acceptance_fraction_mean": 0.960207986111111,
+        "log_weight_span_max": 6.297876736999899,
+        "metropolis_rejection_fraction_max": 0.0440625,
+        "neff_energy": 640.6164680979906,
+        "population_weight_status": "accepted",
+        "rhat_energy": 1.0009419096471446
+      }
+    },
+    {
+      "bundle_sha256": "c3da745c47be617872ad47d6089fd331aecf64bc854a35c7eef672af0022ce11",
+      "case_id": "N10_A10",
+      "conservative_stderr": 0.009180072156523974,
+      "controls": {
+        "burn_in_steps": 2500,
+        "burn_tau": 5.0,
+        "contact_beta": 5.363445591190197e-08,
+        "drift_limiter": "umrigar",
+        "dt": 0.002,
+        "grid_extent": 178.871,
+        "local_step_method": "metropolis",
+        "n_bins": 3579,
+        "production_steps": 10000,
+        "production_tau": 20.0,
+        "relative_alpha": 5.5908651157560385,
+        "store_every": 10,
+        "walkers": 256
+      },
+      "dt": 0.002,
+      "energy": 4535.861995674296,
+      "energy_quality": {
+        "energy_chain_status": "spread_warning",
+        "method_status": "accepted",
+        "precision_status": "blocking_plateau_unresolved_correlated_error_available",
+        "publication_accepted": true,
+        "publication_status": "accepted_with_precision_warning",
+        "source_publication_accepted": true,
+        "source_publication_status": "accepted_with_precision_warning",
+        "status_basis": "source_summary",
+        "validation_passed": true
+      },
+      "energy_quality_assessment": null,
+      "energy_status": "blocking_plateau_unresolved_correlated_error_available",
+      "label": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/calibration/acceptance_dmc_ladder_v1/N10_A10/dt_0.002_seeds8204_8206_tau20/summary.json",
+      "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/calibration/acceptance_dmc_ladder_v1/N10_A10/dt_0.002_seeds8204_8206_tau20/run_manifest.json",
+      "manifest_sha256": "26414707114a1a561ac42179041ecfd53933610f31a66c16850a439fad8d265b",
+      "manifest_verification": "verified",
+      "manifest_verification_warnings": [],
+      "result_schema_version": "dmc_trapped_stationarity_grid_v2",
+      "run_id": "dmc_trapped_stationarity_grid_2026-07-16T08:38:20Z_2d7805338cfb",
+      "run_name": "dmc_trapped_stationarity_grid",
+      "run_status": "accepted_with_warnings",
+      "seed_count": 3,
+      "seeds": [
+        8204,
+        8205,
+        8206
+      ],
+      "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/calibration/acceptance_dmc_ladder_v1/N10_A10/dt_0.002_seeds8204_8206_tau20/summary.json",
+      "summary_sha256": "ef9534ddacc5a2ddeb8af2cf125fccd7bad7cb0bdf7d25311654b9f00f4b6ad0",
+      "telemetry": {
+        "configuration_esjd_mean": 0.01870442648067892,
+        "invalid_proposal_fraction_max": 0.023046875,
+        "local_acceptance_fraction_mean": 0.9104552083333334,
+        "log_weight_span_max": 5.916249406370819,
+        "metropolis_rejection_fraction_max": 0.09609375,
+        "neff_energy": 164.02784533206827,
+        "population_weight_status": "accepted",
+        "rhat_energy": 1.0071166609309958
+      }
+    }
+  ],
+  "point_count": 5,
+  "practical_resolution_assessment": {
+    "accepted_with_model_bound": true,
+    "bound_scope": "declared leading-linear and leading-quadratic models and their leave-largest-time-step-out windows; not every possible asymptotic model",
+    "checks": {
+      "analysis_is_model_sensitive": true,
+      "cross_timestep_covariance_accepted": true,
+      "curvature_fit_adequate_or_absent": true,
+      "curvature_window_stable_or_four_point_unavailable": true,
+      "fit_window_accepted": true,
+      "fit_window_upper_allowance_within_resolution": true,
+      "input_quality_accepted": true,
+      "leading_linear_fit_adequate": true,
+      "leading_linear_window_stable": true,
+      "leading_quadratic_fit_adequate": true,
+      "leading_quadratic_window_stable": true,
+      "model_difference_is_statistically_resolved": true,
+      "model_order_upper_allowance_within_resolution": true
+    },
+    "curvature_diagnostic": {
+      "fit_available": true,
+      "fit_goodness_of_fit_status": "accepted",
+      "four_point_unavailable_allowed": false,
+      "interpretation": "an unavailable curvature leave-largest-time-step-out check is allowed only for a four-point fit window; every available check must be stable",
+      "largest_point_check_available": true,
+      "largest_point_classification": "largest_point_stable"
+    },
+    "failed_checks": [],
+    "fit_window": {
+      "leading_linear": {
+        "absolute_difference_estimate": 8.656224326841766e-05,
+        "allowance_rule": "absolute_difference_estimate + normal_quantile * comparison_uncertainty",
+        "comparison_uncertainty": 0.0003756861938887612,
+        "confidence_level": 0.95,
+        "interpretation": "two-sided normal-approximation upper allowance for the declared estimator difference",
+        "model": "leading_linear",
+        "normal_quantile": 1.959963984540054,
+        "statistical_classification": "largest_point_stable",
+        "upper_allowance": 0.0008228936527793214
+      },
+      "leading_quadratic": {
+        "absolute_difference_estimate": 0.0002528631475797738,
+        "allowance_rule": "absolute_difference_estimate + normal_quantile * comparison_uncertainty",
+        "comparison_uncertainty": 0.0002081253206109357,
+        "confidence_level": 0.95,
+        "interpretation": "two-sided normal-approximation upper allowance for the declared estimator difference",
+        "model": "leading_quadratic",
+        "normal_quantile": 1.959963984540054,
+        "statistical_classification": "largest_point_stable",
+        "upper_allowance": 0.0006607812802480596
+      },
+      "selection_rule": "maximum upper allowance across the two leading models",
+      "upper_allowance": 0.0008228936527793214
+    },
+    "model_order": {
+      "absolute_difference_estimate": 0.0012305814434512286,
+      "allowance_rule": "absolute_difference_estimate + normal_quantile * comparison_uncertainty",
+      "comparison_uncertainty": 0.00044172624121047654,
+      "confidence_level": 0.95,
+      "interpretation": "two-sided normal-approximation upper allowance for the declared estimator difference",
+      "normal_quantile": 1.959963984540054,
+      "upper_allowance": 0.002096348967250015
+    },
+    "policy": {
+      "confidence_level": 0.95,
+      "energy_unit": "hbar*Omega",
+      "rationale": "thesis scalar-energy reporting resolution",
+      "resolution": 0.01,
+      "timing": "retrospective"
+    },
+    "scope": "fixed-walker-population mixed-energy time-step extrapolation",
+    "statistical_classification": "model_sensitive",
+    "status": "bounded_below_reporting_resolution",
+    "uncertainty_component_combination": "statistical stderr, model-order upper allowance, and fit-window upper allowance are reported separately and are not combined in quadrature"
+  },
+  "publication_ready_within_fixed_population_timestep_scope": true,
+  "qualified_systematics": [
+    "leading_model_difference_bounded_below_reporting_resolution",
+    "fit_window_difference_bounded_below_reporting_resolution"
+  ],
+  "reference_energy_used_for_model_selection": false,
+  "sampling_design": {
+    "comparisons": {
+      "burn_tau": [
+        60.0,
+        5.0
+      ],
+      "grid_extent": [
+        178.871
+      ],
+      "n_bins": [
+        3579
+      ],
+      "production_tau": [
+        480.0,
+        60.0,
+        20.0
+      ],
+      "trace_spacing_tau": [
+        0.025,
+        0.02
+      ]
+    },
+    "interpretation": "These sampling-effort and diagnostic-grid differences are advisory for mixed-energy WLS once every point passes its numerical checks.",
+    "status": "varied",
+    "varied_fields": [
+      "burn_tau",
+      "production_tau",
+      "trace_spacing_tau"
+    ]
+  },
+  "schema_version": "dmc_timestep_extrapolation_v4",
+  "scientific_scope": "The fit quantifies finite-time-step dependence at fixed case, guide, source implementation, walker population, initialization, propagator, and population method. Sampling-effort variation remains visible but does not change the mixed-energy estimand once each input is accepted.",
+  "sensitivity_sigma": 2.0,
+  "status": "accepted_with_model_bound",
+  "uncertainty_component_combination": "statistical and systematic components are reported separately; systematic upper allowances are not combined in quadrature",
+  "unresolved_reasons": []
+}

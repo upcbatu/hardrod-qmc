@@ -8,9 +8,10 @@ new temporary directory.
 
 ## Prerequisites
 
-The simulation bundles under `results/` are not tracked. Before running the
-command, copy these directories from the thesis evidence archive to the paths
-shown below:
+A compact set of final summaries, systematics assessments, and figures is
+tracked under `results/` for direct inspection. It does not contain the
+per-seed packets needed for reassembly. Before running the command, copy these
+directories from the thesis evidence archive to the paths shown below:
 
 - `results/dmc/final_matrix/thesis_5seed_all_optimized_v1/`
 - `results/dmc/final_matrix/thesis_5seed_all_optimized_v1_supplement/N20_A10_r2_tau15/`

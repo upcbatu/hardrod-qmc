@@ -20,6 +20,21 @@ results/**/*.md
 results/**/.tmp/
 results/**/.matplotlib/
 !results/README.md
+
+# Compact, thesis-facing DMC evidence. Full simulation packets remain ignored.
+!results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/final_matrix_summary.json
+!results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/final_matrix_table.csv
+!results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/run_manifest.json
+!results/dmc/systematics/timestep_extrapolation_v4/**/*.json
+!results/dmc/systematics/timestep_extrapolation_v4/**/*.csv
+!results/dmc/systematics/population_systematics_v7_simultaneous/**/*.json
+!results/dmc/systematics/population_systematics_v7_simultaneous/**/*.csv
+!results/dmc/systematics/population_systematics_v8_selected_treatment/**/*.json
+!results/dmc/systematics/population_systematics_v8_selected_treatment/**/*.csv
+!results/dmc/systematics/fw_sensitivity_v1/**/*.json
+!results/dmc/systematics/fw_sensitivity_v1/**/*.csv
+!results/figures/final_matrix_density_profiles.pdf
+!results/figures/final_matrix_lda_comparison.pdf
 data/raw/
 data/processed/
 notebooks/

@@ -1,0 +1,365 @@
+{
+  "artifacts": [
+    {
+      "path": "summary.json",
+      "sha256": "2fc2031b1eb74f0665bb14ca4701877930d7f4845db9212f4d106847edc37399",
+      "size_bytes": 58951
+    },
+    {
+      "path": "point_table.csv",
+      "sha256": "52b8a00780c1ce3632bf064f947560cbfac8e23db0ec9e543dfa3e44b0b23c61",
+      "size_bytes": 4727
+    },
+    {
+      "path": "comparison_table.csv",
+      "sha256": "41a2fcc14fd855a7dcc9ce18e94b7aee6a0d6f8a93b8e8d30870f916468b3454",
+      "size_bytes": 1238
+    }
+  ],
+  "bundle_sha256": "cc14d483380b3c315b9d11d453474a94040bcb2d0ff8516a57946b3534fb5b4e",
+  "config": {
+    "case_id": "N20_A10",
+    "coarse_dt": 0.000625,
+    "energy_quality_assessment": {
+      "assessment_method": "bonferroni_simultaneous_directional_screen",
+      "assessment_scope": "supplied_population_treatments",
+      "assessment_type": "simultaneous_population_energy_stationarity",
+      "input_bindings": [
+        {
+          "bundle_sha256": "a8b815f02aba611e49dbe60eb3a12eb093baf2e78a1ed529ea31df8cbc955828",
+          "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.0005_seeds10501_10503_tau60/run_manifest.json",
+          "manifest_sha256": "ff2af9921f04d6f8c4bcf27b6279ba1578cd6d03f574f190a4cf43fbec4fd4ec",
+          "run_id": "dmc_trapped_stationarity_grid_2026-07-16T11:14:39Z_f524bbd1aed4",
+          "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.0005_seeds10501_10503_tau60/summary.json",
+          "summary_sha256": "c436edef9444db96f3c3d4f2a077ba6e9a1f7ec0553e1da21fb0bdebb7202e44",
+          "treatment_id": "dt=0.00050000000000000001;walkers=512"
+        },
+        {
+          "bundle_sha256": "577da0ae14f21dca95fd5b0b6ffc0dd6bff6b3317c4aa874ca36c266f6823acd",
+          "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.0005_W1024_seeds10501_10503_tau60/run_manifest.json",
+          "manifest_sha256": "95a53b90154e15480eea668b73ee0600603f4c6baa828960e8196e7c85ee406d",
+          "run_id": "dmc_trapped_stationarity_grid_2026-07-16T14:50:56Z_11aed859f69a",
+          "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.0005_W1024_seeds10501_10503_tau60/summary.json",
+          "summary_sha256": "fc92524dd1ed154d9139bbeece59fdfe781155e1b705f8da2f3e72df4da0ef53",
+          "treatment_id": "dt=0.00050000000000000001;walkers=1024"
+        },
+        {
+          "bundle_sha256": "51f5e87e7702afc1382401b4449d3f4a7f9ab6ec2f771b97bdfe802b985392d3",
+          "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.000625_seeds10521_10523_tau60/run_manifest.json",
+          "manifest_sha256": "21e7a4246bf1155b84a61d87f49a78014386286b18868606c78722db705fb703",
+          "run_id": "dmc_trapped_stationarity_grid_2026-07-16T11:24:31Z_d16a899352ea",
+          "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.000625_seeds10521_10523_tau60/summary.json",
+          "summary_sha256": "f09d9f586edd5ae9ce759f281dac79c375c3d6fb4de772913c3fc5d269f67212",
+          "treatment_id": "dt=0.00062500000000000001;walkers=512"
+        },
+        {
+          "bundle_sha256": "17c1a07cf9accbf31c0cfac7b0a358781ce3bcb473001a640421d0c38b3f8c04",
+          "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.000625_W1024_seeds10521_10523_tau60/run_manifest.json",
+          "manifest_sha256": "29bff299a27d151098d8e5ab006210724d30e4ab3c33b259b0a3a26ce54aff15",
+          "run_id": "dmc_trapped_stationarity_grid_2026-07-16T14:46:58Z_4f8b3c5446ff",
+          "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.000625_W1024_seeds10521_10523_tau60/summary.json",
+          "summary_sha256": "418c1ec2b0075e7cc14c38342680a948d35656dbbe130957d60c6b261823c450",
+          "treatment_id": "dt=0.00062500000000000001;walkers=1024"
+        }
+      ],
+      "policy_timing": "retrospective",
+      "simultaneous_assessment": {
+        "assessment_type": "simultaneous_population_energy_stationarity",
+        "chain_count": 12,
+        "confidence_level": 0.95,
+        "directional_statistics": [
+          "slope_z_autocorr_adjusted",
+          "first_last_quarter_z",
+          "late_cumulative_z"
+        ],
+        "directional_test_count": 36,
+        "effective_samples_kind": "minimum_per_seed_autocorrelation_effective_samples",
+        "first_last_block_statistic": "retained_in_source_but_not_double_counted",
+        "method": "bonferroni_simultaneous_directional_screen",
+        "min_effective_samples": 30.0,
+        "policy_timing": "retrospective",
+        "rhat_kind": "stored_split_rhat_without_rank_normalization",
+        "rhat_limit": 1.05,
+        "scope": "supplied_population_treatments",
+        "simultaneous_two_sided_critical_z": 3.1969502291312546,
+        "status": "accepted",
+        "threshold_basis": "prospective_population_source_rhat_and_effective-sample criteria with family-wise directional correction",
+        "treatment_count": 4,
+        "treatments": {
+          "dt=0.00050000000000000001;walkers=1024": {
+            "effective_samples_min": 626.2176196118988,
+            "failures": [],
+            "invariant_checks": {
+              "base_numerics_valid": true,
+              "density_accounting_clean": true,
+              "directional_statistics_below_simultaneous_limit": true,
+              "effective_samples_above_minimum": true,
+              "population_weights_controlled": true,
+              "rhat_below_limit": true,
+              "valid_finite_clean": true
+            },
+            "maximum_directional_z": 1.1023451005901563,
+            "rhat": 1.0018832829037352,
+            "source_failing_seeds": [
+              10501,
+              10502,
+              10503
+            ],
+            "source_stationarity_reason": "spread_warning",
+            "source_stationarity_status": "spread_warning",
+            "spread_warning_count": 3,
+            "status": "accepted"
+          },
+          "dt=0.00050000000000000001;walkers=512": {
+            "effective_samples_min": 607.1289935740982,
+            "failures": [],
+            "invariant_checks": {
+              "base_numerics_valid": true,
+              "density_accounting_clean": true,
+              "directional_statistics_below_simultaneous_limit": true,
+              "effective_samples_above_minimum": true,
+              "population_weights_controlled": true,
+              "rhat_below_limit": true,
+              "valid_finite_clean": true
+            },
+            "maximum_directional_z": 2.296657901669031,
+            "rhat": 1.001175626071481,
+            "source_failing_seeds": [
+              10502,
+              10503
+            ],
+            "source_stationarity_reason": "spread_warning",
+            "source_stationarity_status": "spread_warning",
+            "spread_warning_count": 2,
+            "status": "accepted"
+          },
+          "dt=0.00062500000000000001;walkers=1024": {
+            "effective_samples_min": 640.2724345498254,
+            "failures": [],
+            "invariant_checks": {
+              "base_numerics_valid": true,
+              "density_accounting_clean": true,
+              "directional_statistics_below_simultaneous_limit": true,
+              "effective_samples_above_minimum": true,
+              "population_weights_controlled": true,
+              "rhat_below_limit": true,
+              "valid_finite_clean": true
+            },
+            "maximum_directional_z": 0.8882770645035366,
+            "rhat": 1.0004368427653452,
+            "source_failing_seeds": [
+              10523
+            ],
+            "source_stationarity_reason": "spread_warning",
+            "source_stationarity_status": "spread_warning",
+            "spread_warning_count": 1,
+            "status": "accepted"
+          },
+          "dt=0.00062500000000000001;walkers=512": {
+            "effective_samples_min": 556.3289850339804,
+            "failures": [],
+            "invariant_checks": {
+              "base_numerics_valid": true,
+              "density_accounting_clean": true,
+              "directional_statistics_below_simultaneous_limit": true,
+              "effective_samples_above_minimum": true,
+              "population_weights_controlled": true,
+              "rhat_below_limit": true,
+              "valid_finite_clean": true
+            },
+            "maximum_directional_z": 1.645895095456057,
+            "rhat": 1.0018406298410687,
+            "source_failing_seeds": [
+              10522,
+              10523
+            ],
+            "source_stationarity_reason": "spread_warning",
+            "source_stationarity_status": "spread_warning",
+            "spread_warning_count": 2,
+            "status": "accepted"
+          }
+        }
+      },
+      "threshold_basis": "prospective_population_source_rhat_and_effective-sample criteria with family-wise directional correction",
+      "verification_scope": "population_workflow_manifest_bound_inputs"
+    },
+    "energy_reporting_policy": {
+      "confidence_level": 0.95,
+      "energy_unit": "hbar*Omega",
+      "rationale": "predeclared absolute thesis reporting resolution for population and timestep-population sensitivity",
+      "resolution": 0.01,
+      "timing": "prospective"
+    },
+    "fit_alpha": 0.05,
+    "identity": {
+      "case_id": "N20_A10",
+      "case_parameterization": "harmonic_oscillator_units",
+      "collective_rn": null,
+      "coordinate": "q = x/a_ho",
+      "drift_limiter": "umrigar",
+      "energy_semantics": {
+        "energy_coordinate": "E_tilde = E/(hbar*Omega)",
+        "energy_unit": "hbar*Omega",
+        "estimator": "mixed_local_energy",
+        "report_energy_unit": "hbar*Omega"
+      },
+      "guide_family": "contact-corrected-reduced-tg",
+      "guide_parameters": {
+        "contact_beta": 5.363445591190197e-08,
+        "relative_alpha": 7.011111084682286,
+        "source": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/calibration/final_matrix_guides_v1/N20_A10/validation/summary.json",
+        "source_identity_fingerprint": "90330679a93a1b06636aacce2538890baaa027371d87975ca2234d806daf26d4",
+        "source_manifest_sha256": "308c5d0f3aa2fcc006cf6414b8c0f5b14c7f053238261772bfae464a31ac362c",
+        "source_sha256": "590b6a406140a3baafabd4090c9d9b49928c88556ab517435c6f901aeecf9f1f"
+      },
+      "implementation_source_tree_sha256": "23618f59d1735b05f3ed929c36e9ed9963077c1f76e0afa436da2501813593d1",
+      "initialization": {
+        "breathing_preburn_log_step": 0.04,
+        "breathing_preburn_steps": 0,
+        "init_width_log_sigma": 0.1,
+        "mode": "lda-rms-lattice"
+      },
+      "length_unit": "a_ho = sqrt(hbar/(m*Omega))",
+      "local_step_method": "metropolis",
+      "n_particles": 20,
+      "population_control": {
+        "ess_resample_fraction": 0.35
+      },
+      "response_lambda": null,
+      "rod_length_ho": 10.0,
+      "time_unit": "1/Omega"
+    },
+    "identity_fingerprint": "1904832c2c73f0eb1dbe886e5294e50b9f8269e819c778e7dcbc831a19711218",
+    "inputs": [
+      {
+        "bundle_sha256": "a8b815f02aba611e49dbe60eb3a12eb093baf2e78a1ed529ea31df8cbc955828",
+        "dt": 0.0005,
+        "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.0005_seeds10501_10503_tau60/run_manifest.json",
+        "manifest_sha256": "ff2af9921f04d6f8c4bcf27b6279ba1578cd6d03f574f190a4cf43fbec4fd4ec",
+        "run_id": "dmc_trapped_stationarity_grid_2026-07-16T11:14:39Z_f524bbd1aed4",
+        "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.0005_seeds10501_10503_tau60/summary.json",
+        "summary_sha256": "c436edef9444db96f3c3d4f2a077ba6e9a1f7ec0553e1da21fb0bdebb7202e44",
+        "walkers": 512
+      },
+      {
+        "bundle_sha256": "577da0ae14f21dca95fd5b0b6ffc0dd6bff6b3317c4aa874ca36c266f6823acd",
+        "dt": 0.0005,
+        "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.0005_W1024_seeds10501_10503_tau60/run_manifest.json",
+        "manifest_sha256": "95a53b90154e15480eea668b73ee0600603f4c6baa828960e8196e7c85ee406d",
+        "run_id": "dmc_trapped_stationarity_grid_2026-07-16T14:50:56Z_11aed859f69a",
+        "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.0005_W1024_seeds10501_10503_tau60/summary.json",
+        "summary_sha256": "fc92524dd1ed154d9139bbeece59fdfe781155e1b705f8da2f3e72df4da0ef53",
+        "walkers": 1024
+      },
+      {
+        "bundle_sha256": "51f5e87e7702afc1382401b4449d3f4a7f9ab6ec2f771b97bdfe802b985392d3",
+        "dt": 0.000625,
+        "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.000625_seeds10521_10523_tau60/run_manifest.json",
+        "manifest_sha256": "21e7a4246bf1155b84a61d87f49a78014386286b18868606c78722db705fb703",
+        "run_id": "dmc_trapped_stationarity_grid_2026-07-16T11:24:31Z_d16a899352ea",
+        "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.000625_seeds10521_10523_tau60/summary.json",
+        "summary_sha256": "f09d9f586edd5ae9ce759f281dac79c375c3d6fb4de772913c3fc5d269f67212",
+        "walkers": 512
+      },
+      {
+        "bundle_sha256": "17c1a07cf9accbf31c0cfac7b0a358781ce3bcb473001a640421d0c38b3f8c04",
+        "dt": 0.000625,
+        "manifest_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.000625_W1024_seeds10521_10523_tau60/run_manifest.json",
+        "manifest_sha256": "29bff299a27d151098d8e5ab006210724d30e4ab3c33b259b0a3a26ce54aff15",
+        "run_id": "dmc_trapped_stationarity_grid_2026-07-16T14:46:58Z_4f8b3c5446ff",
+        "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.000625_W1024_seeds10521_10523_tau60/summary.json",
+        "summary_sha256": "418c1ec2b0075e7cc14c38342680a948d35656dbbe130957d60c6b261823c450",
+        "walkers": 1024
+      }
+    ],
+    "reference_fine_dt": 0.0005,
+    "sampling_design": {
+      "interpretation": "trace cadence is an advisory observation-control difference; physical burn and production times are matched and each source supplies its own autocorrelation-aware conservative standard error",
+      "points": [
+        {
+          "dt": 0.0005,
+          "store_every": 50,
+          "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.0005_seeds10501_10503_tau60/summary.json",
+          "trace_spacing_tau": 0.025,
+          "walkers": 512
+        },
+        {
+          "dt": 0.0005,
+          "store_every": 50,
+          "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.0005_W1024_seeds10501_10503_tau60/summary.json",
+          "trace_spacing_tau": 0.025,
+          "walkers": 1024
+        },
+        {
+          "dt": 0.000625,
+          "store_every": 40,
+          "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.000625_seeds10521_10523_tau60/summary.json",
+          "trace_spacing_tau": 0.025,
+          "walkers": 512
+        },
+        {
+          "dt": 0.000625,
+          "store_every": 40,
+          "summary_path": "/Users/batu/Desktop/UPC/TFM/hardrod-qmc/results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.000625_W1024_seeds10521_10523_tau60/summary.json",
+          "trace_spacing_tau": 0.025,
+          "walkers": 1024
+        }
+      ],
+      "status": "common_trace_cadence",
+      "trace_cadence_varies_across_timesteps": false
+    },
+    "selected_dt": 0.000625,
+    "selected_dt_basis": "explicit_selected_dt",
+    "selected_treatment_role": "coarse",
+    "selected_walkers": 512,
+    "selected_walkers_basis": "reference_population_of_selected_timestep_ladder",
+    "statistical_method_policy": {
+      "confidence_rule": "apply the Student-t critical value once",
+      "contrast_standard_error": "max(matched-replicate contrast SEM, coefficient-weighted source-run quadrature standard error)",
+      "legacy_l1_role": "worst_case_arbitrary_covariance_envelope retained as a diagnostic only",
+      "method_correction_scope": "applied uniformly to every population case",
+      "method_correction_timing": "retrospective"
+    }
+  },
+  "config_fingerprint": "355f964fe7001e865fe2127ca236770bf05a73301707b331a4346ad7355ac113",
+  "provenance": {
+    "command": [
+      "experiments/dmc/local/assess_population_systematics.py",
+      "results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.0005_seeds10501_10503_tau60/summary.json",
+      "results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.0005_W1024_seeds10501_10503_tau60/summary.json",
+      "results/dmc/systematics/timestep_energy_v1/N20_A10/dt_0.000625_seeds10521_10523_tau60/summary.json",
+      "results/dmc/systematics/population_energy_selected_v1/N20_A10/dt_0.000625_W1024_seeds10521_10523_tau60/summary.json",
+      "--energy-reporting-resolution",
+      "0.01",
+      "--selected-dt",
+      "0.000625",
+      "--interaction-dt",
+      "0.000625",
+      "--simultaneous-energy-stationarity",
+      "--output-dir",
+      "results/dmc/systematics/population_systematics_v7_simultaneous/N20_A10"
+    ],
+    "created_utc": "2026-07-16T20:16:33Z",
+    "dependencies": {
+      "matplotlib": "3.10.8",
+      "numba": "0.65.1",
+      "numpy": "2.4.2",
+      "scipy": "1.17.1",
+      "tqdm": "4.67.3"
+    },
+    "implementation": {
+      "git_revision": "f5276aa4c20d1b06ced7d47895fefd4d0e4781c4",
+      "git_status": "clean",
+      "source_file_count": 209,
+      "source_tree_sha256": "af67dca4385310ac8bf7071b0f5fd557cc4a99f251526f41c3cd6c54f4abb91c",
+      "status": "identified"
+    },
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "python_version": "3.12.10"
+  },
+  "result_schema_version": "dmc_population_systematics_v3",
+  "run_id": "dmc_population_systematics_2026-07-16T20:16:33Z_355f964fe700",
+  "run_name": "dmc_population_systematics",
+  "schema_version": "hrdmc_run_manifest_v2",
+  "status": "additional_population_point_required"
+}
