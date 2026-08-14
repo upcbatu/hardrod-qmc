@@ -1,0 +1,95 @@
+[project]
+name = "hardrod-dmc-thesis"
+version = "0.1.0"
+description = "QMC scaffold for trapped one-dimensional hard-rod bosons and excluded-volume LDA benchmarks."
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dmc = [
+  "numba>=0.59",
+  "scipy>=1.11",
+  "tqdm>=4.66",
+]
+dev = [
+  "pip-audit>=2.7",
+  "pylint>=3.0",
+  "pyright>=1.1",
+  "pytest>=7.4",
+  "ruff>=0.4",
+  "vulture>=2.11",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "experiments", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W", "I", "UP", "B",
+  "C4", "SIM", "RET", "PIE",
+  "LOG", "G", "RUF",
+  "C90", "PLR0912", "PLR0915",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-branches = 12
+max-statements = 50
+
+[tool.pyright]
+include = ["src", "experiments", "tests"]
+exclude = ["operator", "results", "data", "notebooks"]
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
+extraPaths = ["src"]
+reportMissingTypeStubs = false
+
+# Enforced by scripts/checks/structure.py.
+[tool.hrdmc.structure]
+max-module-lines = 600
+max-callable-lines = 150
+max-module-symbols = 25
+subject-group-min-modules = 3
+subject-group-min-lines = 1000
+stage-packages = ["sampling", "statistics", "estimators"]
+role-module-names = [
+  "assessment",
+  "case",
+  "comparison",
+  "config",
+  "engine",
+  "models",
+  "outputs",
+  "results",
+  "run",
+  "seed",
+  "transitions",
+  "workflow",
+]
+
+layering = [
+  "hrdmc.statistics must not import hrdmc.production",
+  "hrdmc.statistics must not import hrdmc.uncertainty",
+  "hrdmc.statistics must not import hrdmc.validation",
+  "hrdmc.statistics must not import hrdmc.plotting",
+  "hrdmc.theory must not import hrdmc.production",
+  "hrdmc.theory must not import hrdmc.uncertainty",
+  "hrdmc.theory must not import hrdmc.validation",
+  "hrdmc.system must not import hrdmc.production",
+  "hrdmc.system must not import hrdmc.uncertainty",
+  "hrdmc.system must not import hrdmc.validation",
+  "hrdmc.trial must not import hrdmc.production",
+  "hrdmc.trial must not import hrdmc.uncertainty",
+  "hrdmc.trial must not import hrdmc.validation",
+]
