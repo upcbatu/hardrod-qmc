@@ -1,0 +1,23 @@
+from __future__ import annotations
+
+import math
+from dataclasses import fields, is_dataclass
+from typing import Any
+
+import numpy as np
+
+
+def to_jsonable(obj: Any) -> Any:
+    if is_dataclass(obj) and not isinstance(obj, type):
+        return {field.name: to_jsonable(getattr(obj, field.name)) for field in fields(obj)}
+    if isinstance(obj, dict):
+        return {str(key): to_jsonable(value) for key, value in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_jsonable(value) for value in obj]
+    if isinstance(obj, np.ndarray):
+        return to_jsonable(obj.tolist())
+    if isinstance(obj, np.generic):
+        return to_jsonable(obj.item())
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    return obj
