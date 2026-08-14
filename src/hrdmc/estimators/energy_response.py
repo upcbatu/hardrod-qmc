@@ -89,6 +89,7 @@ def paired_trap_r2_from_energy_response(
     lambda0: float = BASE_TRAP_QUADRATIC_COUPLING,
     confidence_level: float = 0.95,
 ) -> TrapR2EnergyResponseResult:
+    """Infer trap R2 by the Hellmann--Feynman theorem [Hellmann1937; Feynman1939]."""
     if n_particles <= 0 or not 0.0 < confidence_level < 1.0:
         raise ValueError("invalid response aggregation controls")
     grouped: dict[int, list[PairedEnergyResponsePoint]] = {}

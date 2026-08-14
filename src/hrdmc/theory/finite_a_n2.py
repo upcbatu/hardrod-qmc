@@ -181,7 +181,7 @@ def trapped_n2_finite_a_reference(
     y_max: float | None = None,
     center: float = 0.0,
 ) -> TrappedN2FiniteAReference:
-    """Build the deterministic N=2 finite-a trapped hard-rod reference."""
+    """Build the trapped N=2 finite-a reference [GirardeauAstrakharchik2010]."""
     if rod_length < 0.0:
         raise ValueError("rod_length must be non-negative")
     if omega <= 0.0 or not math.isfinite(omega):

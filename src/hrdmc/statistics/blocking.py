@@ -26,7 +26,7 @@ class BlockingPlateauResult:
     plateau_n_blocks: int
     reason: str
 def blocking_standard_error(series: FloatArray, min_blocks: int = 8) -> BlockingResult:
-    """Estimate standard error using blocking analysis."""
+    """Estimate standard error by Flyvbjerg--Petersen blocking [Flyvbjerg1989]."""
     x = np.asarray(series, dtype=float).reshape(-1)
     n = len(x)
     if n < 2:

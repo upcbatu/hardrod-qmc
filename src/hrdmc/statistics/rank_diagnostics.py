@@ -43,7 +43,7 @@ class RankNormalizedDiagnostics:
 
 
 def rank_normalized_diagnostics(chains: FloatArray) -> RankNormalizedDiagnostics:
-    """Return Vehtari-style rank split-Rhat and bulk ESS."""
+    """Return rank-normalized split-Rhat and bulk ESS following Vehtari [Vehtari2021]."""
     values = np.asarray(chains, dtype=float)
     if values.ndim != 2:
         raise ValueError("chains must be a two-dimensional rectangular array")

@@ -32,7 +32,7 @@ from hrdmc.estimators.forward_walking.status import (
 
 
 class TransportedAuxiliaryForwardWalking:
-    """Online transported auxiliary-variable FW estimator."""
+    """Online transported auxiliary-variable FW estimator [CasullerasBoronat1995]."""
 
     def __init__(self, config: PureWalkingConfig):
         config.validate()

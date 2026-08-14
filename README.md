@@ -1,90 +1,98 @@
 # Microscopic Description of Trapped Hard Rods
 
-QMC/DMC thesis codebase for strictly one-dimensional trapped finite-length hard rods, with homogeneous-ring validation and excluded-volume local-density comparisons.
+## What the code computes
 
-This repository is a computational-physics thesis codebase for the microscopic description of trapped one-dimensional hard-rod bosons.
+This repository computes ground-state observables for strictly one-dimensional
+hard rods in a harmonic trap. The production calculations use
+importance-sampled diffusion Monte Carlo (DMC), with transported forward
+walking for coordinate observables. Exact Tonks--Girardeau and two-body
+solutions provide validation anchors, and an excluded-volume local-density
+approximation (LDA) provides the analytic comparison. The reported matrix
+covers particle numbers 10 and 20 at rod lengths 0, 0.1, 1, and 10 in
+harmonic-oscillator units.
 
-The homogeneous hard-rod system on a ring is kept as a controlled QMC validation benchmark, because its excluded-volume mapping gives known reference energies and wavefunction structure. The main thesis target is the strictly one-dimensional trapped hard-rod system: compute microscopic benchmark observables with QMC, with DMC as the target production method and VMC as a baseline, then map where an excluded-volume local-density approximation succeeds or fails.
+The outputs include mixed energies, pure cloud radii and density profiles,
+DMC--LDA comparisons, and numerical allowances from time-step,
+walker-population, and forward-walking checks. The manuscript contains the
+derivations and physical interpretation. These notes document the
+implementation, conventions, and reproduction procedure.
 
-## Units
+## Installation
 
-Trapped-system runs use harmonic-oscillator units directly:
+Python 3.10 or newer is required. From a clone of the repository:
 
-- coordinate stored by the code: \(q=x/a_{\rm ho}\)
-- length unit: \(a_{\rm ho}=\sqrt{\hbar/(m\Omega)}\)
-- energy stored by the code: \(\widetilde E=E/(\hbar\Omega)\)
-- energy unit: \(\hbar\Omega\)
-- time unit: \(1/\Omega\)
-- fixed dimensionless trap frequency in code variables: \(1\)
-
-After nondimensionalization, trapped hard-rod cases are specified by the
-particle number \(N\) and the dimensionless rod length \(A=a/a_{\rm ho}\).
-
-## Start here
-
-- [docs/00_PROPOSAL.md](docs/00_PROPOSAL.md)
-  Short thesis proposal.
-- [docs/01_ARCHITECTURE_RATIONALE.md](docs/01_ARCHITECTURE_RATIONALE.md)
-  Why the code is organized the way it is.
-- [docs/02_HIGH_LEVEL_WORKFLOW.md](docs/02_HIGH_LEVEL_WORKFLOW.md)
-  High-level workflow from homogeneous validation to trapped-system comparison.
-- [docs/03_EQUATION_SOURCE_MAP.md](docs/03_EQUATION_SOURCE_MAP.md)
-  Which equations and method ideas come from which papers.
-- [docs/04_CURRENT_REPO_STATE.md](docs/04_CURRENT_REPO_STATE.md)
-  What is already implemented, what the tests cover, and what is still missing.
-- [docs/05_TIMELINE_AND_NAVIGATION.md](docs/05_TIMELINE_AND_NAVIGATION.md)
-  Tentative calendar and navigation note.
-- [docs/dmc/method.md](docs/dmc/method.md)
-  Local DMC method, optional collective RN extension, and numerical checks.
-- [docs/validation/README.md](docs/validation/README.md)
-  Validation notes for benchmark status, interpretation, and remaining checks.
-
-## Code layout
-
-```text
-src/hrdmc/systems/        physical geometry, constraints, potentials, kernels
-src/hrdmc/wavefunctions/  VMC trials and DMC guides
-src/hrdmc/monte_carlo/    VMC plus DMC contracts and implementations
-src/hrdmc/estimators/     observables from coordinate data
-src/hrdmc/theory/         homogeneous EOS, chemical potential, LDA
-src/hrdmc/analysis/       errors, uncertainty, and failure maps
-src/hrdmc/runners/        generic seed-batch execution and progress plumbing
-src/hrdmc/workflows/      method workflow composition above engines
-src/hrdmc/artifacts/      result routing, serialization, manifests, provenance
-src/hrdmc/io/             bounded terminal output, progress, run checkpoints
-src/hrdmc/plotting/       figures
-experiments/anchors/      exact and analytic anchor entrypoints
-experiments/dmc/local/    local DMC experiment entrypoints
-data/                     external/reference inputs, usually untracked
-results/                  generated experiment outputs, usually untracked
-notebooks/                inspection and figure drafting
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -e ".[dmc]"
 ```
 
-## Development Checks
+Install `.[dmc,dev]` instead when developing the repository.
 
-Install development tooling with `python3 -m pip install -e ".[dev]"`.
+## Reproducing the eight-case result
 
-- `make lint` runs `ruff check`.
-- `make typecheck` runs `pyright` with the repository `pyproject.toml` settings.
-- `make check` runs both lint and type checks.
+The following command reassembles the eight thesis cases from the archived
+result bundle. The simulation bundle is not tracked, so a clean clone must
+first receive the directory
+`results/dmc/final_matrix/thesis_5seed_all_optimized_v1/` and its
+`thesis_5seed_all_optimized_v1_supplement/N20_A10_r2_tau15` supplement.
 
-## Current status
+```bash
+OUT="$(mktemp -d "${TMPDIR:-/tmp}/hardrod-final-matrix.XXXXXX")"
+PYTHONPATH=src python3 experiments/dmc/local/assemble_final_matrix.py \
+  --source-root results/dmc/final_matrix/thesis_5seed_all_optimized_v1 \
+  --output-root "$OUT" \
+  --r2-supplement \
+    N20_A10=results/dmc/final_matrix/thesis_5seed_all_optimized_v1_supplement/N20_A10_r2_tau15 \
+  --retrospective-energy-cases N10_A0.1
+```
 
-- homogeneous periodic hard-rod geometry is implemented
-- exact homogeneous ring reference energies and hard-rod EOS utilities are implemented in `theory/`
-- the anchor validation entrypoints compare exact/analytic references against
-  the public engine and estimator surfaces through thin CLIs
-- VMC remains available in the package as scaffold code, but development VMC
-  experiment scripts are no longer part of the public experiment surface
-- observable estimators for local energy, `g(r)`, `S(k)`, and ring-based `n(x)` exist
-- the default DMC implementation is the importance-sampled local engine under
-  `src/hrdmc/monte_carlo/dmc/local/`
-- collective Radon-Nikodym-corrected moves are an optional scheduled extension
-  under `src/hrdmc/monte_carlo/dmc/collective_rn/`; they are disabled unless a
-  runner explicitly enables them
-- trapped-system runners live under `experiments/dmc/local/` and can combine
-  local DMC with transported forward walking under
-  `src/hrdmc/estimators/pure/forward_walking/`
-- table-generation policy and method documentation are included; validation
-  tables and long-run result bundles remain manifest-traceable generated
-  artifacts rather than tracked source files
+On success, the command reports an accepted 8/8 matrix. See
+[docs/reproducing.md](docs/reproducing.md) for the complete table, figure, and
+Hellmann--Feynman reproduction chain and for every untracked prerequisite.
+
+## Packages
+
+The source layout has the root `hrdmc` namespace and eleven owner subpackages.
+Command-line entry points are thin programs under `experiments/`.
+
+| Package | Ownership |
+|---|---|
+| `hrdmc` | Empty root namespace; consumers import directly from owner modules. |
+| `artifacts` | Artifact paths, schemas, manifests, progress, and terminal summaries. |
+| `estimators` | Mixed, variational, Hellmann--Feynman, and forward-walking observables. |
+| `plotting` | Reusable styles and diagnostic figure builders. |
+| `production` | DMC benchmark, stationarity, and final-matrix packet production. |
+| `sampling` | Initial conditions, MALA transitions, DMC/VMC engines, and population control. |
+| `statistics` | Physics-independent diagnostics, equivalence tests, and numerical fits. |
+| `system` | Hard-rod geometry, run settings, guide registry, and code units. |
+| `theory` | Tonks--Girardeau, finite-diameter two-body, EOS, and LDA references. |
+| `trial` | Trial/importance-sampling guides and their numerical kernels. |
+| `uncertainty` | Time-step, population, stationarity, and forward-walking allowances. |
+| `validation` | Exact anchors and branching-free sampler-equivalence checks. |
+
+Package boundaries and dependency rules are documented in
+[docs/architecture.md](docs/architecture.md). Code-unit conventions are in
+[docs/units.md](docs/units.md).
+
+## Development checks
+
+After installing `.[dmc,dev]`:
+
+- `make check` runs lint, type, structure, dead-code, import, test, public-surface,
+  and whitespace checks.
+- `make check-science` runs the fixed-seed DMC and published
+  Hellmann--Feynman regression checks.
+- `make report-duplicates` reports duplicate code without failing the build.
+- `make security` runs the network-dependent dependency audit.
+- `make clean` removes local caches and empty generated directories.
+
+## Citation
+
+Use [CITATION.cff](CITATION.cff) to cite the software or its preferred thesis
+citation. [CITATION.bib](CITATION.bib) records the papers whose methods are
+implemented by the code; it is not the software citation.
+
+## License
+
+This project is distributed under the [MIT License](LICENSE).

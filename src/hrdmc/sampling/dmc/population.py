@@ -42,7 +42,7 @@ def _normalize_weights(weights: FloatArray) -> FloatArray:
         raise ValueError("weights must have positive sum")
     return weights / total
 def _systematic_resample(weights: FloatArray, rng: np.random.Generator) -> IntArray:
-    """Systematic resampling indices for DMC population control."""
+    """Systematic fixed-population DMC resampling [Assaraf2000; Foulkes2001]."""
     w = _normalize_weights(weights)
     n = len(w)
     positions = (rng.random() + np.arange(n)) / n

@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 
 FloatArray = NDArray[np.float64]
 def trapped_tg_energy_total(n_particles: int, omega: float) -> float:
-    """Exact trapped Tonks-Girardeau energy in harmonic-oscillator units."""
+    """Return the exact trapped TG energy [GirardeauWrightTriscari2001]."""
     _validate_trapped_tg_inputs(n_particles, omega)
     return float(0.5 * n_particles * n_particles * omega)
 def trapped_tg_r2_radius(n_particles: int, omega: float) -> float:
@@ -13,7 +13,7 @@ def trapped_tg_r2_radius(n_particles: int, omega: float) -> float:
     _validate_trapped_tg_inputs(n_particles, omega)
     return float(n_particles / (2.0 * omega))
 def trapped_tg_rms_radius(n_particles: int, omega: float) -> float:
-    """Exact RMS radius sqrt(<x^2>) for the trapped TG anchor."""
+    """Return the exact TG RMS radius from Bose--Fermi mapping [Girardeau1960]."""
     return float(np.sqrt(trapped_tg_r2_radius(n_particles, omega)))
 def trapped_tg_density_profile(
     x: FloatArray,

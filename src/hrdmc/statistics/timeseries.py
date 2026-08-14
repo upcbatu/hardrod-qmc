@@ -96,6 +96,7 @@ def integrated_autocorrelation_time(
     *,
     window_c: float = 5.0,
 ) -> AutocorrelationResult:
+    """Use Sokal's self-consistent window for autocorrelation time [Sokal1997]."""
     arr = np.asarray(values, dtype=float).reshape(-1)
     arr = arr[np.isfinite(arr)]
     if _trace_is_constant(arr):

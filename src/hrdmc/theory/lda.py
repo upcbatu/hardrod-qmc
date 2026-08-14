@@ -17,7 +17,7 @@ def _validate_density(density: float, rod_length: float) -> None:
 
 
 def excluded_length(n_particles: int, length: float, rod_length: float) -> float:
-    """Return the free ring length after removing the hard-rod excluded volume."""
+    """Return the hard-rod ring's excluded free length [Mazzanti2008]."""
     if n_particles <= 0:
         raise ValueError("n_particles must be positive")
     if length <= 0:
@@ -160,7 +160,7 @@ def lda_density_profile(
     boundary_density_tolerance: float = 1e-8,
     max_iterations: int = 200,
 ) -> LDADensityProfile:
-    """Solve the excluded-volume LDA normalization on a fixed spatial grid."""
+    """Solve excluded-volume LDA normalization following [Astrakharchik2005LDA]."""
     x = np.asarray(x, dtype=float)
     potential_x = np.asarray(potential_x, dtype=float)
     _validate_lda_request(x, potential_x, n_particles, rod_length, boundary_density_tolerance)

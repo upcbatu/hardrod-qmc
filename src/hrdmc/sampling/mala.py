@@ -69,7 +69,7 @@ def limit_drift(
     *,
     method: str = "none",
 ) -> FloatArray:
-    """Return the proposal drift used by the Metropolis transition."""
+    """Limit proposal drift by Umrigar--Nightingale--Runge Eq. 33 [Umrigar1993]."""
     values = np.asarray(drift, dtype=float)
     if method == "none":
         return values
