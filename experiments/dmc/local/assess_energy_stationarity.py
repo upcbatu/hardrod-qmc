@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
-from hrdmc.artifacts import repo_root_from
-from hrdmc.io import print_run_summary
-from hrdmc.workflows.dmc.systematics.energy_stationarity import (
+from hrdmc.artifacts.layout import repo_root_from
+from hrdmc.artifacts.terminal import print_run_summary
+from hrdmc.uncertainty.stationarity import (
     run_energy_stationarity_assessment,
 )
 
@@ -47,7 +46,6 @@ def main() -> None:
         sources,
         expected_case_ids=expected_cases,
         output_dir=args.output_dir,
-        command=sys.argv,
         confidence_level=args.confidence_level,
         rhat_limit=args.rhat_limit,
         min_effective_samples=args.min_effective_samples,
@@ -58,9 +56,7 @@ def main() -> None:
         status=str(payload["status"]),
         summary={
             "case_count": len(expected_cases),
-            "publication_ready": payload[
-                "publication_ready_within_energy_stationarity_scope"
-            ],
+            "publication_ready": payload["publication_ready_within_energy_stationarity_scope"],
         },
         artifacts={
             "summary": artifacts["summary"],

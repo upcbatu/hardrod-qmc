@@ -1,17 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from hrdmc.plotting.components import (
-    draw_case_header,
-    draw_chain_panel,
-    draw_density_panel,
-    draw_energy_stationarity_panel,
-    draw_fw_lag_panel,
-    draw_scalar_panel,
-)
-from hrdmc.plotting.numerics import array_or_none
+import numpy as np
+
 from hrdmc.plotting.style import load_pyplot, save_figure
 
 
@@ -21,282 +15,125 @@ def write_benchmark_packet_plots(
     *,
     formats: tuple[str, ...] = ("png", "pdf"),
 ) -> list[str]:
-    """Render benchmark packet plots from an assembled workflow payload."""
-
+    """Write the six compact diagnostics consumed by a benchmark packet."""
     output = Path(output_dir)
     plot_dir = output / "plots"
     plt = load_pyplot(plot_dir)
+    writers: tuple[tuple[str, Callable[[Any, dict[str, Any]], Any]], ...] = (
+        ("scalar_comparison", _scalar_figure),
+        ("density_comparison", _density_figure),
+        ("numerical_diagnostics", _chain_figure),
+        ("energy_stationarity_diagnostics", _energy_trace_figure),
+        ("fw_lag_diagnostics", _fw_figure),
+        ("benchmark_packet_one_page", _packet_figure),
+    )
     paths: list[Path] = []
-    paths.extend(_write_scalar_comparison(plt, plot_dir, payload, formats=formats))
-    paths.extend(_write_density_comparison(plt, plot_dir, payload, formats=formats))
-    paths.extend(_write_numerical_diagnostics(plt, plot_dir, payload, formats=formats))
-    paths.extend(_write_energy_stationarity_diagnostics(plt, plot_dir, payload, formats=formats))
-    paths.extend(_write_fw_lag_diagnostics(plt, plot_dir, payload, formats=formats))
-    paths.extend(_write_optional_vector_observables(plt, plot_dir, payload, formats=formats))
-    paths.extend(_write_one_page_packet(plt, plot_dir, payload, formats=formats))
+    for stem, writer in writers:
+        figure = writer(plt, payload)
+        paths.extend(save_figure(figure, plot_dir / stem, formats))
+        plt.close(figure)
     return [str(path.relative_to(output)) for path in paths]
-
-
-def _write_scalar_comparison(
-    plt: Any,  # noqa: ANN401
-    plot_dir: Path,
-    payload: dict[str, Any],
-    *,
-    formats: tuple[str, ...],
-) -> list[Path]:
-    estimates = payload.get("estimates", {})
-    energy_label, r2_label, rms_label = _scalar_ylabels(payload)
-    rows = [
-        ("Energy", energy_label, "energy", estimates.get("energy", {})),
-        (r"$R^2$", r2_label, "r2", estimates.get("r2", {})),
-        (
-            r"$R_\mathrm{rms}$",
-            rms_label,
-            "rms",
-            estimates.get("rms", {}),
-        ),
-    ]
-    fig, axes = plt.subplots(1, 3, figsize=(10.8, 3.8), constrained_layout=False)
-    draw_case_header(fig, payload)
-    precision_status = _precision_status(payload)
-    for ax, (title, ylabel, observable, data) in zip(axes, rows, strict=True):
-        draw_scalar_panel(
-            ax,
-            title=title,
-            ylabel=ylabel,
-            data=data,
-            observable=observable,
-            precision_status=precision_status,
+def _scalar_figure(plt: Any, payload: dict[str, Any]) -> Any:
+    fig, axes = plt.subplots(1, 3, figsize=(10.2, 3.5))
+    estimates = _mapping(payload.get("estimates"))
+    for axis, (name, label) in zip(
+        axes,
+        (("energy", "Energy"), ("r2", r"$R^2$"), ("rms", r"$R_{rms}$")),
+        strict=True,
+    ):
+        row = _mapping(estimates.get(name))
+        value, stderr, reference = (
+            _number(row.get("value")),
+            _number(row.get("stderr")),
+            _number(row.get("lda", row.get("reference"))),
         )
-    fig.subplots_adjust(top=0.82, bottom=0.12, left=0.07, right=0.985, wspace=0.30)
-    paths = save_figure(fig, plot_dir / "scalar_comparison", formats)
-    plt.close(fig)
-    return paths
-
-
-def _write_density_comparison(
-    plt: Any,  # noqa: ANN401
-    plot_dir: Path,
-    payload: dict[str, Any],
-    *,
-    formats: tuple[str, ...],
-) -> list[Path]:
-    fig, axes = plt.subplots(
-        2,
-        1,
-        figsize=(8.7, 6.3),
-        sharex=True,
-        gridspec_kw={"height_ratios": (2.35, 1.0)},
-        constrained_layout=False,
-    )
-    draw_density_panel(axes[0], payload, residual_ax=axes[1])
-    fig.subplots_adjust(top=0.93, bottom=0.08, left=0.08, right=0.985, hspace=0.12)
-    paths = save_figure(fig, plot_dir / "density_comparison", formats)
-    plt.close(fig)
-    return paths
-
-
-def _write_numerical_diagnostics(
-    plt: Any,  # noqa: ANN401
-    plot_dir: Path,
-    payload: dict[str, Any],
-    *,
-    formats: tuple[str, ...],
-) -> list[Path]:
-    fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.9), constrained_layout=False)
-    draw_case_header(fig, payload)
-    draw_chain_panel(axes[0], axes[1], payload)
-    fig.subplots_adjust(top=0.82, bottom=0.15, left=0.09, right=0.985, wspace=0.28)
-    paths = save_figure(fig, plot_dir / "numerical_diagnostics", formats)
-    plt.close(fig)
-    return paths
-
-
-def _write_energy_stationarity_diagnostics(
-    plt: Any,  # noqa: ANN401
-    plot_dir: Path,
-    payload: dict[str, Any],
-    *,
-    formats: tuple[str, ...],
-) -> list[Path]:
-    fig, axes = plt.subplots(
-        2,
-        1,
-        figsize=(8.2, 5.8),
-        sharex=False,
-        gridspec_kw={"height_ratios": (1.15, 1.0)},
-        constrained_layout=False,
-    )
-    draw_case_header(fig, payload)
-    draw_energy_stationarity_panel(axes[0], axes[1], payload)
-    fig.subplots_adjust(top=0.84, bottom=0.11, left=0.10, right=0.985, hspace=0.30)
-    paths = save_figure(fig, plot_dir / "energy_stationarity_diagnostics", formats)
-    plt.close(fig)
-    return paths
-
-
-def _write_fw_lag_diagnostics(
-    plt: Any,  # noqa: ANN401
-    plot_dir: Path,
-    payload: dict[str, Any],
-    *,
-    formats: tuple[str, ...],
-) -> list[Path]:
-    fig, ax = plt.subplots(figsize=(7.2, 4.1), constrained_layout=False)
-    draw_case_header(fig, payload)
-    draw_fw_lag_panel(ax, payload)
-    fig.subplots_adjust(top=0.84, bottom=0.25, left=0.11, right=0.985)
-    paths = save_figure(fig, plot_dir / "fw_lag_diagnostics", formats)
-    plt.close(fig)
-    return paths
-
-
-def _write_optional_vector_observables(
-    plt: Any,  # noqa: ANN401
-    plot_dir: Path,
-    payload: dict[str, Any],
-    *,
-    formats: tuple[str, ...],
-) -> list[Path]:
-    estimates = payload.get("estimates", {})
-    paths: list[Path] = []
-    paths.extend(
-        _write_xy_figure(
-            plt,
-            plot_dir,
-            payload,
-            estimates.get("pair_distance_density", {}),
-            x_key="x",
-            x_label="pair distance",
-            y_label="pair-distance density",
-            title="Pair-distance density",
-            filename="pair_distance_density",
-            formats=formats,
-        )
-    )
-    paths.extend(
-        _write_xy_figure(
-            plt,
-            plot_dir,
-            payload,
-            estimates.get("structure_factor", {}),
-            x_key="k_values",
-            x_label=r"$k$",
-            y_label=r"$S(k)$",
-            title="Finite-cloud structure factor",
-            filename="structure_factor",
-            formats=formats,
-        )
-    )
-    return paths
-
-
-def _write_xy_figure(
-    plt: Any,  # noqa: ANN401
-    plot_dir: Path,
-    payload: dict[str, Any],
-    observable: dict[str, Any],
-    *,
-    x_key: str,
-    x_label: str,
-    y_label: str,
-    title: str,
-    filename: str,
-    formats: tuple[str, ...],
-) -> list[Path]:
-    x = array_or_none(observable.get(x_key))
-    y = array_or_none(observable.get("value"))
-    if x is None or y is None:
-        return []
-    stderr = array_or_none(observable.get("stderr"))
-    fig, ax = plt.subplots(figsize=(6.8, 3.9), constrained_layout=False)
-    draw_case_header(fig, payload)
-    ax.plot(x, y, marker="o", linewidth=1.8, markersize=3.8)
-    if stderr is not None and stderr.shape == y.shape:
-        ax.fill_between(x, y - stderr, y + stderr, alpha=0.22, linewidth=0)
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
-    ax.set_title(title)
-    status = str(observable.get("status", ""))
-    if status:
-        ax.text(0.02, 0.96, status, transform=ax.transAxes, ha="left", va="top", fontsize=8)
-    fig.subplots_adjust(top=0.82, bottom=0.15, left=0.11, right=0.985)
-    paths = save_figure(fig, plot_dir / filename, formats)
-    plt.close(fig)
-    return paths
-
-
-def _write_one_page_packet(
-    plt: Any,  # noqa: ANN401
-    plot_dir: Path,
-    payload: dict[str, Any],
-    *,
-    formats: tuple[str, ...],
-) -> list[Path]:
-    estimates = payload.get("estimates", {})
-    energy_label, r2_label, rms_label = _scalar_ylabels(payload)
-    fig = plt.figure(figsize=(8.27, 11.69), constrained_layout=False)
-    draw_case_header(fig, payload)
-    spec = fig.add_gridspec(
-        4,
-        3,
-        height_ratios=(0.95, 1.5, 1.1, 1.25),
-        hspace=0.45,
-        wspace=0.34,
-    )
-    scalar_axes = [fig.add_subplot(spec[0, i]) for i in range(3)]
-    draw_scalar_panel(
-        scalar_axes[0],
-        title="Energy",
-        ylabel=energy_label,
-        data=estimates.get("energy", {}),
-        observable="energy",
-        precision_status=_precision_status(payload),
-    )
-    draw_scalar_panel(
-        scalar_axes[1],
-        title=r"$R^2$",
-        ylabel=r2_label,
-        data=estimates.get("r2", {}),
-        observable="r2",
-        precision_status=_precision_status(payload),
-    )
-    draw_scalar_panel(
-        scalar_axes[2],
-        title=r"$R_\mathrm{rms}$",
-        ylabel=rms_label,
-        data=estimates.get("rms", {}),
-        observable="rms",
-        precision_status=_precision_status(payload),
-    )
-    density_spec = spec[1, :].subgridspec(
-        2,
-        1,
-        height_ratios=(2.2, 0.8),
-        hspace=0.14,
-    )
-    draw_density_panel(
-        fig.add_subplot(density_spec[0, 0]),
-        payload,
-        residual_ax=fig.add_subplot(density_spec[1, 0]),
-    )
-    draw_chain_panel(fig.add_subplot(spec[2, :2]), fig.add_subplot(spec[2, 2]), payload)
-    draw_fw_lag_panel(fig.add_subplot(spec[3, :]), payload)
-    paths = save_figure(fig, plot_dir / "benchmark_packet_one_page", formats)
-    plt.close(fig)
-    return paths
-
-
-def _precision_status(payload: dict[str, Any]) -> str:
-    stationarity = payload.get("stationarity", {})
-    return str(stationarity.get("precision_status", payload.get("status", "")))
-
-
-def _scalar_ylabels(payload: dict[str, Any]) -> tuple[str, str, str]:
-    if payload.get("case_parameterization") == "harmonic_oscillator_units":
-        return (
-            r"$E/(\hbar\omega)$",
-            r"$R^2/a_{\mathrm{ho}}^2$",
-            r"$R_\mathrm{rms}/a_{\mathrm{ho}}$",
-        )
-    return r"$E$", r"$R^2$", r"$R_\mathrm{rms}$"
+        axis.errorbar([0], [value], yerr=[stderr], fmt="o", label="DMC")
+        if np.isfinite(reference):
+            axis.axhline(reference, color="black", linestyle="--", label="LDA/reference")
+        axis.set(title=label, xticks=[])
+        axis.legend(fontsize=8)
+    _title(fig, payload)
+    return fig
+def _density_figure(plt: Any, payload: dict[str, Any]) -> Any:
+    fig, axes = plt.subplots(2, 1, figsize=(8.4, 5.8), sharex=True)
+    density = _mapping(_mapping(payload.get("estimates")).get("density"))
+    x, value = _vector(density.get("x")), _vector(density.get("value"))
+    lda_x, lda = _vector(density.get("lda_x")), _vector(density.get("lda_value"))
+    axes[0].plot(x, value, label="forward-walking DMC")
+    axes[0].plot(lda_x, lda, "--", color="black", label="LDA")
+    axes[0].set_ylabel(r"$n(x)$")
+    axes[0].legend(fontsize=8)
+    if x.size and lda_x.size:
+        axes[1].plot(x, value - np.interp(x, lda_x, lda))
+    axes[1].axhline(0.0, color="black", linewidth=0.7)
+    axes[1].set(xlabel=r"$x/a_{ho}$", ylabel="DMC - LDA")
+    _title(fig, payload)
+    return fig
+def _chain_figure(plt: Any, payload: dict[str, Any]) -> Any:
+    fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.5))
+    stationarity = _mapping(payload.get("stationarity"))
+    metrics = stationarity.get("metrics", stationarity.get("observables", {}))
+    rows = list(metrics.values()) if isinstance(metrics, dict) else []
+    rhat = [_number(_mapping(row).get("split_rhat")) for row in rows]
+    ess = [_number(_mapping(row).get("effective_sample_size")) for row in rows]
+    axes[0].plot(rhat, "o-")
+    axes[0].axhline(1.01, color="black", linestyle="--")
+    axes[0].set(title="Split R-hat", xlabel="observable")
+    axes[1].plot(ess, "o-")
+    axes[1].set(title="Effective sample count", xlabel="observable")
+    _title(fig, payload)
+    return fig
+def _energy_trace_figure(plt: Any, payload: dict[str, Any]) -> Any:
+    fig, axes = plt.subplots(2, 1, figsize=(8.2, 5.4), sharex=True)
+    for seed in payload.get("seed_results", []):
+        row = _mapping(seed)
+        trace = _vector(row.get("block_energies", row.get("energy_trace")))
+        if trace.size:
+            axes[0].plot(trace, alpha=0.75, label=str(row.get("seed", "")))
+            axes[1].plot(np.cumsum(trace) / np.arange(1, trace.size + 1), alpha=0.75)
+    axes[0].set(ylabel="block energy", title="Energy stationarity")
+    axes[1].set(xlabel="block", ylabel="cumulative mean")
+    if axes[0].lines:
+        axes[0].legend(fontsize=7, ncol=5)
+    _title(fig, payload)
+    return fig
+def _fw_figure(plt: Any, payload: dict[str, Any]) -> Any:
+    fig, axis = plt.subplots(figsize=(7.2, 4.0))
+    pure = _mapping(payload.get("pure_walking"))
+    for name, marker in (("r2", "o"), ("density", "s")):
+        row = _mapping(_mapping(pure.get("observables")).get(name))
+        lags = _vector(row.get("lags", row.get("lag_steps")))
+        values = _vector(row.get("lag_values", row.get("values")))
+        if lags.size and values.size == lags.size and values.ndim == 1:
+            axis.plot(lags, values, marker=marker, label=name)
+    axis.set(xlabel="forward-walking lag (steps)", ylabel="estimate", title="Lag dependence")
+    if axis.lines:
+        axis.legend()
+    _title(fig, payload)
+    return fig
+def _packet_figure(plt: Any, payload: dict[str, Any]) -> Any:
+    fig = plt.figure(figsize=(8.27, 6.0))
+    axis = fig.add_subplot(111)
+    axis.axis("off")
+    estimates = _mapping(payload.get("estimates"))
+    lines = [f"{payload.get('case_id', '')} — {payload.get('status', '')}"]
+    for key in ("energy", "r2", "rms"):
+        row = _mapping(estimates.get(key))
+        lines.append(f"{key}: {_number(row.get('value')):.8g} ± {_number(row.get('stderr')):.3g}")
+    lines.append(f"seeds: {payload.get('seeds', [])}")
+    lines.append(f"energy validation: {payload.get('energy_validation_status', '')}")
+    lines.append(f"FW validation: {payload.get('pure_fw_validation_status', '')}")
+    axis.text(0.05, 0.95, "\n".join(lines), va="top", family="monospace")
+    return fig
+def _title(fig: Any, payload: dict[str, Any]) -> None:
+    fig.suptitle(f"{payload.get('case_id', '')}  |  {payload.get('status', '')}")
+def _mapping(value: object) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+def _vector(value: object) -> np.ndarray:
+    array = np.asarray(value if value is not None else [], dtype=float)
+    return array if array.ndim == 1 else np.asarray([], dtype=float)
+def _number(value: object) -> float:
+    try:
+        return float(cast(Any, value))
+    except (TypeError, ValueError):
+        return float("nan")

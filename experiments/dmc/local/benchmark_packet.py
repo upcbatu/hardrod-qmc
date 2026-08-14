@@ -4,33 +4,17 @@ import argparse
 import sys
 from pathlib import Path
 
-import numpy as np
-
-from hrdmc.estimators.pure.forward_walking import PureWalkingConfig
-from hrdmc.io import print_run_summary, progress_requested
-from hrdmc.workflows.dmc.benchmark_packet import (
-    run_benchmark_packet_workflow,
+from hrdmc.artifacts.progress import progress_requested
+from hrdmc.artifacts.terminal import print_run_summary
+from hrdmc.estimators.forward_walking.config import PureWalkingConfig
+from hrdmc.production.benchmark.run import run_benchmark_packet_workflow
+from hrdmc.sampling.dmc.run import parse_seeds
+from hrdmc.sampling.initial_conditions import InitializationControls
+from hrdmc.system.guide_registry import (
+    load_validated_reduced_tg_guide,
 )
-from hrdmc.workflows.dmc.collective_rn import (
-    DEFAULT_COMPONENT_LOG_SCALES,
-    DEFAULT_COMPONENT_PROBABILITIES,
-    DEFAULT_PROPOSAL_FAMILY,
-    DEFAULT_TARGET_FAMILY,
-    PROPOSAL_FAMILIES,
-    TARGET_FAMILIES,
-    CollectiveRNControls,
-)
-from hrdmc.workflows.dmc.guide_validation import (
-    load_validated_contact_guide,
-)
-from hrdmc.workflows.dmc.initial_conditions import InitializationControls
-from hrdmc.workflows.dmc.trapped import (
-    DEFAULT_GUIDE_FAMILY,
-    GUIDE_FAMILIES,
-    DMCRunControls,
-    parse_case,
-    parse_seeds,
-)
+from hrdmc.system.settings import DMCRunControls, parse_case
+from hrdmc.trial.guide import DEFAULT_GUIDE_FAMILY, GUIDE_FAMILIES
 
 DEFAULT_CASE = "N8_A0.1"
 DEFAULT_LAGS = "0,10,20,30,40,50,100,200"
@@ -39,8 +23,7 @@ DEFAULT_LAGS = "0,10,20,30,40,50,100,200"
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Run one DMC benchmark packet with energy diagnostics and transported "
-            "FW observables; collective RN transport is optional."
+            "Run one DMC benchmark packet with energy diagnostics and transported FW observables."
         )
     )
     parser.add_argument(
@@ -51,25 +34,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seeds", default="1001,1002")
     parser.add_argument("--dt", type=float, default=0.00125)
     parser.add_argument(
-        "--local-step-method",
-        choices=("euler", "metropolis"),
-        default="metropolis",
-        help="Local drift-diffusion proposal used between any collective moves.",
-    )
-    parser.add_argument(
         "--drift-limiter",
         choices=("none", "umrigar"),
         default="none",
         help="Finite-timestep MALA drift limiter; branching and local energy are unchanged.",
     )
     parser.add_argument("--walkers", type=int, default=256)
-    collective = parser.add_argument_group("optional collective RN move")
-    collective.add_argument(
-        "--collective-rn",
-        action="store_true",
-        help="Add collective reconfiguration moves to the local DMC trajectory.",
-    )
-    collective.add_argument("--collective-cadence-tau", type=float, default=0.01)
     parser.add_argument("--burn-tau", type=float, default=60.0)
     parser.add_argument("--production-tau", type=float, default=120.0)
     parser.add_argument("--store-every", type=int, default=40)
@@ -102,15 +72,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--guide-validation-summary",
         type=Path,
         default=None,
-        help="Load relative_alpha and contact_beta from a validated calibration summary.",
+        help="Load relative_alpha from the validated final-matrix guide registry.",
     )
     parser.add_argument("--breathing-preburn-steps", type=int, default=1000)
     parser.add_argument("--breathing-preburn-log-step", type=float, default=0.04)
-    collective.add_argument(
-        "--proposal-family",
-        choices=PROPOSAL_FAMILIES,
-        default=DEFAULT_PROPOSAL_FAMILY,
-    )
     parser.add_argument(
         "--guide-family",
         choices=GUIDE_FAMILIES,
@@ -119,19 +84,6 @@ def build_parser() -> argparse.ArgumentParser:
             f"Importance-sampling guide family; defaults to {DEFAULT_GUIDE_FAMILY}. "
             "Omit when using --guide-validation-summary."
         ),
-    )
-    collective.add_argument(
-        "--target-family",
-        choices=TARGET_FAMILIES,
-        default=DEFAULT_TARGET_FAMILY,
-    )
-    collective.add_argument(
-        "--component-log-scales",
-        default=",".join(f"{value:g}" for value in DEFAULT_COMPONENT_LOG_SCALES),
-    )
-    collective.add_argument(
-        "--component-probabilities",
-        default=",".join(f"{value:g}" for value in DEFAULT_COMPONENT_PROBABILITIES),
     )
     parser.add_argument(
         "--ess-resample-fraction",
@@ -194,18 +146,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--pure-fw-plateau-window-lag-count", type=int, default=4)
     parser.add_argument("--pure-fw-density-plateau-window-lag-count", type=int, default=None)
-    parser.add_argument(
-        "--pure-fw-pair-max",
-        type=float,
-        default=None,
-        help="Pair-distance histogram max; defaults to 2*grid_extent.",
-    )
-    parser.add_argument("--pure-fw-pair-bins", type=int, default=240)
-    parser.add_argument(
-        "--pure-fw-k-values",
-        default="0.05,0.1,0.2,0.4,0.8,1.6",
-        help="Comma-separated k values for finite-cloud structure factor.",
-    )
     parser.add_argument("--parallel-workers", type=int, default=0)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--progress", action="store_true")
@@ -221,32 +161,20 @@ def main() -> None:
     case = parse_case(args.case)
     seeds = parse_seeds(args.seeds)
     guide_family = args.guide_family or DEFAULT_GUIDE_FAMILY
-    contact_beta: float | None = None
     guide_parameter_source = "explicit"
-    guide_parameter_source_sha256: str | None = None
-    guide_parameter_source_manifest_sha256: str | None = None
-    guide_parameter_source_identity_fingerprint: str | None = None
     if args.guide_validation_summary is not None:
         if args.relative_alpha is not None or args.guide_family is not None:
             raise ValueError(
                 "omit explicit guide parameters and --guide-family when using "
                 "--guide-validation-summary"
             )
-        validated_guide = load_validated_contact_guide(
+        validated_guide = load_validated_reduced_tg_guide(
             args.guide_validation_summary,
             case=case,
         )
         args.relative_alpha = validated_guide.relative_alpha
-        contact_beta = validated_guide.contact_beta
-        guide_family = "contact-corrected-reduced-tg"
+        guide_family = "reduced-tg"
         guide_parameter_source = str(validated_guide.summary_path)
-        guide_parameter_source_sha256 = validated_guide.summary_sha256
-        guide_parameter_source_manifest_sha256 = validated_guide.manifest_sha256
-        guide_parameter_source_identity_fingerprint = validated_guide.identity_fingerprint
-    elif guide_family == "contact-corrected-reduced-tg":
-        raise ValueError(
-            "contact-corrected-reduced-tg production requires --guide-validation-summary"
-        )
     controls = DMCRunControls(
         dt=args.dt,
         walkers=args.walkers,
@@ -256,10 +184,8 @@ def main() -> None:
         grid_extent=args.grid_extent,
         n_bins=args.n_bins,
         ess_resample_fraction=args.ess_resample_fraction,
-        local_step_method=args.local_step_method,
         drift_limiter=args.drift_limiter,
         relative_alpha=args.relative_alpha,
-        contact_beta=contact_beta,
     )
     initialization = InitializationControls(
         mode=args.initialization_mode,
@@ -267,15 +193,12 @@ def main() -> None:
         breathing_preburn_steps=args.breathing_preburn_steps,
         breathing_preburn_log_step=args.breathing_preburn_log_step,
     )
-    collective_rn = _collective_rn_controls(args)
     pure_config = PureWalkingConfig(
         lag_steps=_parse_int_tuple(args.pure_fw_lags),
         observables=_parse_str_tuple(args.pure_fw_observables),
         observable_source=args.pure_fw_observable_source,
         density_source=args.pure_fw_density_source,
         density_parity_average=args.pure_fw_density_parity_average,
-        pair_bin_edges=_pair_edges(args),
-        structure_k_values=_parse_float_array(args.pure_fw_k_values),
         min_block_count=args.pure_fw_min_block_count,
         min_walker_weight_ess=args.pure_fw_min_walker_weight_ess,
         min_source_ancestor_ess=args.pure_fw_min_source_ancestor_ess,
@@ -316,12 +239,8 @@ def main() -> None:
         ess_invalid_fraction=args.ess_invalid_fraction,
         log_weight_span_warning=args.log_weight_span_warning,
         initialization=initialization,
-        collective_rn=collective_rn,
         guide_family=guide_family,
         guide_parameter_source=guide_parameter_source,
-        guide_parameter_source_sha256=guide_parameter_source_sha256,
-        guide_parameter_source_manifest_sha256=guide_parameter_source_manifest_sha256,
-        guide_parameter_source_identity_fingerprint=(guide_parameter_source_identity_fingerprint),
     )
     print_run_summary(
         run="dmc_benchmark_packet",
@@ -331,29 +250,6 @@ def main() -> None:
         verbose_payload=result.payload,
         verbose_json=args.verbose_json,
     )
-
-
-def _parse_float_tuple(value: str) -> tuple[float, ...]:
-    values = tuple(float(item) for item in value.split(",") if item.strip())
-    if not values:
-        raise ValueError("at least one numeric value is required")
-    return values
-
-
-def _collective_rn_controls(args: argparse.Namespace) -> CollectiveRNControls | None:
-    if not args.collective_rn:
-        return None
-    return CollectiveRNControls(
-        cadence_tau=args.collective_cadence_tau,
-        proposal_family=args.proposal_family,
-        target_family=args.target_family,
-        component_log_scales=_parse_float_tuple(args.component_log_scales),
-        component_probabilities=_parse_float_tuple(args.component_probabilities),
-    )
-
-
-def _parse_float_array(value: str) -> np.ndarray:
-    return np.asarray(_parse_float_tuple(value), dtype=float)
 
 
 def _parse_int_tuple(value: str) -> tuple[int, ...]:
@@ -368,20 +264,6 @@ def _parse_str_tuple(value: str) -> tuple[str, ...]:
     if not values:
         raise ValueError("at least one observable is required")
     return values
-
-
-def _pair_edges(args: argparse.Namespace) -> np.ndarray | None:
-    observables = set(_parse_str_tuple(args.pure_fw_observables))
-    if "pair_distance_density" not in observables:
-        return None
-    pair_max = float(
-        2.0 * args.grid_extent if args.pure_fw_pair_max is None else args.pure_fw_pair_max
-    )
-    if pair_max <= 0.0:
-        raise ValueError("pure-fw-pair-max must be positive")
-    if args.pure_fw_pair_bins <= 0:
-        raise ValueError("pure-fw-pair-bins must be positive")
-    return np.linspace(0.0, pair_max, args.pure_fw_pair_bins + 1)
 
 
 if __name__ == "__main__":

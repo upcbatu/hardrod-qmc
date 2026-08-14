@@ -4,9 +4,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from hrdmc.artifacts import repo_root_from
-from hrdmc.io import print_run_summary
-from hrdmc.workflows.dmc.benchmark_packet.matrix_assembly import (
+from hrdmc.artifacts.layout import repo_root_from
+from hrdmc.artifacts.terminal import print_run_summary
+from hrdmc.production.matrix.assembly import (
     REQUIRED_CASE_ORDER,
     assemble_final_benchmark_matrix,
 )

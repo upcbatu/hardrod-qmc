@@ -1,27 +1,57 @@
 PYTHON ?= python3
+PY := PYTHONPATH=src $(PYTHON)
 
-.PHONY: check lint typecheck validate-ring validate-ring-grid validate-dmc-exact validate-dmc-trapped-stationarity clean
+.PHONY: check check-science lint typecheck deadcode structure test imports \
+        surface whitespace report-duplicates security clean
 
-check: lint typecheck
+check: lint typecheck structure deadcode imports test surface whitespace
+
+# Not in `check`: runs a short DMC case, too slow for the edit loop.
+check-science:
+	$(PY) scripts/checks/science.py
 
 lint:
 	$(PYTHON) -m ruff check
 
 typecheck:
-	PYTHONPATH=src $(PYTHON) -m pyright
+	$(PY) -m pyright
 
-validate-ring:
-	PYTHONPATH=src $(PYTHON) experiments/anchors/homogeneous_ring.py
+structure:
+	$(PYTHON) scripts/checks/structure.py
 
-validate-ring-grid:
-	PYTHONPATH=src $(PYTHON) experiments/anchors/homogeneous_ring_exact_grid.py
+# 100% only; the 60% default flags public API and dynamic dispatch.
+deadcode:
+	$(PYTHON) -m vulture src experiments --min-confidence 100 --sort-by-size
 
-validate-dmc-exact:
-	PYTHONPATH=src $(PYTHON) experiments/anchors/exact_tg_trap.py
+imports:
+	$(PY) -c "import importlib, pkgutil, hrdmc; [importlib.import_module(m.name) for m in pkgutil.walk_packages(hrdmc.__path__, 'hrdmc.')]"
 
-validate-dmc-trapped-stationarity:
-	PYTHONPATH=src $(PYTHON) experiments/dmc/local/trapped_stationarity_grid.py
+# tests/ is untracked, so this binds locally only; check-science carries reproducibility.
+test:
+	$(PY) -m pytest tests -q
+
+surface:
+	$(PYTHON) operator/audit_public_surface.py --root .
+
+whitespace:
+	git diff --check
+
+# Report-only until triaged.
+report-duplicates:
+	-$(PYTHON) -m pylint src experiments \
+	  --disable=all --enable=duplicate-code \
+	  --reports=no --score=no \
+	  --min-similarity-lines=12 \
+	  --ignore-comments=yes --ignore-docstrings=yes \
+	  --ignore-imports=yes --ignore-signatures=yes
+
+# Outside `check`: network-dependent.
+security:
+	$(PYTHON) -m pip_audit
 
 clean:
 	rm -rf .pytest_cache .ruff_cache
-	find . -type d -name __pycache__ -prune -exec rm -rf {} +
+	find src experiments tests -type d -name __pycache__ -prune -exec rm -rf {} +
+	find src experiments tests -type f -name '*.py[co]' -delete
+	find . -type d -name '*.egg-info' -prune -exec rm -rf {} +
+	find src experiments tests -depth -type d -empty -delete

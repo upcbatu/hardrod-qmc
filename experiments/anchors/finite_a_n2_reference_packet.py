@@ -5,36 +5,24 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from hrdmc.artifacts import ArtifactRoute, artifact_dir, repo_root_from
-from hrdmc.estimators.pure.forward_walking import PureWalkingConfig
-from hrdmc.io import print_run_summary, progress_requested
+from hrdmc.artifacts.layout import ArtifactRoute, artifact_dir, repo_root_from
+from hrdmc.artifacts.progress import progress_requested
+from hrdmc.artifacts.terminal import print_run_summary
+from hrdmc.estimators.forward_walking.config import PureWalkingConfig
 from hrdmc.plotting.figures.finite_a_n2_reference import (
     write_finite_a_n2_reference_plots,
 )
-from hrdmc.workflows.anchors.finite_a_n2 import (
+from hrdmc.sampling.dmc.run import dmc_progress_bar, resolve_parallel_workers
+from hrdmc.sampling.initial_conditions import InitializationControls
+from hrdmc.system.settings import DMCRunControls, TrappedCase, controls_to_dict
+from hrdmc.trial.guide import DEFAULT_GUIDE_FAMILY, GUIDE_FAMILIES
+from hrdmc.validation.finite_a_n2.case import (
     FiniteAN2ReferenceTolerances,
     summarize_finite_a_n2_reference_case,
+)
+from hrdmc.validation.finite_a_n2.outputs import (
     write_finite_a_n2_reference_artifacts,
     write_finite_a_n2_reference_manifest,
-)
-from hrdmc.workflows.dmc.collective_rn import (
-    DEFAULT_COMPONENT_LOG_SCALES,
-    DEFAULT_COMPONENT_PROBABILITIES,
-    DEFAULT_PROPOSAL_FAMILY,
-    DEFAULT_TARGET_FAMILY,
-    PROPOSAL_FAMILIES,
-    TARGET_FAMILIES,
-    CollectiveRNControls,
-)
-from hrdmc.workflows.dmc.initial_conditions import InitializationControls
-from hrdmc.workflows.dmc.trapped import (
-    DEFAULT_GUIDE_FAMILY,
-    GUIDE_FAMILIES,
-    DMCRunControls,
-    TrappedCase,
-    controls_to_dict,
-    dmc_progress_bar,
-    resolve_parallel_workers,
 )
 
 
@@ -53,14 +41,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seeds", default="1001,1002")
     parser.add_argument("--dt", type=float, default=0.00125)
     parser.add_argument("--walkers", type=int, default=256)
-    collective = parser.add_argument_group("optional collective RN move")
-    collective.add_argument("--collective-rn", action="store_true")
-    collective.add_argument("--collective-cadence-tau", type=float, default=0.01)
-    parser.add_argument(
-        "--local-step-method",
-        choices=("euler", "metropolis"),
-        default="metropolis",
-    )
     parser.add_argument("--burn-tau", type=float, default=60.0)
     parser.add_argument("--production-tau", type=float, default=240.0)
     parser.add_argument("--store-every", type=int, default=40)
@@ -91,28 +71,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--breathing-preburn-steps", type=int, default=1000)
     parser.add_argument("--breathing-preburn-log-step", type=float, default=0.04)
-    collective.add_argument(
-        "--proposal-family",
-        choices=PROPOSAL_FAMILIES,
-        default=DEFAULT_PROPOSAL_FAMILY,
-    )
     parser.add_argument(
         "--guide-family",
         choices=GUIDE_FAMILIES,
         default=DEFAULT_GUIDE_FAMILY,
-    )
-    collective.add_argument(
-        "--target-family",
-        choices=TARGET_FAMILIES,
-        default=DEFAULT_TARGET_FAMILY,
-    )
-    collective.add_argument(
-        "--component-log-scales",
-        default=_format_float_tuple(DEFAULT_COMPONENT_LOG_SCALES),
-    )
-    collective.add_argument(
-        "--component-probabilities",
-        default=_format_float_tuple(DEFAULT_COMPONENT_PROBABILITIES),
     )
     parser.add_argument("--ess-warning-fraction", type=float, default=0.20)
     parser.add_argument("--ess-invalid-fraction", type=float, default=0.10)
@@ -184,7 +146,6 @@ def main() -> None:
         store_every=args.store_every,
         grid_extent=args.grid_extent,
         n_bins=args.n_bins,
-        local_step_method=args.local_step_method,
         relative_alpha=args.relative_alpha,
     )
     seeds = _parse_ints(args.seeds)
@@ -261,17 +222,6 @@ def _build_payload(
         breathing_preburn_steps=args.breathing_preburn_steps,
         breathing_preburn_log_step=args.breathing_preburn_log_step,
     )
-    collective_rn = (
-        CollectiveRNControls(
-            cadence_tau=args.collective_cadence_tau,
-            proposal_family=args.proposal_family,
-            target_family=args.target_family,
-            component_log_scales=_parse_float_tuple(args.component_log_scales),
-            component_probabilities=_parse_float_tuple(args.component_probabilities),
-        )
-        if args.collective_rn
-        else None
-    )
     pure_config = PureWalkingConfig(
         lag_steps=_parse_int_tuple(args.pure_fw_lags),
         density_lag_steps=(
@@ -305,11 +255,7 @@ def _build_payload(
     with dmc_progress_bar(
         controls=controls,
         seed_count=len(seeds) * max(1, len(cases)),
-        label=(
-            "Finite-A N2 reference with collective RN"
-            if collective_rn is not None
-            else "Finite-A N2 reference"
-        ),
+        label="Finite-A N2 reference",
         enabled=progress_requested(args.progress),
     ) as bar:
         for case in cases:
@@ -329,7 +275,6 @@ def _build_payload(
                     ess_invalid_fraction=args.ess_invalid_fraction,
                     log_weight_span_warning=args.log_weight_span_warning,
                     initialization=initialization,
-                    collective_rn=collective_rn,
                     guide_family=args.guide_family,
                 )
             )
@@ -339,7 +284,6 @@ def _build_payload(
         else "one_or_more_reference_cases_unresolved"
     )
     return {
-        "schema_version": "finite_a_n2_reference_packet_v3",
         "status": status,
         "validation": "finite-A DMC/FW against the deterministic N=2 reference",
         "controls": controls_to_dict(controls),
@@ -351,7 +295,6 @@ def _build_payload(
         "relative_alpha": args.relative_alpha,
         "breathing_preburn_steps": args.breathing_preburn_steps,
         "breathing_preburn_log_step": args.breathing_preburn_log_step,
-        "collective_rn": (None if collective_rn is None else collective_rn.to_metadata()),
         "guide_family": args.guide_family,
         "reference_grid_points": args.reference_grid_points,
         "reference_y_max": args.reference_y_max,
@@ -414,19 +357,11 @@ def _parse_floats(value: str) -> list[float]:
     return parsed
 
 
-def _parse_float_tuple(value: str) -> tuple[float, ...]:
-    return tuple(_parse_floats(value))
-
-
 def _parse_str_tuple(value: str) -> tuple[str, ...]:
     values = tuple(item.strip() for item in value.split(",") if item.strip())
     if not values:
         raise ValueError("expected at least one string")
     return values
-
-
-def _format_float_tuple(values: tuple[float, ...]) -> str:
-    return ",".join(f"{value:g}" for value in values)
 
 
 if __name__ == "__main__":

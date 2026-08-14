@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 
-def to_jsonable(obj: Any) -> Any:  # noqa: ANN401
+def to_jsonable(obj: Any) -> Any:
     if is_dataclass(obj) and not isinstance(obj, type):
         return {field.name: to_jsonable(getattr(obj, field.name)) for field in fields(obj)}
     if isinstance(obj, dict):

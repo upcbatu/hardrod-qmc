@@ -1,1 +1,0 @@
-"""Reusable anchor-validation workflows."""

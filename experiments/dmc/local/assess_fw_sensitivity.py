@@ -4,9 +4,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from hrdmc.artifacts import repo_root_from
-from hrdmc.io import print_run_summary
-from hrdmc.workflows.dmc.fw_sensitivity import run_fw_sensitivity_workflow
+from hrdmc.artifacts.layout import repo_root_from
+from hrdmc.artifacts.terminal import print_run_summary
+from hrdmc.uncertainty.forward_walking.run import run_fw_sensitivity_workflow
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--candidate-summary",
         type=Path,
         required=True,
-        help="Candidate dmc_benchmark_packet_v3 summary.json.",
+        help="Candidate benchmark summary.json.",
     )
     parser.add_argument(
         "--energy-assessment-manifest",

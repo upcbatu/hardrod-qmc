@@ -5,42 +5,26 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from hrdmc.artifacts import ArtifactRoute, artifact_dir, repo_root_from
-from hrdmc.io import print_run_summary, progress_requested
-from hrdmc.theory.units import HO_TRAP_OMEGA
-from hrdmc.workflows.anchors.exact_validation import (
-    HomogeneousRingAnchor,
-    TrappedTGAnchor,
-    anchor_row_from_homogeneous,
+from hrdmc.artifacts.layout import ArtifactRoute, artifact_dir, repo_root_from
+from hrdmc.artifacts.progress import progress_requested
+from hrdmc.artifacts.terminal import print_run_summary
+from hrdmc.sampling.dmc.run import dmc_progress_bar, resolve_parallel_workers
+from hrdmc.system.settings import DMCRunControls, controls_to_dict
+from hrdmc.system.units import HO_TRAP_OMEGA
+from hrdmc.validation.tonks_girardeau.models import TrappedTGAnchor
+from hrdmc.validation.tonks_girardeau.outputs import (
     anchor_row_from_trapped,
-    run_homogeneous_ring_anchor,
-    run_trapped_tg_anchor,
     write_exact_validation_manifest,
     write_packet_artifacts,
 )
-from hrdmc.workflows.dmc.trapped import (
-    DMCRunControls,
-    controls_to_dict,
-    dmc_progress_bar,
-    resolve_parallel_workers,
-)
+from hrdmc.validation.tonks_girardeau.run import run_trapped_tg_anchor
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Run exact trapped and homogeneous validation cases."
-    )
+    parser = argparse.ArgumentParser(description="Run exact trapped TG validation cases.")
     parser.add_argument("--trapped-n-values", default="2,4")
-    parser.add_argument("--homogeneous-n-values", default="4,8")
-    parser.add_argument("--homogeneous-eta-values", default="0.1,0.5")
-    parser.add_argument("--rod-length", type=float, default=0.5)
     parser.add_argument("--seeds", default="301,302")
     parser.add_argument("--dt", type=float, default=0.00125)
-    parser.add_argument(
-        "--local-step-method",
-        choices=("euler", "metropolis"),
-        default="metropolis",
-    )
     parser.add_argument("--walkers", type=int, default=256)
     parser.add_argument(
         "--relative-alpha",
@@ -66,9 +50,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--parallel-workers", type=int, default=0)
     parser.add_argument("--energy-tolerance", type=float, default=1e-8)
-    parser.add_argument("--homogeneous-samples", type=int, default=6)
-    parser.add_argument("--homogeneous-tolerance", type=float, default=1e-7)
-    parser.add_argument("--homogeneous-seed", type=int, default=20260511)
     parser.add_argument("--pure-fw-lags", default="0,10,20,30")
     parser.add_argument("--pure-fw-density-lags", default=None)
     parser.add_argument("--pure-fw-observables", default="r2,density")
@@ -127,22 +108,16 @@ def main() -> None:
         store_every=args.store_every,
         grid_extent=args.grid_extent,
         n_bins=args.n_bins,
-        local_step_method=args.local_step_method,
         relative_alpha=args.relative_alpha,
     )
     seeds = _parse_ints(args.seeds)
     trapped_anchors = _trapped_anchors(args.trapped_n_values)
-    homogeneous_anchors = _homogeneous_anchors(
-        args.homogeneous_n_values,
-        args.homogeneous_eta_values,
-    )
     requested_workers = resolve_parallel_workers(len(seeds), args.parallel_workers)
     payload = _build_payload(
         args=args,
         controls=controls,
         seeds=seeds,
         trapped_anchors=trapped_anchors,
-        homogeneous_anchors=homogeneous_anchors,
         requested_workers=requested_workers,
     )
     output_dir: Path | None = None
@@ -167,7 +142,6 @@ def main() -> None:
         summary={
             "anchor_count": len(payload["anchor_table"]),
             "trapped_anchor_count": len(trapped_anchors),
-            "homogeneous_anchor_count": len(homogeneous_anchors),
         },
         artifacts={
             "summary": None if output_dir is None else str(output_dir / "summary.json"),
@@ -186,7 +160,6 @@ def _build_payload(
     controls: DMCRunControls,
     seeds: list[int],
     trapped_anchors: list[TrappedTGAnchor],
-    homogeneous_anchors: list[HomogeneousRingAnchor],
     requested_workers: int,
 ) -> dict[str, Any]:
     trapped_payloads: list[dict[str, Any]] = []
@@ -232,32 +205,19 @@ def _build_payload(
             )
             trapped_payloads.append(payload)
             trapped_rows.append(anchor_row_from_trapped(payload))
-    homogeneous_payloads = [
-        run_homogeneous_ring_anchor(
-            anchor,
-            rod_length=args.rod_length,
-            samples_per_case=args.homogeneous_samples,
-            seed=args.homogeneous_seed + index,
-            tolerance=args.homogeneous_tolerance,
-        )
-        for index, anchor in enumerate(homogeneous_anchors)
-    ]
-    homogeneous_rows = [anchor_row_from_homogeneous(row) for row in homogeneous_payloads]
-    anchor_table = [*trapped_rows, *homogeneous_rows]
+    anchor_table = trapped_rows
     status = (
         "accepted"
         if all(bool(row["accepted"]) for row in anchor_table)
         else "one_or_more_exact_references_unresolved"
     )
     return {
-        "schema_version": "dmc_exact_validation_packet_v4",
         "status": status,
-        "validation": "exact trapped TG and homogeneous hard-rod cases",
+        "validation": "exact trapped TG cases",
         "controls": controls_to_dict(controls),
         "seeds": seeds,
         "parallel_workers_requested": requested_workers,
         "trapped_tg_anchors": trapped_payloads,
-        "homogeneous_ring_anchors": homogeneous_payloads,
         "anchor_table": anchor_table,
     }
 
@@ -266,28 +226,10 @@ def _trapped_anchors(n_values: str) -> list[TrappedTGAnchor]:
     return [TrappedTGAnchor(n_particles=n, omega=HO_TRAP_OMEGA) for n in _parse_ints(n_values)]
 
 
-def _homogeneous_anchors(
-    n_values: str,
-    eta_values: str,
-) -> list[HomogeneousRingAnchor]:
-    return [
-        HomogeneousRingAnchor(n_particles=n, packing_fraction=eta)
-        for n in _parse_ints(n_values)
-        for eta in _parse_floats(eta_values)
-    ]
-
-
 def _parse_ints(value: str) -> list[int]:
     parsed = [int(item.strip()) for item in value.split(",") if item.strip()]
     if not parsed:
         raise ValueError("expected at least one integer")
-    return parsed
-
-
-def _parse_floats(value: str) -> list[float]:
-    parsed = [float(item.strip()) for item in value.split(",") if item.strip()]
-    if not parsed:
-        raise ValueError("expected at least one float")
     return parsed
 
 

@@ -4,9 +4,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from hrdmc.artifacts import repo_root_from
-from hrdmc.io import print_run_summary
-from hrdmc.workflows.dmc.population_systematics import (
+from hrdmc.artifacts.layout import repo_root_from
+from hrdmc.artifacts.terminal import print_run_summary
+from hrdmc.uncertainty.population import (
     FIXED_ENERGY_REPORTING_RESOLUTION,
     run_population_systematics_workflow,
 )

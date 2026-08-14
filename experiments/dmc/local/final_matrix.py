@@ -3,9 +3,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from hrdmc.artifacts import repo_root_from
-from hrdmc.io import print_run_summary
-from hrdmc.workflows.dmc.final_matrix import (
+from hrdmc.artifacts.layout import repo_root_from
+from hrdmc.artifacts.terminal import print_run_summary
+from hrdmc.production.matrix.final_matrix import (
     DEFAULT_CASES,
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_PLATEAU_EQUIVALENCE_CONFIDENCE_LEVEL,
@@ -79,8 +79,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help=(
-            "Root containing <case>/validation/summary.json artifacts for every "
-            "requested finite-rod case."
+            "Optional override root containing <case>/validation/summary.json for "
+            "every finite-rod case; otherwise use the tracked thesis guide registry."
         ),
     )
     parser.add_argument("--dry-run", action="store_true")

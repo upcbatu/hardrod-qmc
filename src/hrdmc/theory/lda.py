@@ -1,14 +1,105 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
 
-from hrdmc.theory.hard_rods import (
-    hard_rod_energy_density,
-    invert_hard_rod_chemical_potential,
-)
+
+def _validate_density(density: float, rod_length: float) -> None:
+    if density < 0:
+        raise ValueError("density must be non-negative")
+    if rod_length < 0:
+        raise ValueError("rod_length must be non-negative")
+    if density * rod_length >= 1.0:
+        raise ValueError("packing fraction density * rod_length must be < 1")
+
+
+def excluded_length(n_particles: int, length: float, rod_length: float) -> float:
+    """Return the free ring length after removing the hard-rod excluded volume."""
+    if n_particles <= 0:
+        raise ValueError("n_particles must be positive")
+    if length <= 0:
+        raise ValueError("length must be positive")
+    if rod_length < 0:
+        raise ValueError("rod_length must be non-negative")
+    reduced_length = length - n_particles * rod_length
+    if reduced_length <= 0:
+        raise ValueError("excluded length N * a must be smaller than L")
+    return float(reduced_length)
+
+
+def hard_rod_finite_ring_energy_per_particle(
+    n_particles: int,
+    length: float,
+    rod_length: float,
+) -> float:
+    """Finite-N homogeneous ring benchmark energy in units hbar^2/(m)=1."""
+    if n_particles < 2:
+        raise ValueError("n_particles must be at least 2")
+    free_length = excluded_length(n_particles, length, rod_length)
+    quantum_numbers = np.arange(n_particles, dtype=float) - (n_particles - 1) / 2.0
+    k = 2.0 * np.pi * quantum_numbers / free_length
+    return float(0.5 * np.sum(k**2) / n_particles)
+
+
+def hard_rod_energy_per_particle(density: float, rod_length: float) -> float:
+    """Thermodynamic homogeneous hard-rod EOS in units hbar^2/(m)=1."""
+    _validate_density(density, rod_length)
+    if density == 0.0:
+        return 0.0
+    return float(np.pi**2 * density**2 / (6.0 * (1.0 - density * rod_length) ** 2))
+
+
+def hard_rod_energy_density(density: float, rod_length: float) -> float:
+    """Homogeneous energy density epsilon(rho)=rho e(rho)."""
+    return float(density * hard_rod_energy_per_particle(density, rod_length))
+
+
+def hard_rod_chemical_potential(density: float, rod_length: float) -> float:
+    """Chemical potential d epsilon_HR / d rho for the homogeneous hard-rod EOS."""
+    _validate_density(density, rod_length)
+    if density == 0.0:
+        return 0.0
+    numerator = np.pi**2 * density**2 * (3.0 - rod_length * density)
+    denominator = 6.0 * (1.0 - rod_length * density) ** 3
+    return float(numerator / denominator)
+
+
+def invert_hard_rod_chemical_potential(
+    chemical_potential: float,
+    rod_length: float,
+    *,
+    tolerance: float = 1e-12,
+    max_iterations: int = 200,
+) -> float:
+    """Invert mu_HR(rho) for rho by monotone bisection."""
+    if chemical_potential < 0:
+        raise ValueError("chemical_potential must be non-negative")
+    if rod_length < 0:
+        raise ValueError("rod_length must be non-negative")
+    if tolerance <= 0:
+        raise ValueError("tolerance must be positive")
+    if max_iterations <= 0:
+        raise ValueError("max_iterations must be positive")
+    if chemical_potential == 0.0:
+        return 0.0
+    if rod_length == 0.0:
+        return float(np.sqrt(2.0 * chemical_potential) / np.pi)
+    low = 0.0
+    high = (1.0 / rod_length) * (1.0 - 1e-14)
+    for _ in range(max_iterations):
+        mid = 0.5 * (low + high)
+        mu_mid = hard_rod_chemical_potential(mid, rod_length)
+        if abs(mu_mid - chemical_potential) <= tolerance * max(1.0, chemical_potential):
+            return float(mid)
+        if mu_mid < chemical_potential:
+            low = mid
+        else:
+            high = mid
+    return float(0.5 * (low + high))
+
 
 FloatArray = NDArray[np.float64]
 
@@ -23,21 +114,11 @@ class LDADensityProfile:
     integrated_particles: float
 
 
-def hard_rod_lda_density_from_local_mu(
+def _hard_rod_lda_density_from_local_mu(
     local_mu: float | FloatArray,
     rod_length: float,
 ) -> float | FloatArray:
-    """Invert the local hard-rod LDA equation in harmonic-oscillator units.
-
-    The trapped LDA equation solved by this module is
-
-        local_mu = mu_HR(n)
-
-    where `local_mu = mu_0 - V(x)` and `mu_HR` is the homogeneous hard-rod
-    chemical potential in the same physical unit convention as the trapped
-    DMC engine.
-    """
-
+    """Invert the local hard-rod LDA equation in harmonic-oscillator units."""
     scalar_input = np.isscalar(local_mu)
     values = np.atleast_1d(np.asarray(local_mu, dtype=float))
     if rod_length < 0.0:
@@ -49,79 +130,6 @@ def hard_rod_lda_density_from_local_mu(
     densities[positive] = [
         invert_hard_rod_chemical_potential(float(mu), rod_length) for mu in values[positive]
     ]
-    if scalar_input:
-        return float(densities[0])
-    return densities
-
-
-def hard_rod_lda_density_from_local_mu_cubic(
-    local_mu: float | FloatArray,
-    rod_length: float,
-) -> float | FloatArray:
-    """Solve the same local LDA equation through its explicit cubic form.
-
-    For `a = rod_length > 0`, set
-
-        y = a n / (1 - a n).
-
-    Then the hard-rod LDA equation becomes
-
-        2 y^3 + 3 y^2 = 6 a^2 local_mu / pi^2.
-
-    The physical density is recovered as `n = y / (a * (1 + y))`. This helper is
-    kept as an analytic cross-check of the production bisection inversion, not
-    as a replacement for it.
-    """
-
-    scalar_input = np.isscalar(local_mu)
-    values = np.atleast_1d(np.asarray(local_mu, dtype=float))
-    if rod_length < 0.0:
-        raise ValueError("rod_length must be non-negative")
-    if np.any(values < 0.0):
-        raise ValueError("local_mu must be non-negative")
-    if rod_length == 0.0:
-        densities = np.sqrt(2.0 * values) / np.pi
-        return float(densities[0]) if scalar_input else densities
-
-    densities = np.zeros_like(values, dtype=float)
-    positive_indices = np.flatnonzero(values > 0.0)
-    for index in positive_indices:
-        scaled_mu = 6.0 * rod_length * rod_length * float(values[index]) / (np.pi**2)
-        roots = np.roots([2.0, 3.0, 0.0, -scaled_mu])
-        real_roots = roots[np.isclose(roots.imag, 0.0, atol=1e-10)].real
-        candidates = real_roots[real_roots >= 0.0]
-        if candidates.size == 0:
-            raise RuntimeError("failed to find physical hard-rod LDA cubic root")
-        y = float(np.min(candidates))
-        densities[index] = y / (rod_length * (1.0 + y))
-    if scalar_input:
-        return float(densities[0])
-    return densities
-
-
-def hard_rod_lda_density_small_a_expansion(
-    local_mu: float | FloatArray,
-    rod_length: float,
-) -> float | FloatArray:
-    """Return the fixed-chemical-potential small-`a` LDA density expansion.
-
-    In harmonic-oscillator units,
-
-        n(local_mu, a) = sqrt(2 local_mu)/pi
-            - 8 a local_mu / (3 pi^2) + O(a^2).
-
-    The helper is a diagnostic expression for the analytic small-rod limit;
-    production profiles continue to use the exact local inversion above.
-    """
-
-    scalar_input = np.isscalar(local_mu)
-    values = np.atleast_1d(np.asarray(local_mu, dtype=float))
-    if rod_length < 0.0:
-        raise ValueError("rod_length must be non-negative")
-    if np.any(values < 0.0):
-        raise ValueError("local_mu must be non-negative")
-    densities = np.sqrt(2.0 * values) / np.pi - (8.0 * rod_length * values) / (3.0 * np.pi**2)
-    densities = np.maximum(densities, 0.0)
     if scalar_input:
         return float(densities[0])
     return densities
@@ -155,23 +163,12 @@ def lda_density_profile(
     """Solve the excluded-volume LDA normalization on a fixed spatial grid."""
     x = np.asarray(x, dtype=float)
     potential_x = np.asarray(potential_x, dtype=float)
-    _validate_grid(x, potential_x)
-    if n_particles <= 0:
-        raise ValueError("n_particles must be positive")
-    if rod_length < 0:
-        raise ValueError("rod_length must be non-negative")
-    if boundary_density_tolerance < 0:
-        raise ValueError("boundary_density_tolerance must be non-negative")
-    if rod_length > 0:
-        max_particles = (float(x[-1]) - float(x[0])) / rod_length
-        if n_particles >= max_particles:
-            raise ValueError("grid is too small for the requested hard-rod excluded volume")
-
+    _validate_lda_request(x, potential_x, n_particles, rod_length, boundary_density_tolerance)
     v_min = float(np.min(potential_x))
 
     def density_for_mu(global_mu: float) -> FloatArray:
         local_mu = np.maximum(global_mu - potential_x, 0.0)
-        return np.asarray(hard_rod_lda_density_from_local_mu(local_mu, rod_length), dtype=float)
+        return np.asarray(_hard_rod_lda_density_from_local_mu(local_mu, rod_length), dtype=float)
 
     def build_profile(global_mu: float, n_x: FloatArray, count: float) -> LDADensityProfile:
         if max(float(n_x[0]), float(n_x[-1])) > boundary_density_tolerance:
@@ -187,29 +184,79 @@ def lda_density_profile(
             integrated_particles=float(count),
         )
 
-    low = v_min
-    high = max(v_min + 1.0, float(np.max(potential_x)) + 1.0)
+    low, high = _bracket_chemical_potential(
+        density_for_mu, x, n_particles, v_min, float(np.max(potential_x)), max_iterations
+    )
+    global_mu, n_x, count = _bisect_chemical_potential(
+        density_for_mu,
+        x,
+        n_particles,
+        low,
+        high,
+        tolerance,
+        max_iterations,
+    )
+    return build_profile(global_mu, n_x, count)
+
+
+def _validate_lda_request(
+    x: FloatArray,
+    potential_x: FloatArray,
+    n_particles: float,
+    rod_length: float,
+    boundary_density_tolerance: float,
+) -> None:
+    _validate_grid(x, potential_x)
+    if n_particles <= 0:
+        raise ValueError("n_particles must be positive")
+    if rod_length < 0:
+        raise ValueError("rod_length must be non-negative")
+    if boundary_density_tolerance < 0:
+        raise ValueError("boundary_density_tolerance must be non-negative")
+    if rod_length > 0 and n_particles >= (float(x[-1]) - float(x[0])) / rod_length:
+        raise ValueError("grid is too small for the requested hard-rod excluded volume")
+
+
+def _bracket_chemical_potential(
+    density_for_mu: Callable[[float], FloatArray],
+    x: FloatArray,
+    n_particles: float,
+    v_min: float,
+    v_max: float,
+    max_iterations: int,
+) -> tuple[float, float]:
+    high = max(v_min + 1.0, v_max + 1.0)
     for _ in range(max_iterations):
         if _integrate(x, density_for_mu(high)) >= n_particles:
-            break
+            return v_min, high
         high = v_min + 2.0 * (high - v_min)
-    else:
-        raise RuntimeError("failed to bracket LDA chemical potential")
+    raise RuntimeError("failed to bracket LDA chemical potential")
 
+
+def _bisect_chemical_potential(
+    density_for_mu: Callable[[float], FloatArray],
+    x: FloatArray,
+    n_particles: float,
+    low: float,
+    high: float,
+    tolerance: float,
+    max_iterations: int,
+) -> tuple[float, FloatArray, float]:
+    n_mid = density_for_mu(0.5 * (low + high))
+    count_mid = _integrate(x, n_mid)
     for _ in range(max_iterations):
         mid = 0.5 * (low + high)
         n_mid = density_for_mu(mid)
         count_mid = _integrate(x, n_mid)
         if abs(count_mid - n_particles) <= tolerance * max(1.0, n_particles):
-            return build_profile(mid, n_mid, count_mid)
+            return mid, n_mid, count_mid
         if count_mid < n_particles:
             low = mid
         else:
             high = mid
-
-    global_mu = 0.5 * (low + high)
-    n_x = density_for_mu(global_mu)
-    return build_profile(global_mu, n_x, _integrate(x, n_x))
+    mid = 0.5 * (low + high)
+    n_mid = density_for_mu(mid)
+    return mid, n_mid, _integrate(x, n_mid)
 
 
 def lda_total_energy(profile: LDADensityProfile, rod_length: float) -> float:

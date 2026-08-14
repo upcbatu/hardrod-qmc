@@ -5,27 +5,22 @@ from pathlib import Path
 from typing import Any
 
 
-def load_pyplot(output_dir: str | Path | None = None) -> Any:  # noqa: ANN401
+def load_pyplot(output_dir: str | Path | None = None) -> Any:
     """Load Matplotlib with a non-interactive backend and stable rcParams."""
-
     if output_dir is not None:
         os.environ.setdefault("MPLCONFIGDIR", str(Path(output_dir) / "mplconfig"))
     try:
         import matplotlib
-
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except (ModuleNotFoundError, ImportError, OSError) as exc:
         raise RuntimeError(
             "matplotlib is unavailable for plotting in the current environment"
         ) from exc
-    apply_thesis_style(plt)
+    _apply_thesis_style(plt)
     return plt
-
-
-def apply_thesis_style(plt: Any) -> None:  # noqa: ANN401
+def _apply_thesis_style(plt: Any) -> None:
     """Apply a compact static style for thesis and artifact figures."""
-
     plt.rcParams.update(
         {
             "figure.dpi": 140,
@@ -57,15 +52,12 @@ def apply_thesis_style(plt: Any) -> None:  # noqa: ANN401
             "figure.constrained_layout.use": True,
         }
     )
-
-
 def save_figure(
-    fig: Any,  # noqa: ANN401
+    fig: Any,
     base_path: str | Path,
     formats: tuple[str, ...],
 ) -> list[Path]:
     """Save a figure to every requested format and close it."""
-
     base = Path(base_path)
     base.parent.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []

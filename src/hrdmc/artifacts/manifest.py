@@ -1,21 +1,18 @@
 from __future__ import annotations
 
+import csv
 import hashlib
-import importlib.metadata
+import io
 import json
-import platform
-import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from hrdmc.artifacts.schema import to_jsonable
 
-IMPLEMENTATION_SOURCE_DIRECTORIES = ("src/hrdmc", "experiments")
-IMPLEMENTATION_SOURCE_FILES = ("pyproject.toml",)
-RUNTIME_DISTRIBUTIONS = ("numpy", "scipy", "numba", "matplotlib", "tqdm")
+IMPLEMENTATION_PATHS = ("src/hrdmc", "experiments", "pyproject.toml")
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -24,11 +21,11 @@ def ensure_dir(path: str | Path) -> Path:
     return p
 
 
-def utc_timestamp() -> str:
+def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def canonical_json_bytes(payload: Any) -> bytes:
+def _canonical_json_bytes(payload: Any) -> bytes:
     return json.dumps(
         to_jsonable(payload),
         sort_keys=True,
@@ -37,8 +34,8 @@ def canonical_json_bytes(payload: Any) -> bytes:
     ).encode("utf-8")
 
 
-def payload_sha256(payload: Any) -> str:
-    return hashlib.sha256(canonical_json_bytes(payload)).hexdigest()
+def _payload_sha256(payload: Any) -> str:
+    return hashlib.sha256(_canonical_json_bytes(payload)).hexdigest()
 
 
 def file_sha256(path: str | Path) -> str:
@@ -64,121 +61,76 @@ def write_json(path: str | Path, payload: dict[str, Any]) -> None:
     write_json_atomic(path, payload)
 
 
-def build_run_provenance(
-    command: list[str] | None = None,
+def csv_text(
+    rows: Iterable[dict[str, Any]],
     *,
-    source_root: str | Path | None = None,
-) -> dict[str, Any]:
-    """Describe the runtime and bind the run to the sampled source tree."""
+    exclude: Sequence[str] = (),
+    fieldnames: Sequence[str] | None = None,
+) -> str:
+    values = list(rows)
+    excluded = set(exclude)
+    fields = (
+        list(fieldnames)
+        if fieldnames is not None
+        else sorted({key for row in values for key in row if key not in excluded}) or ["empty"]
+    )
+    stream = io.StringIO(newline="")
+    writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore", lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(values)
+    return stream.getvalue()
 
-    return {
-        "created_utc": utc_timestamp(),
-        "python_version": sys.version.split()[0],
-        "platform": platform.platform(),
-        "dependencies": _runtime_dependencies(),
-        "command": command,
-        "implementation": implementation_identity(source_root),
-    }
+
+def write_csv(
+    path: str | Path,
+    rows: Iterable[dict[str, Any]],
+    *,
+    exclude: Sequence[str] = (),
+    fieldnames: Sequence[str] | None = None,
+) -> Path:
+    target = Path(path)
+    target.write_text(csv_text(rows, exclude=exclude, fieldnames=fieldnames), encoding="utf-8")
+    return target
 
 
-def implementation_identity(source_root: str | Path | None = None) -> dict[str, Any]:
-    """Return a content identity for scientific source files, including dirty trees."""
+def config_fingerprint(config: Any) -> str:
+    return _payload_sha256(config)
 
-    root = _resolve_source_root(source_root)
-    if root is None:
-        return {"status": "source_root_unavailable"}
-    files = _implementation_source_paths(root)
-    if not files:
-        return {"status": "source_files_unavailable"}
 
+def _implementation_identity(source_root: str | Path | None = None) -> dict[str, Any]:
+    """Hash every tracked scientific source byte, including dirty-tree edits."""
+    root = _source_root(source_root)
+    files: list[Path] = []
+    for relative in IMPLEMENTATION_PATHS:
+        path = root / relative
+        files.extend(path.rglob("*.py") if path.is_dir() else (path,))
+    files = sorted((path for path in files if path.is_file()), key=lambda p: str(p))
     digest = hashlib.sha256()
     for path in files:
-        relative = path.relative_to(root).as_posix().encode("utf-8")
-        digest.update(len(relative).to_bytes(8, byteorder="big"))
-        digest.update(relative)
+        relative = path.relative_to(root).as_posix().encode()
         data = path.read_bytes()
-        digest.update(len(data).to_bytes(8, byteorder="big"))
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        digest.update(len(data).to_bytes(8, "big"))
         digest.update(data)
-
-    identity: dict[str, Any] = {
+    return {
         "status": "identified",
         "source_tree_sha256": digest.hexdigest(),
         "source_file_count": len(files),
     }
-    identity.update(_git_identity(root))
-    return identity
 
 
-def _runtime_dependencies() -> dict[str, str]:
-    versions: dict[str, str] = {}
-    for distribution in RUNTIME_DISTRIBUTIONS:
-        try:
-            versions[distribution] = importlib.metadata.version(distribution)
-        except importlib.metadata.PackageNotFoundError:
-            versions[distribution] = "not_installed"
-    return versions
-
-
-def _resolve_source_root(source_root: str | Path | None) -> Path | None:
+def _source_root(source_root: str | Path | None) -> Path:
     if source_root is not None:
-        candidate = Path(source_root).resolve()
-        if not (candidate / "pyproject.toml").is_file():
-            raise ValueError(f"source_root is not a project root: {candidate}")
-        return candidate
+        root = Path(source_root).resolve()
+        if not (root / "pyproject.toml").is_file():
+            raise ValueError(f"source_root is not a project root: {root}")
+        return root
     for start in (Path.cwd(), Path(__file__).resolve()):
         for candidate in (start, *start.parents):
             if (candidate / "pyproject.toml").is_file():
                 return candidate
-    return None
-
-
-def _implementation_source_paths(root: Path) -> list[Path]:
-    paths = [
-        root / relative for relative in IMPLEMENTATION_SOURCE_FILES if (root / relative).is_file()
-    ]
-    for relative in IMPLEMENTATION_SOURCE_DIRECTORIES:
-        directory = root / relative
-        if directory.is_dir():
-            paths.extend(path for path in directory.rglob("*.py") if path.is_file())
-    return sorted(set(paths), key=lambda path: path.relative_to(root).as_posix())
-
-
-def _git_identity(root: Path) -> dict[str, Any]:
-    try:
-        revision = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--verify", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=2.0,
-        ).stdout.strip()
-        status = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(root),
-                "status",
-                "--porcelain",
-                "--untracked-files=all",
-                "--",
-                *IMPLEMENTATION_SOURCE_DIRECTORIES,
-                *IMPLEMENTATION_SOURCE_FILES,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=2.0,
-        ).stdout
-    except (OSError, subprocess.SubprocessError):
-        return {"git_status": "unavailable"}
-    return {
-        "git_status": "clean" if not status.strip() else "dirty",
-        "git_revision": revision,
-    }
-
-
-def config_fingerprint(config: Any) -> str:
-    return payload_sha256(config)
+    raise ValueError("project source root is unavailable")
 
 
 def _artifact_entry(root: Path, path: Path) -> dict[str, Any]:
@@ -189,45 +141,16 @@ def _artifact_entry(root: Path, path: Path) -> dict[str, Any]:
     }
 
 
-def _bundle_payload_v1(manifest: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "schema_version": manifest["schema_version"],
-        "run_id": manifest["run_id"],
-        "config_fingerprint": manifest["config_fingerprint"],
-        "artifacts": manifest["artifacts"],
-    }
-
-
-def _bundle_payload_v2(manifest: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "schema_version": manifest["schema_version"],
-        "result_schema_version": manifest["result_schema_version"],
-        "run_name": manifest["run_name"],
-        "run_id": manifest["run_id"],
-        "status": manifest["status"],
-        "config_fingerprint": manifest["config_fingerprint"],
-        "config": manifest["config"],
-        "provenance": manifest["provenance"],
-        "artifacts": manifest["artifacts"],
-    }
-
-
 def write_run_manifest(
     output_dir: str | Path,
     *,
     run_name: str,
     config: dict[str, Any],
     artifacts: Sequence[str | Path],
-    schema_version: str,
-    provenance: dict[str, Any] | None = None,
     status: str = "completed",
 ) -> Path:
     root = ensure_dir(output_dir)
     fingerprint = config_fingerprint(config)
-    manifest_provenance = _merge_run_provenance(provenance)
-    provenance_errors = _provenance_identity_errors(manifest_provenance)
-    if provenance_errors:
-        raise ValueError("run provenance is incomplete: " + "; ".join(provenance_errors))
     artifact_paths = [Path(path) for path in artifacts]
     missing = [path for path in artifact_paths if not path.is_file()]
     if missing:
@@ -238,68 +161,18 @@ def write_run_manifest(
     if len({path.resolve() for path in artifact_paths}) != len(artifact_paths):
         raise ValueError("run manifest artifacts must be unique")
     manifest: dict[str, Any] = {
-        "schema_version": "hrdmc_run_manifest_v2",
-        "result_schema_version": schema_version,
         "run_name": run_name,
-        "run_id": f"{run_name}_{utc_timestamp()}_{fingerprint[:12]}",
+        "run_id": f"{run_name}_{_utc_timestamp()}_{fingerprint[:12]}",
         "status": status,
         "config_fingerprint": fingerprint,
         "config": to_jsonable(config),
-        "provenance": manifest_provenance,
+        "provenance": {
+            "python_version": sys.version.split()[0],
+            "implementation": _implementation_identity(),
+        },
         "artifacts": [_artifact_entry(root, path) for path in artifact_paths],
     }
-    manifest["bundle_sha256"] = payload_sha256(_bundle_payload_v2(manifest))
     return write_json_atomic(root / "run_manifest.json", manifest)
-
-
-def _merge_run_provenance(provenance: dict[str, Any] | None) -> dict[str, Any]:
-    """Keep mandatory runtime/source identity when callers add provenance fields."""
-
-    merged = build_run_provenance()
-    if provenance is None:
-        return merged
-    supplied = to_jsonable(provenance)
-    if not isinstance(supplied, dict):
-        raise TypeError("run provenance must be a mapping")
-    for key, value in supplied.items():
-        if key in {"dependencies", "implementation"}:
-            current = merged.get(key)
-            if isinstance(current, dict) and isinstance(value, dict):
-                merged[key] = {**current, **value}
-                continue
-        merged[key] = value
-    return merged
-
-
-def _provenance_identity_errors(provenance: Any) -> list[str]:
-    if not isinstance(provenance, dict):
-        return ["provenance is not a mapping"]
-    errors: list[str] = []
-    implementation = provenance.get("implementation")
-    source_digest = (
-        implementation.get("source_tree_sha256") if isinstance(implementation, dict) else None
-    )
-    if (
-        not isinstance(source_digest, str)
-        or len(source_digest) != 64
-        or any(character not in "0123456789abcdef" for character in source_digest)
-    ):
-        errors.append("implementation source-tree SHA-256 is missing")
-    dependencies = provenance.get("dependencies")
-    if (
-        not isinstance(dependencies, dict)
-        or not dependencies
-        or not all(
-            isinstance(name, str) and isinstance(version, str)
-            for name, version in dependencies.items()
-        )
-    ):
-        errors.append("runtime dependency versions are missing")
-    if not isinstance(provenance.get("python_version"), str) or not provenance["python_version"]:
-        errors.append("Python version is missing")
-    if not isinstance(provenance.get("platform"), str) or not provenance["platform"]:
-        errors.append("platform identity is missing")
-    return errors
 
 
 def verify_run_manifest(manifest_path: str | Path) -> tuple[bool, list[str]]:
@@ -331,21 +204,6 @@ def verify_run_manifest(manifest_path: str | Path) -> tuple[bool, list[str]]:
             errors.append(f"size mismatch: {relative_text}")
         if file_sha256(artifact) != entry.get("sha256"):
             errors.append(f"sha256 mismatch: {relative_text}")
-    schema = manifest.get("schema_version")
-    try:
-        if schema == "hrdmc_run_manifest_v1":
-            expected = payload_sha256(_bundle_payload_v1(manifest))
-        elif schema == "hrdmc_run_manifest_v2":
-            errors.extend(_provenance_identity_errors(manifest.get("provenance")))
-            expected = payload_sha256(_bundle_payload_v2(manifest))
-        else:
-            errors.append(f"unsupported manifest schema: {schema}")
-            expected = None
-    except KeyError as exc:
-        errors.append(f"manifest is missing required field: {exc.args[0]}")
-        expected = None
-    if expected is not None and manifest.get("bundle_sha256") != expected:
-        errors.append("bundle sha256 mismatch")
     return not errors, errors
 
 
@@ -355,15 +213,7 @@ def load_manifest_bound_artifact(
     *,
     allowed_unrelated_artifact_roots: Sequence[str] = (),
 ) -> tuple[dict[str, Any], tuple[str, ...]]:
-    """Load a manifest after verifying one selected artifact exactly.
-
-    Structural manifest failures and any failure involving the selected artifact
-    remain fatal.  A workflow may explicitly tolerate drift under named,
-    unrelated artifact roots (for example regenerated presentation plots); those
-    failures are returned so that the derived artifact can retain them as
-    provenance warnings.
-    """
-
+    """Load a manifest after verifying one selected artifact exactly."""
     path = Path(manifest_path).resolve()
     root = path.parent
     selected = Path(artifact_path).resolve()
@@ -371,7 +221,6 @@ def load_manifest_bound_artifact(
         relative_selected = selected.relative_to(root).as_posix()
     except ValueError as exc:
         raise ValueError("selected artifact must be inside its run-manifest directory") from exc
-
     manifest = json.loads(path.read_text(encoding="utf-8"))
     entries_value = manifest.get("artifacts")
     if not isinstance(entries_value, list):
@@ -387,18 +236,7 @@ def load_manifest_bound_artifact(
         raise ValueError(f"selected artifact size does not match its manifest: {selected}")
     if entry.get("sha256") != file_sha256(selected):
         raise ValueError(f"selected artifact digest does not match its manifest: {selected}")
-
-    allowed_roots = set(allowed_unrelated_artifact_roots)
-    if any(
-        not isinstance(value, str)
-        or not value
-        or Path(value).is_absolute()
-        or len(Path(value).parts) != 1
-        or value in {".", ".."}
-        for value in allowed_roots
-    ):
-        raise ValueError("allowed unrelated artifact roots must be simple relative names")
-
+    allowed_roots = _validated_artifact_roots(allowed_unrelated_artifact_roots)
     _, errors = verify_run_manifest(path)
     tolerated: list[str] = []
     for error in errors:
@@ -414,6 +252,20 @@ def load_manifest_bound_artifact(
             continue
         raise ValueError(f"run manifest verification failed: {path}: {error}")
     return manifest, tuple(tolerated)
+
+
+def _validated_artifact_roots(values: Sequence[str]) -> set[str]:
+    roots = set(values)
+    invalid = any(
+        not value
+        or Path(value).is_absolute()
+        or len(Path(value).parts) != 1
+        or value in {".", ".."}
+        for value in roots
+    )
+    if invalid:
+        raise ValueError("allowed unrelated artifact roots must be simple relative names")
+    return roots
 
 
 def _manifest_artifact_error_path(error: str) -> str | None:
