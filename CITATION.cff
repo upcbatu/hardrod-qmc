@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using this metadata."
+title: "hardrod-qmc: Microscopic Description of Trapped Hard Rods"
+type: software
+authors:
+  - family-names: Turgay
+    given-names: Batuhan
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/upcbatu/hardrod-qmc"
+preferred-citation:
+  type: thesis
+  title: "Microscopic Description of Trapped Hard Rods"
+  authors:
+    - family-names: Turgay
+      given-names: Batuhan
+  institution:
+    name: "Universitat Politècnica de Catalunya"
+  thesis-type: "Master's thesis"
+  year: 2026

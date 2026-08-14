@@ -1,0 +1,140 @@
+# Changelog
+
+## 2026-08-14
+
+### Added
+
+- Added the complete eight-case trapped hard-rod DMC comparison for
+  \(N=10,20\) and \(a/a_{\mathrm{ho}}=0,0.1,1,10\), together with compact
+  machine-readable summaries and the two thesis figures.
+- Added time-step extrapolation, walker-population comparison,
+  forward-walking sensitivity, and energy-stationarity analyses for the
+  numerical uncertainty budget.
+- Added the five-seed Hellmann--Feynman energy-response calculation used for
+  the \(N=20\), \(a/a_{\mathrm{ho}}=10\) cloud radius.
+- Added branching-free RWM and MALA validation workflows, variational kinetic
+  estimators, initialization comparisons, and exact Tonks--Girardeau checks.
+- Added deterministic structure, import, public-surface, fixed-seed DMC,
+  Umrigar-limiter, kernel-parity, and published-radius checks.
+- Added concise installation, architecture, units, and reproduction
+  documentation for the thesis result set.
+
+### Changed
+
+- Reorganized the implementation into explicit owners for system geometry,
+  trial functions, sampling, estimators, statistics, production,
+  uncertainty, validation, artifacts, and plotting.
+- Consolidated DMC packet assembly and numerical-systematics processing while
+  preserving the recorded random-number sequence and published observables.
+- Replaced the contact-corrected production guide with the reduced-TG guide
+  using the same optimized relative-width parameters; the fitted contact
+  coefficient was numerically zero in all six finite-diameter cases.
+- Reduced the test suite to result reproduction, deterministic mathematics,
+  and fail-closed input checks, with names organized by the claim protected.
+- Restricted tracked numerical evidence to compact summaries, tables,
+  manifests, and final figures; full stochastic run bundles remain external.
+
+### Removed
+
+- Removed the unused uncorrected Euler local DMC step and retained only the
+  Metropolis-corrected transition used by production calculations.
+- Removed the null contact-correction kernels, unused observables, abandoned
+  experiment entry points, compatibility re-exports, and redundant artifact
+  validation layers.
+- Removed stale architecture and method notes superseded by the current
+  reproduction documentation.
+
+## 2026-05-12
+
+### Added
+
+- Added breathing-aware RN-DMC initialization controls for LDA-RMS lattice/logspread starts and optional guide-Metropolis breathing preburn.
+- Added configurable fixed-scale RN collective proposal mixtures for weak-trap stationarity probes.
+- Added Hellmann-Feynman energy-response estimator and offline reanalysis support for pure trap R2/RMS from existing RN-DMC energy artifacts.
+- Added Sokal/Geyer/flat-top-HAC correlated-error triangulation for RN-block stationarity precision reporting.
+
+### Changed
+
+- Reduced the public RN-DMC release runner surface and tightened initialization metadata typing.
+- Updated trapped RN-block blocking-plateau detection to use Flyvbjerg-Petersen/pyblock-compatible standard-error uncertainty instead of relying only on a fixed relative-spread cutoff.
+- Raised the stationarity plateau gate to ignore under-sampled coarsest blocking points while keeping full blocking curves in artifacts.
+- Split blocking-plateau absence from hard methodology failures when correlated-error triangulation provides a conservative finite error bar.
+
+## 2026-05-11
+
+### Added
+
+- Added RN-block DMC modules with shared DMC population, guide, result, and streaming owners.
+- Added finite-`a` trapped RN-DMC workflows with stationarity gates, run manifests, checkpointing, and progress reporting.
+- Added exact homogeneous and trapped validation entrypoints for RN-DMC release checks.
+- Added weighted estimators, time-series diagnostics, chain diagnostics, and artifact/provenance helpers.
+- Added cloud run scripts for reproducible VM campaigns.
+- Added a canonical RN-block DMC method note and completed bibliography entries
+  for DMC kernels, RN transition components, and stationarity diagnostics.
+
+### Changed
+
+- Reorganized experiments into validation, VMC, and DMC method folders.
+- Moved DMC ownership from a flat module into method-specific and shared DMC packages.
+- Reworked trapped stationarity checks to separate hygiene failures, correlated-data uncertainty, and stationarity failures.
+- Updated documentation and equation source mapping for RN-block DMC, LDA comparison, and release gate semantics.
+
+### Removed
+
+- Removed tracked generated VMC result summaries from the source tree.
+- Removed numbered top-level VMC experiment scripts in favor of domain folders.
+
+## 2026-05-09
+
+### Added
+
+- Added trapped hard-rod local-energy diagnostics with kinetic, trap, and total energy components.
+- Added finite-difference and invalid-configuration tests for the trapped local-energy estimator.
+- Added total-energy alpha-scan reporting, including an energy-vs-alpha plot and bracketing diagnostics.
+- Added a lower-alpha trapped VMC energy bracket packet for the current diagnostic trial.
+- Added an upper-side trapped VMC energy alpha scan with longer chains to test whether the diagnostic minimum is bracketed.
+
+### Changed
+
+- Updated trapped alpha-scan summaries to keep `sampled_potential_energy_mean` as a labeled harmonic-trap-energy alias while using `sampled_total_energy_mean` for energy diagnostics.
+
+## 2026-05-08
+
+### Added
+
+- Added normalization/reference checks for homogeneous `g(r)`, `S(k)`, and periodic density estimators.
+- Added histogram-edge density integration, LDA boundary containment checks, and relative density L2 diagnostics.
+- Added trapped cloud-radius estimators and an alpha-scan diagnostic for the trapped VMC trial.
+
+### Changed
+
+- Updated validation notes to distinguish initial homogeneous observable normalization checks from later literature-curve comparisons.
+- Removed invalid blocking-analysis reporting from the homogeneous smoke output.
+- Clarified homogeneous validation and structure-factor source-map wording.
+
+## 2026-04-30
+
+### Changed
+
+- Reframed the thesis direction around trapped hard-rod QMC benchmarks of excluded-volume LDA.
+- Split architecture ownership so `systems/` owns geometry and constraints, while `theory/` owns EOS, excluded-volume mapping, and LDA predictions.
+- Updated proposal, architecture, workflow, source-map, and current-state docs to mirror the new owner boundaries.
+- Updated the homogeneous VMC smoke path to read ring reference energies from `theory/`.
+
+### Added
+
+- Added `src/hrdmc/theory/` for hard-rod EOS, chemical-potential inversion, finite ring energy, and LDA density/energy predictions.
+- Added package-level README files documenting owner boundaries.
+- Added a runnable homogeneous validation table experiment.
+- Added a homogeneous ring validation benchmark with all-pair trial local-energy checks and a `make validate-ring` target.
+- Added tests for hard-rod theory formulas and LDA normalization.
+- Added tests for the all-pair local-energy estimator against finite-`N` ring references.
+- Added `docs/validation/` for thesis-facing validation notes.
+- Added open-line trapped hard-rod geometry, harmonic trap support, trapped density diagnostics, and a trapped VMC smoke entrypoint.
+- Added a trapped VMC diagnostic grid over particle number and trap strength.
+- Added a trapped VMC seed-stability diagnostic for replicate spread checks.
+
+### Removed
+
+- Removed the old estimator-cost benchmark path and estimator-family analysis helpers.
+- Removed pure-estimator and forward-walking infrastructure from the active architecture.
