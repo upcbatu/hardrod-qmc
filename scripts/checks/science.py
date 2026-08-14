@@ -50,6 +50,28 @@ PARITY_EXPECTED = {
     "density_first_moment": -0.001623953974895407,
 }
 
+# Measured on this tree and on pre-compaction HEAD f85e19d.  The historical
+# contact correction changes these values by less than the frozen tolerance.
+UMRIGAR_PARITY_CASE = "N10_A0.1"
+UMRIGAR_PARITY_SEED = 7001
+UMRIGAR_PARITY_CONTROLS = {
+    "dt": 0.0025,
+    "walkers": 64,
+    "burn_tau": 0.5,
+    "production_tau": 1.0,
+    "store_every": 10,
+    "grid_extent": 20.0,
+    "n_bins": 240,
+    "drift_limiter": "umrigar",
+    "relative_alpha": 1.0637325870622627,
+}
+UMRIGAR_PARITY_EXPECTED = {
+    "mixed_energy": 56.61405251917114,
+    "r2_radius": 7.045090933536422,
+    "density_sum": 59.75,
+    "density_max": 1.3141958361459367,
+}
+
 # main.tex:959-960 prints R_rms/a_ho = 58.85127(74).
 HF_SOURCE = Path("data/energy_response/N20_A10_h0025_5seed.csv")
 HF_N_PARTICLES = 20
@@ -66,18 +88,42 @@ def _close(observed: float, expected: float) -> bool:
 
 
 def check_fixed_seed_parity() -> list[str]:
-    case = parse_case(PARITY_CASE)
-    controls = DMCRunControls(**PARITY_CONTROLS)  # type: ignore[arg-type]
+    return _check_fixed_seed_case(
+        case_id=PARITY_CASE,
+        seed=PARITY_SEED,
+        controls_payload=PARITY_CONTROLS,
+        expected=PARITY_EXPECTED,
+    )
+
+
+def check_umrigar_fixed_seed_parity() -> list[str]:
+    return _check_fixed_seed_case(
+        case_id=UMRIGAR_PARITY_CASE,
+        seed=UMRIGAR_PARITY_SEED,
+        controls_payload=UMRIGAR_PARITY_CONTROLS,
+        expected=UMRIGAR_PARITY_EXPECTED,
+    )
+
+
+def _check_fixed_seed_case(
+    *,
+    case_id: str,
+    seed: int,
+    controls_payload: dict[str, float | int | str | None],
+    expected: dict[str, float],
+) -> list[str]:
+    case = parse_case(case_id)
+    controls = DMCRunControls(**controls_payload)  # type: ignore[arg-type]
     summary = run_streaming_seed(
         case,
         controls,
-        seed=PARITY_SEED,
+        seed=seed,
         guide_family=PARITY_GUIDE_FAMILY,
     )
     density = np.asarray(summary.density, dtype=float)
     grid = np.linspace(
-        -PARITY_CONTROLS["grid_extent"],  # type: ignore[operator]
-        PARITY_CONTROLS["grid_extent"],  # type: ignore[arg-type]
+        -controls.grid_extent,
+        controls.grid_extent,
         density.size,
     )
     observed = {
@@ -88,9 +134,9 @@ def check_fixed_seed_parity() -> list[str]:
         "density_first_moment": float(np.sum(density * grid) / np.sum(density)),
     }
     return [
-        _fail(name, observed[name], expected)
-        for name, expected in PARITY_EXPECTED.items()
-        if not _close(observed[name], expected)
+        _fail(f"{case_id} {name}", observed[name], expected_value)
+        for name, expected_value in expected.items()
+        if not _close(observed[name], expected_value)
     ]
 
 
@@ -171,9 +217,7 @@ def check_population_guard_rejection() -> list[str]:
     except ValueError as exc:
         expected = "may vary only walker count"
         return (
-            []
-            if expected in str(exc)
-            else [_fail("population guard message", str(exc), expected)]
+            [] if expected in str(exc) else [_fail("population guard message", str(exc), expected)]
         )
     return ["population ladder accepted a non-walker control mismatch"]
 
@@ -219,12 +263,14 @@ def main() -> int:
         return 1
 
     parity = check_fixed_seed_parity()
+    umrigar_parity = check_umrigar_fixed_seed_parity()
     hf = check_hellmann_feynman(root)
     backends = check_backend_parity()
     population_guard = check_population_guard_rejection()
     forward_walking_guard = check_forward_walking_guard_rejection()
 
     report("fixed-seed DMC observables", parity)
+    report("finite-A Umrigar fixed-seed DMC observables", umrigar_parity)
     report("published Hellmann-Feynman radius", hf)
     report("numba and python kernel agreement", backends)
     report("population ladder rejects non-walker control changes", population_guard)
@@ -232,6 +278,7 @@ def main() -> int:
 
     total = (
         len(parity)
+        + len(umrigar_parity)
         + len(hf)
         + len(backends)
         + len(population_guard)
