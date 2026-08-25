@@ -51,4 +51,5 @@ data/raw/
 data/processed/
 notebooks/
 operator/
+output/
 tmp/
