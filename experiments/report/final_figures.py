@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 import argparse
+import csv
 import hashlib
 import json
 import math
@@ -182,6 +183,26 @@ def _load_sources(
     return assembly, row_by_case, density_by_case
 
 
+def _use_reported_energies(
+    rows: dict[str, dict[str, Any]], energy_table_path: Path
+) -> dict[str, dict[str, Any]]:
+    _expect(energy_table_path.is_file(), f"energy table is missing: {energy_table_path}")
+    plotted = {case: dict(row) for case, row in rows.items()}
+    with energy_table_path.open(encoding="utf-8", newline="") as handle:
+        records = list(csv.DictReader(handle))
+    _expect(bool(records), "energy table is empty")
+    for record in records:
+        case = record.get("case", "")
+        _expect(case in plotted, f"unexpected energy-table case: {case}")
+        plotted[case]["energy"] = float(record["energy"])
+        plotted[case]["energy_stderr"] = float(record["energy_statistical_stderr"])
+        plotted[case]["energy_lda"] = float(record["energy_lda"])
+        plotted[case]["energy_relative_delta_vs_lda"] = float(
+            record["relative_delta_vs_lda"]
+        )
+    return plotted
+
+
 def _seed_density_values(
     case: str, seed_results: list[dict[str, Any]], bin_count: int
 ) -> np.ndarray:
@@ -299,6 +320,20 @@ def _plot_lda_comparison(rows: dict[str, dict[str, Any]], output_dir: Path) -> N
             markerfacecolor="white" if n_particles == 20 else COLORS[n_particles],
             zorder=3,
         )
+        if n_particles == 20:
+            absolute_axis.errorbar(
+                [x[-1]],
+                [energies[-1]],
+                yerr=[errors[-1]],
+                color=COLORS[n_particles],
+                marker="D",
+                linestyle="none",
+                capsize=2.0,
+                elinewidth=0.8,
+                markeredgewidth=0.9,
+                markerfacecolor="white",
+                zorder=4,
+            )
         absolute_handles.extend(
             (
                 Line2D(
@@ -325,7 +360,7 @@ def _plot_lda_comparison(rows: dict[str, dict[str, Any]], output_dir: Path) -> N
     absolute_axis.legend(
         handles=absolute_handles,
         frameon=False,
-        fontsize=6.9,
+        fontsize=8.0,
         ncol=1,
         loc="upper left",
         borderaxespad=0.2,
@@ -345,7 +380,7 @@ def _plot_lda_comparison(rows: dict[str, dict[str, Any]], output_dir: Path) -> N
             "rms_relative_delta_vs_lda",
             "rms_mc_statistical_stderr",
             "rms_lda",
-            "(c) RMS-radius deviation",
+            "(c) RMS radius deviation",
         ),
     )
     for axis, (estimate_key, value_key, error_key, reference_key, title) in zip(
@@ -383,12 +418,26 @@ def _plot_lda_comparison(rows: dict[str, dict[str, Any]], output_dir: Path) -> N
                 label=rf"$N={n_particles}$",
                 zorder=3,
             )
+            if estimate_key == "energy" and n_particles == 20:
+                axis.errorbar(
+                    [x[-1]],
+                    [values[-1]],
+                    yerr=[errors[-1]],
+                    color=COLORS[n_particles],
+                    marker="D",
+                    linestyle="none",
+                    capsize=2.2,
+                    elinewidth=0.9,
+                    markeredgewidth=0.9,
+                    markerfacecolor="white",
+                    zorder=4,
+                )
         axis.axhline(0.0, color="#666666", linewidth=0.85, linestyle=(0, (3, 2)), zorder=1)
         axis.set_title(title, loc="left", fontweight="semibold", pad=7)
     axes[1].set_ylabel(r"Relative deviation from LDA  [\%]")
-    axes[1].legend(frameon=False, loc="lower left", fontsize=7.4)
+    axes[1].legend(frameon=False, loc="lower left", fontsize=8.2)
     for axis in axes:
-        axis.set_xlabel(r"Rod length  $a/a_{\rm ho}$")
+        axis.set_xlabel(r"Rod diameter  $a/a_{\rm ho}$")
         axis.set_xticks(x, ROD_LENGTH_LABELS)
         axis.set_xlim(-0.25, 3.25)
         axis.grid(axis="y", color="#D9D9D9", linewidth=0.55, alpha=0.8)
@@ -398,7 +447,7 @@ def _plot_lda_comparison(rows: dict[str, dict[str, Any]], output_dir: Path) -> N
         fig,
         output_dir,
         "final_matrix_lda_comparison",
-        "DMC and hard-rod LDA energy plus relative energy and RMS-radius differences",
+        "DMC and hard-rod LDA energy plus relative energy and RMS radius differences",
     )
 
 
@@ -529,7 +578,7 @@ def _plot_density_profiles(densities: dict[str, DensityProfile], output_dir: Pat
             marker="o",
             markersize=3.0,
             linewidth=1.45,
-            label="One-shell average, (g)",
+            label="Cell average, (g)",
         ),
     )
     fig.legend(
@@ -540,19 +589,19 @@ def _plot_density_profiles(densities: dict[str, DensityProfile], output_dir: Pat
         frameon=False,
         columnspacing=1.0,
         handlelength=2.0,
-        fontsize=7.8,
+        fontsize=8.8,
     )
     fig.subplots_adjust(left=0.082, right=0.992, bottom=0.105, top=0.875, wspace=0.18, hspace=0.22)
     _save_pair(
         fig,
         output_dir,
         "final_matrix_density_profiles",
-        "Forward-walking densities, a one-shell-period average, and hard-rod LDA",
+        "Forward-walking densities, a cell average, and hard-rod LDA",
     )
 
 
 def _parse_args() -> argparse.Namespace:
-    repo_root = Path(__file__).resolve().parents[3]
+    repo_root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--assembly",
@@ -560,6 +609,13 @@ def _parse_args() -> argparse.Namespace:
         default=repo_root
         / "results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/final_matrix_summary.json",
         help="assembled final-matrix summary JSON",
+    )
+    parser.add_argument(
+        "--energy-table",
+        type=Path,
+        default=repo_root
+        / "results/dmc/systematics/numerical_systematics_v1/thesis_energy_table.csv",
+        help="table containing the reported zero-time-step energies",
     )
     parser.add_argument(
         "--output-dir",
@@ -570,10 +626,15 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def write_final_report_figures(assembly_path: Path, output_dir: Path) -> tuple[Path, ...]:
-    assembly_path, output_dir = assembly_path.resolve(), output_dir.resolve()
+def write_final_report_figures(
+    assembly_path: Path, energy_table_path: Path, output_dir: Path
+) -> tuple[Path, ...]:
+    assembly_path = assembly_path.resolve()
+    energy_table_path = energy_table_path.resolve()
+    output_dir = output_dir.resolve()
     _expect(assembly_path.is_file(), f"assembly summary is missing: {assembly_path}")
     _, rows, densities = _load_sources(assembly_path)
+    rows = _use_reported_energies(rows, energy_table_path)
     _configure_matplotlib()
     _plot_lda_comparison(rows, output_dir)
     _plot_density_profiles(densities, output_dir)
@@ -588,7 +649,7 @@ def write_final_report_figures(assembly_path: Path, output_dir: Path) -> tuple[P
 
 def main() -> None:
     args = _parse_args()
-    paths = write_final_report_figures(args.assembly, args.output_dir)
+    paths = write_final_report_figures(args.assembly, args.energy_table, args.output_dir)
     print(f"Generated {len(paths)} figure files in {args.output_dir.resolve()}")
 
 
