@@ -17,6 +17,9 @@ walker-population, and forward-walking checks. The manuscript contains the
 derivations and physical interpretation. These notes document the
 implementation, conventions, and reproduction procedure.
 
+The submitted thesis manuscript is available as
+[Batuhan_Turgay_TFM.pdf](docs/Batuhan_Turgay_TFM.pdf).
+
 ## Installation
 
 Python 3.10 or newer is required. From a clone of the repository:
@@ -67,6 +70,22 @@ alerts; all required convergence, estimator-consistency, and sampler-
 equivalence checks pass. The fixed sampler controls are tracked under
 `data/vmc_sampler_choices/`. Exact rerun commands and the interpretation of
 the packet are given in [docs/reproducing.md](docs/reproducing.md).
+
+## Optimizing the trial-guide width
+
+The relative width can be reoptimized from a branching-free VMC sample with
+`experiments/vmc/optimize_alpha.py`. For example:
+
+```bash
+PYTHONPATH=src python3 experiments/vmc/optimize_alpha.py \
+  --case N10_A1 \
+  --reference-relative-alpha 1.6224444406063525 \
+  --output-dir results/vmc/alpha_optimization/N10_A1
+```
+
+The command minimizes the reweighted local-energy variance. Its output is an
+optimization candidate and does not replace the stored guide parameter without
+an independent VMC validation.
 
 ## Packages
 
