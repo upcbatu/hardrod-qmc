@@ -26,12 +26,12 @@ deadcode:
 imports:
 	$(PY) -c "import importlib, pkgutil, hrdmc; [importlib.import_module(m.name) for m in pkgutil.walk_packages(hrdmc.__path__, 'hrdmc.')]"
 
-# tests/ is untracked, so this binds locally only; check-science carries reproducibility.
+# Deterministic tests are tracked; check-science also runs short DMC calculations.
 test:
 	$(PY) -m pytest tests -q
 
 surface:
-	$(PYTHON) operator/audit_public_surface.py --root .
+	$(PYTHON) scripts/checks/public_surface.py --root .
 
 whitespace:
 	git diff --check
