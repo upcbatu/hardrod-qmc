@@ -276,10 +276,6 @@ def _finite_row(
     energy_lda = _optional_float(final.get("energy_lda"))
     comparison = fw_summary.get("observable_comparison")
     comparison = comparison if isinstance(comparison, dict) else {}
-    timestep_extrapolation = ts.get("extrapolation")
-    timestep_extrapolation = (
-        timestep_extrapolation if isinstance(timestep_extrapolation, dict) else {}
-    )
     unresolved = [lane for lane, value in accepted.items() if not value]
     return {
         "case": case_id,
@@ -310,13 +306,10 @@ def _finite_row(
         "uncertainty_components": {
             "energy_statistical_stderr": ts.get("extrapolated_energy_statistical_stderr"),
             "timestep_fit_window_upper_allowance": _nested(
-                timestep_extrapolation,
-                "largest_point_leave_one_out",
-                "leading_linear",
-                "absolute_shift",
+                ts, "practical_resolution_assessment", "fit_window", "upper_allowance"
             ),
-            "timestep_model_order_upper_allowance": timestep_extrapolation.get(
-                "leading_model_intercept_spread"
+            "timestep_model_order_upper_allowance": _nested(
+                ts, "practical_resolution_assessment", "model_order", "upper_allowance"
             ),
             "population_selected_last_doubling_upper_allowance": pop.get(
                 "selected_population_last_doubling_upper_allowance"
