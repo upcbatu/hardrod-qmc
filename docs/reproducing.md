@@ -1,10 +1,19 @@
 # Reproducing the thesis artifacts
 
-These commands were run from the repository root on 14 August 2026. They do
+These commands reassemble the results first checked on 14 August 2026 and
+were checked again on 10 September 2026. They do
 not launch new production simulations. They reassemble the recorded seed
 packets, recompute the numerical summaries, render the two figures, and
 reanalyse the tracked Hellmann--Feynman response data. All output goes to a
 new temporary directory.
+
+For the six finite-diameter density curves alone, use the self-contained CSV
+files in [data/density_profiles](../data/density_profiles/README.md). Their
+plotting example needs no simulation archive.
+
+The commands below process stored results. They do not demonstrate that new
+production simulations reproduce the original stochastic trajectories. For
+new runs, follow the [convergence checks](running/checks-and-results.md).
 
 ## Prerequisites
 
@@ -112,11 +121,31 @@ with (root / "proposal_efficiency.csv").open("w", newline="") as handle:
 
 print(f"Generated {root / 'energy_fit_inputs.csv'}")
 print(f"Generated {root / 'proposal_efficiency.csv'}")
+
+# Supply the plotting script with the energy errors from the same reconstruction.
+# The compact thesis_energy_table.csv contains only central values.
+systematics = json.loads((root / "numerical_systematics" / "summary.json").read_text())
+with (root / "figure_energy_table.csv").open("w", newline="") as handle:
+    fields = ("case", "energy", "energy_statistical_stderr", "energy_lda", "relative_delta_vs_lda")
+    writer = csv.DictWriter(handle, fieldnames=fields)
+    writer.writeheader()
+    for row in systematics["rows"]:
+        if not row["publication_ready"]:
+            continue
+        error = 0.0 if row["exact_tg"] else row["uncertainty_components"]["energy_statistical_stderr"]
+        writer.writerow({
+            "case": row["case"],
+            "energy": row["thesis_energy"],
+            "energy_statistical_stderr": error,
+            "energy_lda": row["energy_lda"],
+            "relative_delta_vs_lda": row["energy_relative_delta_vs_lda"],
+        })
 PY
 
 MPLCONFIGDIR="$REPRO_ROOT/matplotlib" PYTHONPATH=src \
   python3 experiments/report/final_figures.py \
   --assembly "$REPRO_ROOT/final_matrix/final_matrix_summary.json" \
+  --energy-table "$REPRO_ROOT/figure_energy_table.csv" \
   --output-dir "$REPRO_ROOT/figures"
 
 PYTHONPATH=src python3 experiments/dmc/local/reanalyze_energy_response.py \

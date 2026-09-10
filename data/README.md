@@ -64,6 +64,11 @@ N10_A1    0.8             0.04             umrigar
 
 ## Data policy
 
+`density_profiles/` contains the six finite-diameter density profiles used in
+the thesis figure, their statistical errors, the five seed profiles, and LDA
+references. The accompanying metadata records units, selected numerical controls, and source hashes.
+The CSV files can be used independently of the full simulation archive.
+
 Tracked files here must be compact, immutable inputs needed for a documented
 reproduction path. Raw walker histories, checkpoints, per-seed production
 packets, generated plots, and temporary analysis output are not stored here.

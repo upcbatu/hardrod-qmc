@@ -39,3 +39,9 @@ Generated outputs use canonical routes under:
 ```text
 results/<physics-layer>/<method-family>/<workflow-name>/
 ```
+
+## Research commands
+
+`python experiments/run.py --help` lists the common entry points. Start with
+[the running guide](../docs/running/README.md) for VMC, DMC, guide optimization
+plotting and assessment commands. Existing specialized entry points remain available.

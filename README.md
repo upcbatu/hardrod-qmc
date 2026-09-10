@@ -20,6 +20,11 @@ implementation, conventions, and reproduction procedure.
 The submitted thesis manuscript is available as
 [Batuhan_Turgay_TFM.pdf](docs/Batuhan_Turgay_TFM.pdf).
 
+The six finite-diameter density profiles are available directly as CSV files
+in [data/density_profiles](data/density_profiles/README.md), including bin
+edges, statistical errors, individual-seed estimates, and LDA references.
+They can be plotted without the external simulation archive.
+
 ## Installation
 
 Python 3.10 or newer is required. From a clone of the repository:
@@ -33,6 +38,10 @@ python3 -m pip install -e ".[dmc]"
 Install `.[dmc,dev]` instead when developing the repository.
 
 ## Reproducing the eight-case result
+
+Reassembling archived results and running a new simulation are different
+operations. The [running guide](docs/running/README.md) provides commands for
+VMC, DMC, alpha optimization, plotting and numerical checks.
 
 The compact summaries and final figures are tracked under `results/`; their
 scope is described in [results/README.md](results/README.md). The following
@@ -55,6 +64,21 @@ PYTHONPATH=src python3 experiments/dmc/local/assemble_final_matrix.py \
 On success, the command reports an accepted 8/8 matrix. See
 [docs/reproducing.md](docs/reproducing.md) for the complete table, figure, and
 Hellmann--Feynman reproduction chain and for every untracked prerequisite.
+
+## Running a new calculation
+
+Start with [docs/running](docs/running/README.md). Every command accepts its
+parameters in the terminal; no Python file needs editing. For example:
+
+```bash
+python experiments/run.py dmc --preset thesis --case N10_A0.1 \
+  --density-fw-times 0,2,4,7 --workers 5 \
+  --output results/my_N10_A01 --dry-run
+```
+
+This prints the guide, physical forward times, lag steps and numerical controls.
+Remove `--dry-run` to calculate. The guide is shared by VMC and DMC; see
+[Guide and alpha](docs/running/guide-and-alpha.md).
 
 ## Re-running the VMC validation
 

@@ -1,0 +1,300 @@
+{
+  "dataset": "Finite-diameter trapped hard-rod density profiles from the defended thesis",
+  "export_date": "2026-09-10",
+  "export_code_commit": "6b1a5c3837712cb114a09282fcb63b8c5e27fa1d",
+  "export_python": "3.12.10",
+  "export_numpy": "2.4.2",
+  "assembly_path": "results/dmc/final_matrix/thesis_5seed_all_optimized_final_v1/final_matrix_summary.json",
+  "assembly_sha256": "fa948b4171284ce2d717737f2c29f7dd009d86d04378fece6993c48fb9080bcf",
+  "coordinate": "q = x/a_ho",
+  "density": "n_ho(q) = a_ho * n(a_ho*q)",
+  "normalization": "Integral n_ho(q) dq = N, not 1",
+  "estimator": "Transported forward-walking density, with exact harmonic center-of-mass integration and parity averaging",
+  "original_production_source_commit": "Not established by the retained primary manifests; export_code_commit identifies the exporter environment, not the original stochastic calculation",
+  "cases": [
+    {
+      "case": "N10_A0.1",
+      "N": 10,
+      "A": 0.1,
+      "seed_ids": [
+        7001,
+        7002,
+        7003,
+        7004,
+        7005
+      ],
+      "controls": {
+        "burn_in_steps": 24000,
+        "burn_tau": 60.0,
+        "drift_limiter": "umrigar",
+        "dt": 0.0025,
+        "grid_extent": 35.5,
+        "local_step_method": "metropolis",
+        "n_bins": 840,
+        "production_steps": 192000,
+        "production_tau": 480.0,
+        "relative_alpha": 1.0637325870622627,
+        "store_every": 10,
+        "walkers": 256
+      },
+      "density_lag_steps": [
+        800,
+        1600,
+        2800
+      ],
+      "density_lag_omega_tau": [
+        2.0,
+        4.0,
+        7.0
+      ],
+      "density_collection_stride_steps": 40,
+      "bin_count": 840,
+      "bin_width": 0.08462455303933325,
+      "density_integral": 9.999999999999996,
+      "density_fw_lag_systematic_relative_l2_upper_bound": 0.00010296003397815279,
+      "density_status": "accepted",
+      "source_summary": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A0.1/summary.json",
+      "source_summary_sha256": "c02f14e5db7b0d309a8f59af5e8c1e42b47827784468807f0bf4b1ed2444ea7b",
+      "source_manifest": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A0.1/run_manifest.json",
+      "source_manifest_sha256": "dc9624669094088c68d815685d8b310372e6b30f53802087b2de0a1105dbd8a1",
+      "source_run_id": "dmc_benchmark_packet_2026-08-14T06:58:05Z_f82b9e31a0e9"
+    },
+    {
+      "case": "N10_A1",
+      "N": 10,
+      "A": 1.0,
+      "seed_ids": [
+        7001,
+        7002,
+        7003,
+        7004,
+        7005
+      ],
+      "controls": {
+        "burn_in_steps": 48000,
+        "burn_tau": 60.0,
+        "drift_limiter": "umrigar",
+        "dt": 0.00125,
+        "grid_extent": 40.0,
+        "local_step_method": "metropolis",
+        "n_bins": 840,
+        "production_steps": 384000,
+        "production_tau": 480.0,
+        "relative_alpha": 1.6224444406063525,
+        "store_every": 20,
+        "walkers": 512
+      },
+      "density_lag_steps": [
+        1600,
+        3200,
+        5600
+      ],
+      "density_lag_omega_tau": [
+        2.0,
+        4.0,
+        7.0
+      ],
+      "density_collection_stride_steps": 80,
+      "bin_count": 840,
+      "bin_width": 0.09535160905841167,
+      "density_integral": 10.0,
+      "density_fw_lag_systematic_relative_l2_upper_bound": 0.00045207923531053276,
+      "density_status": "accepted",
+      "source_summary": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A1/summary.json",
+      "source_summary_sha256": "f3b371a7ccc1292c61cccc8fd810026235f9dec29d0a097c5e42dd61dcb93d1d",
+      "source_manifest": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A1/run_manifest.json",
+      "source_manifest_sha256": "83027426a8a75c1e968051cbc2973daae8f721398853a36c88b5d00ca333b333",
+      "source_run_id": "dmc_benchmark_packet_2026-08-14T06:58:05Z_363dfc38c033"
+    },
+    {
+      "case": "N10_A10",
+      "N": 10,
+      "A": 10.0,
+      "seed_ids": [
+        7001,
+        7002,
+        7003,
+        7004,
+        7005
+      ],
+      "controls": {
+        "burn_in_steps": 480000,
+        "burn_tau": 60.0,
+        "drift_limiter": "umrigar",
+        "dt": 0.000125,
+        "grid_extent": 178.871,
+        "local_step_method": "metropolis",
+        "n_bins": 3579,
+        "production_steps": 3840000,
+        "production_tau": 480.0,
+        "relative_alpha": 5.5908651157560385,
+        "store_every": 200,
+        "walkers": 256
+      },
+      "density_lag_steps": [
+        16000,
+        32000,
+        56000
+      ],
+      "density_lag_omega_tau": [
+        2.0,
+        4.0,
+        7.0
+      ],
+      "density_collection_stride_steps": 4000,
+      "bin_count": 3579,
+      "bin_width": 0.09998378982669465,
+      "density_integral": 10.000000000000021,
+      "density_fw_lag_systematic_relative_l2_upper_bound": 0.001579207581151541,
+      "density_status": "accepted",
+      "source_summary": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/summary.json",
+      "source_summary_sha256": "6d0eca6456ef1fdc184e6d88e203f63fca921510ce5c852f3f8bd36963b01ca1",
+      "source_manifest": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N10_A10/run_manifest.json",
+      "source_manifest_sha256": "582c7e9910318f571d300acc1a436b4ef550a2e94dde2309129666eca5edb079",
+      "source_run_id": "dmc_benchmark_packet_2026-08-14T06:58:05Z_777f2ddc71f2"
+    },
+    {
+      "case": "N20_A0.1",
+      "N": 20,
+      "A": 0.1,
+      "seed_ids": [
+        7001,
+        7002,
+        7003,
+        7004,
+        7005
+      ],
+      "controls": {
+        "burn_in_steps": 24000,
+        "burn_tau": 60.0,
+        "drift_limiter": "umrigar",
+        "dt": 0.0025,
+        "grid_extent": 36.0,
+        "local_step_method": "metropolis",
+        "n_bins": 840,
+        "production_steps": 192000,
+        "production_tau": 480.0,
+        "relative_alpha": 1.0908094794241916,
+        "store_every": 10,
+        "walkers": 256
+      },
+      "density_lag_steps": [
+        800,
+        1600,
+        2800
+      ],
+      "density_lag_omega_tau": [
+        2.0,
+        4.0,
+        7.0
+      ],
+      "density_collection_stride_steps": 40,
+      "bin_count": 840,
+      "bin_width": 0.0858164481525705,
+      "density_integral": 20.0,
+      "density_fw_lag_systematic_relative_l2_upper_bound": 0.00014119192281475832,
+      "density_status": "accepted",
+      "source_summary": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N20_A0.1/summary.json",
+      "source_summary_sha256": "4075979b01391a26bda30989e475a697d7a6312597d9a12d7f9c8d8cb336312a",
+      "source_manifest": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N20_A0.1/run_manifest.json",
+      "source_manifest_sha256": "e4dff28e9c2591a77257193f38f9f8f990174e547cc05ce46af241fd909eaff8",
+      "source_run_id": "dmc_benchmark_packet_2026-08-14T06:58:05Z_aa2254e83658"
+    },
+    {
+      "case": "N20_A1",
+      "N": 20,
+      "A": 1.0,
+      "seed_ids": [
+        7001,
+        7002,
+        7003,
+        7004,
+        7005
+      ],
+      "controls": {
+        "burn_in_steps": 96000,
+        "burn_tau": 60.0,
+        "drift_limiter": "umrigar",
+        "dt": 0.000625,
+        "grid_extent": 48.512,
+        "local_step_method": "metropolis",
+        "n_bins": 972,
+        "production_steps": 768000,
+        "production_tau": 480.0,
+        "relative_alpha": 1.8669363227063642,
+        "store_every": 40,
+        "walkers": 512
+      },
+      "density_lag_steps": [
+        3200,
+        6400,
+        11200
+      ],
+      "density_lag_omega_tau": [
+        2.0,
+        4.0,
+        7.0
+      ],
+      "density_collection_stride_steps": 160,
+      "bin_count": 972,
+      "bin_width": 0.09992173017508321,
+      "density_integral": 20.0,
+      "density_fw_lag_systematic_relative_l2_upper_bound": 0.0006770778012583285,
+      "density_status": "accepted",
+      "source_summary": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N20_A1/summary.json",
+      "source_summary_sha256": "861d40cc26eb58d43775a62b0249b8f083548d010b16a732731f708600a61365",
+      "source_manifest": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N20_A1/run_manifest.json",
+      "source_manifest_sha256": "5b9db652c442558b09874d90bedb0fcceb8d85dd6b5667388322ecb42c516d99",
+      "source_run_id": "dmc_benchmark_packet_2026-08-14T06:58:05Z_23c31f11f881"
+    },
+    {
+      "case": "N20_A10",
+      "N": 20,
+      "A": 10.0,
+      "seed_ids": [
+        7001,
+        7002,
+        7003,
+        7004,
+        7005
+      ],
+      "controls": {
+        "burn_in_steps": 240000,
+        "burn_tau": 60.0,
+        "drift_limiter": "umrigar",
+        "dt": 0.00025,
+        "grid_extent": 353.565,
+        "local_step_method": "metropolis",
+        "n_bins": 7073,
+        "production_steps": 1920000,
+        "production_tau": 480.0,
+        "relative_alpha": 7.011111084682286,
+        "store_every": 100,
+        "walkers": 512
+      },
+      "density_lag_steps": [
+        8000,
+        16000,
+        28000
+      ],
+      "density_lag_omega_tau": [
+        2.0,
+        4.0,
+        7.0
+      ],
+      "density_collection_stride_steps": 2000,
+      "bin_count": 7073,
+      "bin_width": 0.09999010181002177,
+      "density_integral": 19.999999999999996,
+      "density_fw_lag_systematic_relative_l2_upper_bound": 0.0019314565020120437,
+      "density_status": "accepted",
+      "source_summary": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N20_A10/summary.json",
+      "source_summary_sha256": "73d3321e9bd678a8321da6de1e79096b8ba389695362492dafd2418811f159fb",
+      "source_manifest": "results/dmc/final_matrix/thesis_5seed_all_optimized_v1/N20_A10/run_manifest.json",
+      "source_manifest_sha256": "5d547e111c48c72d3a08e519ff38e4b54abbbe8541ce01dfcebe449c4299b76b",
+      "source_run_id": "dmc_benchmark_packet_2026-08-14T06:58:05Z_486c83563faf"
+    }
+  ],
+  "data_origin": "Export of archived thesis results; no new production simulation was run for this export.",
+  "controls_scope": "Selected numerical settings for interpreting the data; not a complete simulation input file."
+}
