@@ -37,6 +37,9 @@ def write_benchmark_packet_artifacts(
         ),
         "density_fw_table": write_benchmark_packet_density_fw_table(root, payload),
     }
+    density = _write_density_profile(root, payload)
+    if density is not None:
+        artifacts["density_profile"] = density
     artifacts["run_manifest"] = write_run_manifest(
         root,
         run_name="dmc_benchmark_packet",
@@ -60,12 +63,16 @@ def write_benchmark_packet_artifacts(
         status=str(payload["status"]),
     )
     return artifacts
+
+
 def write_benchmark_packet_seed_table(
     output_dir: Path,
     seed_payloads: list[dict[str, Any]],
 ) -> Path:
     rows = (_seed_row(row) for row in seed_payloads)
     return write_csv(output_dir / "seed_table.csv", rows)
+
+
 def _write_benchmark_packet_table(output_dir: Path, payload: dict[str, Any]) -> Path:
     estimates = _mapping(payload.get("estimates"))
     pure = _mapping(payload.get("pure_walking"))
@@ -89,11 +96,15 @@ def _write_benchmark_packet_table(output_dir: Path, payload: dict[str, Any]) -> 
         **_diagnostic_fields("density", density_diag),
     }
     return write_csv(output_dir / "packet_table.csv", [row])
+
+
 def write_benchmark_packet_fw_plateau_table(output_dir: Path, payload: dict[str, Any]) -> Path:
     return write_csv(
         output_dir / "fw_plateau_table.csv",
         _observable_rows(payload, "r2"),
     )
+
+
 def _write_benchmark_packet_energy_stationarity_table(
     output_dir: Path,
     payload: dict[str, Any],
@@ -132,11 +143,15 @@ def _write_benchmark_packet_energy_stationarity_table(
             }
         )
     return write_csv(output_dir / "energy_stationarity_table.csv", rows)
+
+
 def write_benchmark_packet_density_fw_table(output_dir: Path, payload: dict[str, Any]) -> Path:
     return write_csv(
         output_dir / "density_fw_table.csv",
         _observable_rows(payload, "density"),
     )
+
+
 def _seed_row(payload: dict[str, Any]) -> dict[str, Any]:
     dmc = _mapping(payload.get("dmc_summary"))
     metadata = _mapping(dmc.get("metadata"))
@@ -176,6 +191,8 @@ def _seed_row(payload: dict[str, Any]) -> dict[str, Any]:
         },
         **{field: metadata.get(field) for field in fields},
     }
+
+
 def _observable_rows(payload: dict[str, Any], name: str) -> list[dict[str, Any]]:
     pure = _mapping(payload.get("pure_walking"))
     observable = _mapping(_mapping(pure.get("observables")).get(name))
@@ -205,10 +222,14 @@ def _observable_rows(payload: dict[str, Any], name: str) -> list[dict[str, Any]]
             }
         )
     return rows
+
+
 def _estimate_fields(prefix: str, value: Mapping[str, Any]) -> dict[str, Any]:
     return {
         f"{prefix}_{key}": item for key, item in value.items() if not isinstance(item, (list, dict))
     }
+
+
 def _diagnostic_fields(prefix: str, value: Mapping[str, Any]) -> dict[str, Any]:
     keys = [
         "method",
@@ -224,18 +245,47 @@ def _diagnostic_fields(prefix: str, value: Mapping[str, Any]) -> dict[str, Any]:
         "selected_window_pooled_family_fraction_upper_max",
     ]
     return {f"{prefix}_{key}": value.get(key) for key in keys}
+
+
 def _lag_fields(value: Mapping[str, Any]) -> dict[str, Any]:
     lags = value.get("lag_steps")
     lag = max(lags) if isinstance(lags, list) and lags else None
+
     def at_max(name: str) -> Any:
         values = value.get(name)
         if not isinstance(values, dict) or lag is None:
             return None
         return values.get(lag, values.get(str(lag)))
+
     return {
         "genealogy_status": value.get("genealogy_status"),
         "lag_max_source_ancestor_ess_min": at_max("block_source_ancestor_ess_min_by_lag"),
         "lag_max_unique_source_ancestor_min": at_max("block_unique_source_ancestor_min_by_lag"),
     }
+
+
 def _mapping(value: object) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
+def _write_density_profile(root: Path, payload: dict[str, Any]) -> Path | None:
+    density = _mapping(_mapping(payload.get("estimates")).get("density"))
+    x, values, edges = (density.get(key) for key in ("x", "value", "bin_edges"))
+    if not isinstance(x, list) or not x or not isinstance(values, list) or len(values) != len(x):
+        return None
+    if not isinstance(edges, list) or len(edges) != len(x) + 1:
+        return None
+    errors = density.get("stderr")
+    return write_csv(
+        root / "density.csv",
+        [
+            {
+                "q": q,
+                "q_left": edges[i],
+                "q_right": edges[i + 1],
+                "density": values[i],
+                "stderr": errors[i] if isinstance(errors, list) and len(errors) == len(x) else None,
+            }
+            for i, q in enumerate(x)
+        ],
+    )

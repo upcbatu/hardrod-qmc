@@ -146,6 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--pure-fw-plateau-window-lag-count", type=int, default=4)
     parser.add_argument("--pure-fw-density-plateau-window-lag-count", type=int, default=None)
+    parser.add_argument("--pure-fw-density-relative-tolerance", type=float, default=0.03)
     parser.add_argument("--parallel-workers", type=int, default=0)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--progress", action="store_true")
@@ -157,7 +158,31 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    args = build_parser().parse_args()
+    execute(build_parser().parse_args())
+
+
+def execute(
+    args: argparse.Namespace,
+    *,
+    allow_unvalidated_guide: bool = False,
+    guide_provenance: dict | None = None,
+) -> None:
+    result = run_benchmark_packet_workflow(
+        **workflow_options(args),
+        allow_unvalidated_guide=allow_unvalidated_guide,
+        guide_provenance=guide_provenance,
+    )
+    print_run_summary(
+        run="dmc_benchmark_packet",
+        status=result.status,
+        summary=result.summary,
+        artifacts=result.artifacts,
+        verbose_payload=result.payload,
+        verbose_json=args.verbose_json,
+    )
+
+
+def workflow_options(args: argparse.Namespace) -> dict:
     case = parse_case(args.case)
     seeds = parse_seeds(args.seeds)
     guide_family = args.guide_family or DEFAULT_GUIDE_FAMILY
@@ -199,6 +224,7 @@ def main() -> None:
         observable_source=args.pure_fw_observable_source,
         density_source=args.pure_fw_density_source,
         density_parity_average=args.pure_fw_density_parity_average,
+        density_plateau_relative_l2_tolerance=args.pure_fw_density_relative_tolerance,
         min_block_count=args.pure_fw_min_block_count,
         min_walker_weight_ess=args.pure_fw_min_walker_weight_ess,
         min_source_ancestor_ess=args.pure_fw_min_source_ancestor_ess,
@@ -223,33 +249,25 @@ def main() -> None:
         ),
     )
     plot_formats = ("png", "pdf") if args.skip_write else _parse_str_tuple(args.plot_formats)
-    result = run_benchmark_packet_workflow(
-        case,
-        controls,
-        seeds,
-        pure_config=pure_config,
-        parallel_workers=args.parallel_workers,
-        progress=progress_requested(args.progress),
-        output_dir=args.output_dir,
-        write_artifacts=not args.skip_write,
-        write_plots=not args.skip_plots,
-        plot_formats=plot_formats,
-        command=sys.argv,
-        ess_warning_fraction=args.ess_warning_fraction,
-        ess_invalid_fraction=args.ess_invalid_fraction,
-        log_weight_span_warning=args.log_weight_span_warning,
-        initialization=initialization,
-        guide_family=guide_family,
-        guide_parameter_source=guide_parameter_source,
-    )
-    print_run_summary(
-        run="dmc_benchmark_packet",
-        status=result.status,
-        summary=result.summary,
-        artifacts=result.artifacts,
-        verbose_payload=result.payload,
-        verbose_json=args.verbose_json,
-    )
+    return {
+        "case": case,
+        "controls": controls,
+        "seeds": seeds,
+        "pure_config": pure_config,
+        "parallel_workers": args.parallel_workers,
+        "progress": progress_requested(args.progress),
+        "output_dir": args.output_dir,
+        "write_artifacts": not args.skip_write,
+        "write_plots": not args.skip_plots,
+        "plot_formats": plot_formats,
+        "command": sys.argv,
+        "ess_warning_fraction": args.ess_warning_fraction,
+        "ess_invalid_fraction": args.ess_invalid_fraction,
+        "log_weight_span_warning": args.log_weight_span_warning,
+        "initialization": initialization,
+        "guide_family": guide_family,
+        "guide_parameter_source": guide_parameter_source,
+    }
 
 
 def _parse_int_tuple(value: str) -> tuple[int, ...]:

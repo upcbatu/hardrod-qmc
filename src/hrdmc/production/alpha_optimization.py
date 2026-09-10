@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -105,6 +106,7 @@ def run_alpha_optimization(
     controls: AlphaOptimizationControls,
     seed: int,
 ) -> tuple[dict[str, Any], list[dict[str, float]], RelativeWidthSample]:
+    started = time.perf_counter()
     controls.validate()
     if case.rod_length == 0.0:
         raise ValueError("the exact hard-point guide does not require alpha optimization")
@@ -190,6 +192,8 @@ def run_alpha_optimization(
         ),
         "search": search,
         "requires_independent_vmc_validation": True,
+        "calculation_wall_seconds": time.perf_counter() - started,
+        "vmc_sampling_wall_seconds": vmc.wall_seconds,
     }
     return summary, rows, sample
 

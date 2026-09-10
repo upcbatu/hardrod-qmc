@@ -13,14 +13,13 @@ from hrdmc.production.alpha_optimization import (
 from hrdmc.system.settings import parse_case
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(*, require_case: bool = True) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Optimize the reduced-TG relative alpha by correlated-sampling "
-            "local-energy variance."
+            "Optimize the reduced-TG relative alpha by correlated-sampling local-energy variance."
         )
     )
-    parser.add_argument("--case", required=True)
+    parser.add_argument("--case", required=require_case)
     parser.add_argument("--seed", type=int, default=9401)
     parser.add_argument("--dt", type=float, default=0.001)
     parser.add_argument("--drift-limiter", choices=("none", "umrigar"), default="umrigar")
@@ -30,19 +29,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sample-stride-steps", type=int, default=100)
     parser.add_argument("--grid-extent", type=float, default=90.0)
     parser.add_argument("--n-bins", type=int, default=840)
-    parser.add_argument("--reference-relative-alpha", type=float, required=True)
+    parser.add_argument("--reference-relative-alpha", "--alpha-center", type=float, required=True)
     parser.add_argument("--alpha-log-half-width", type=float, default=0.2)
     parser.add_argument("--alpha-grid-points", type=int, default=31)
     parser.add_argument("--min-reweight-ess-fraction", type=float, default=0.10)
     parser.add_argument("--max-configurations", type=int, default=100_000)
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", "--output", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verbose-json", action="store_true")
     return parser
 
 
 def main() -> None:
-    args = build_parser().parse_args()
+    execute(build_parser().parse_args())
+
+
+def execute(args: argparse.Namespace) -> None:
     case = parse_case(args.case)
     if case.rod_length == 0.0:
         raise ValueError("the exact hard-point guide does not require alpha optimization")
@@ -67,6 +69,8 @@ def main() -> None:
     if args.dry_run:
         _print_plan(case.case_id, args.seed, controls, args.output_dir, args.verbose_json)
         return
+    if args.output_dir.exists() and any(args.output_dir.iterdir()):
+        raise FileExistsError(f"choose an empty output directory: {args.output_dir}")
     summary, rows, sample = run_alpha_optimization(case, controls, args.seed)
     artifacts = write_alpha_optimization_outputs(args.output_dir, summary, rows, sample)
     optimum = summary["candidate_metrics"]
@@ -111,5 +115,7 @@ def _print_plan(
         verbose_payload=plan,
         verbose_json=verbose_json,
     )
+
+
 if __name__ == "__main__":
     main()

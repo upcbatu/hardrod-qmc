@@ -33,6 +33,8 @@ def write_benchmark_packet_plots(
         paths.extend(save_figure(figure, plot_dir / stem, formats))
         plt.close(figure)
     return [str(path.relative_to(output)) for path in paths]
+
+
 def _scalar_figure(plt: Any, payload: dict[str, Any]) -> Any:
     fig, axes = plt.subplots(1, 3, figsize=(10.2, 3.5))
     estimates = _mapping(payload.get("estimates"))
@@ -54,35 +56,54 @@ def _scalar_figure(plt: Any, payload: dict[str, Any]) -> Any:
         axis.legend(fontsize=8)
     _title(fig, payload)
     return fig
+
+
 def _density_figure(plt: Any, payload: dict[str, Any]) -> Any:
     fig, axes = plt.subplots(2, 1, figsize=(8.4, 5.8), sharex=True)
     density = _mapping(_mapping(payload.get("estimates")).get("density"))
     x, value = _vector(density.get("x")), _vector(density.get("value"))
     lda_x, lda = _vector(density.get("lda_x")), _vector(density.get("lda_value"))
-    axes[0].plot(x, value, label="forward-walking DMC")
-    axes[0].plot(lda_x, lda, "--", color="black", label="LDA")
+    has_density = x.size > 0 and x.shape == value.shape and np.all(np.isfinite(value))
+    has_lda = lda_x.size > 0 and lda_x.shape == lda.shape and np.all(np.isfinite(lda))
+    if has_density:
+        axes[0].plot(x, value, label="forward-walking DMC")
+    else:
+        axes[0].text(
+            0.5,
+            0.5,
+            "Aggregate FW density unavailable; see seed results",
+            transform=axes[0].transAxes,
+            ha="center",
+        )
+    if has_lda:
+        axes[0].plot(lda_x, lda, "--", color="black", label="LDA")
     axes[0].set_ylabel(r"$n(x)$")
-    axes[0].legend(fontsize=8)
-    if x.size and lda_x.size:
+    if axes[0].lines:
+        axes[0].legend(fontsize=8)
+    if has_density and has_lda:
         axes[1].plot(x, value - np.interp(x, lda_x, lda))
     axes[1].axhline(0.0, color="black", linewidth=0.7)
     axes[1].set(xlabel=r"$x/a_{ho}$", ylabel="DMC - LDA")
     _title(fig, payload)
     return fig
+
+
 def _chain_figure(plt: Any, payload: dict[str, Any]) -> Any:
     fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.5))
     stationarity = _mapping(payload.get("stationarity"))
-    metrics = stationarity.get("metrics", stationarity.get("observables", {}))
-    rows = list(metrics.values()) if isinstance(metrics, dict) else []
-    rhat = [_number(_mapping(row).get("split_rhat")) for row in rows]
-    ess = [_number(_mapping(row).get("effective_sample_size")) for row in rows]
-    axes[0].plot(rhat, "o-")
-    axes[0].axhline(1.01, color="black", linestyle="--")
-    axes[0].set(title="Split R-hat", xlabel="observable")
-    axes[1].plot(ess, "o-")
-    axes[1].set(title="Effective sample count", xlabel="observable")
+    diagnostics = _mapping(stationarity.get("diagnostics"))
+    names = list(diagnostics)
+    rows = [_mapping(diagnostics[name]) for name in names]
+    axes[0].plot([_number(row.get("rhat")) for row in rows], "o")
+    axes[0].set(title="Split R-hat", xticks=range(len(names)), xticklabels=names)
+    axes[1].plot([_number(row.get("min_effective_independent_samples")) for row in rows], "o")
+    axes[1].set(
+        title="Minimum effective observations per seed", xticks=range(len(names)), xticklabels=names
+    )
     _title(fig, payload)
     return fig
+
+
 def _energy_trace_figure(plt: Any, payload: dict[str, Any]) -> Any:
     fig, axes = plt.subplots(2, 1, figsize=(8.2, 5.4), sharex=True)
     for seed in payload.get("seed_results", []):
@@ -95,22 +116,53 @@ def _energy_trace_figure(plt: Any, payload: dict[str, Any]) -> Any:
     axes[1].set(xlabel="block", ylabel="cumulative mean")
     if axes[0].lines:
         axes[0].legend(fontsize=7, ncol=5)
+    else:
+        axes[0].text(
+            0.5,
+            0.5,
+            "Full traces are in the trace artifacts; see summary.json",
+            transform=axes[0].transAxes,
+            ha="center",
+        )
     _title(fig, payload)
     return fig
+
+
 def _fw_figure(plt: Any, payload: dict[str, Any]) -> Any:
-    fig, axis = plt.subplots(figsize=(7.2, 4.0))
-    pure = _mapping(payload.get("pure_walking"))
-    for name, marker in (("r2", "o"), ("density", "s")):
-        row = _mapping(_mapping(pure.get("observables")).get(name))
-        lags = _vector(row.get("lags", row.get("lag_steps")))
-        values = _vector(row.get("lag_values", row.get("values")))
-        if lags.size and values.size == lags.size and values.ndim == 1:
-            axis.plot(lags, values, marker=marker, label=name)
-    axis.set(xlabel="forward-walking lag (steps)", ylabel="estimate", title="Lag dependence")
-    if axis.lines:
-        axis.legend()
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.0))
+    dt = _number(_mapping(payload.get("controls")).get("dt"))
+    scale = dt if np.isfinite(dt) and dt > 0 else 1.0
+    xlabel = "Forward time (1/Omega)" if scale == dt else "Forward lag (steps)"
+    for seed in payload.get("seed_results", []):
+        results = _mapping(_mapping(seed.get("pure_walking")).get("observable_results"))
+        rms = _mapping(_mapping(results.get("r2")).get("rms_radius_by_lag"))
+        ancestry = _mapping(
+            _mapping(results.get("density")).get("block_source_ancestor_ess_min_by_lag")
+        )
+        for axis, values in zip(axes, (rms, ancestry), strict=True):
+            lags = sorted(values, key=int)
+            if lags:
+                axis.plot(
+                    [int(lag) * scale for lag in lags],
+                    [_number(values[lag]) for lag in lags],
+                    "o-",
+                    label=str(seed["seed"]),
+                )
+    axes[0].set(xlabel=xlabel, ylabel="RMS radius / a_ho", title="Measured radii by seed")
+    axes[1].set(
+        xlabel=xlabel,
+        ylabel="Minimum block ancestor ESS",
+        title="Density transport support by seed",
+    )
+    for axis in axes:
+        if axis.lines:
+            axis.legend(fontsize=7)
+        else:
+            axis.text(0.5, 0.5, "No lag estimates available", transform=axis.transAxes, ha="center")
     _title(fig, payload)
     return fig
+
+
 def _packet_figure(plt: Any, payload: dict[str, Any]) -> Any:
     fig = plt.figure(figsize=(8.27, 6.0))
     axis = fig.add_subplot(111)
@@ -125,13 +177,21 @@ def _packet_figure(plt: Any, payload: dict[str, Any]) -> Any:
     lines.append(f"FW validation: {payload.get('pure_fw_validation_status', '')}")
     axis.text(0.05, 0.95, "\n".join(lines), va="top", family="monospace")
     return fig
+
+
 def _title(fig: Any, payload: dict[str, Any]) -> None:
     fig.suptitle(f"{payload.get('case_id', '')}  |  {payload.get('status', '')}")
+
+
 def _mapping(value: object) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
 def _vector(value: object) -> np.ndarray:
     array = np.asarray(value if value is not None else [], dtype=float)
     return array if array.ndim == 1 else np.asarray([], dtype=float)
+
+
 def _number(value: object) -> float:
     try:
         return float(cast(Any, value))

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from hrdmc.system.guide_registry import load_validated_reduced_tg_guide
 from hrdmc.system.settings import parse_case
+from hrdmc.system.units import forward_time_steps
 
 DEFAULT_GUIDE_VALIDATION_SUMMARY = (
     Path(__file__).resolve().parents[4] / "data" / "final_matrix_guides" / "summary.json"
@@ -75,11 +76,11 @@ def row_method(case_id: str, *, guide_validation_root: Path | None) -> RowMethod
         init_width_log_sigma=DEFAULT_INIT_WIDTH_LOG_SIGMA,
         breathing_preburn_steps=preburn_steps,
         breathing_preburn_log_step=DEFAULT_BREATHING_PREBURN_LOG_STEP,
-        store_every=_steps_for_tau(STORE_INTERVAL_TAU, dt),
-        pure_fw_lags=tuple(_steps_for_tau(tau, dt) for tau in r2_lags),
-        pure_fw_density_lags=tuple(_steps_for_tau(tau, dt) for tau in DENSITY_FW_LAG_TIMES),
-        pure_fw_collection_stride_steps=_steps_for_tau(FW_COLLECTION_INTERVAL_TAU, dt),
-        pure_fw_density_collection_stride_steps=_steps_for_tau(
+        store_every=forward_time_steps(STORE_INTERVAL_TAU, dt),
+        pure_fw_lags=tuple(forward_time_steps(tau, dt) for tau in r2_lags),
+        pure_fw_density_lags=tuple(forward_time_steps(tau, dt) for tau in DENSITY_FW_LAG_TIMES),
+        pure_fw_collection_stride_steps=forward_time_steps(FW_COLLECTION_INTERVAL_TAU, dt),
+        pure_fw_density_collection_stride_steps=forward_time_steps(
             LARGE_GRID_DENSITY_FW_COLLECTION_INTERVAL_TAU
             if math.isclose(case.rod_length, 10.0, rel_tol=0.0, abs_tol=1e-12)
             else DENSITY_FW_COLLECTION_INTERVAL_TAU,
@@ -116,12 +117,3 @@ def _base_treatment(n_particles: int, rod_length: float) -> tuple[float, int, st
     if math.isclose(rod_length, 1.0, rel_tol=0.0, abs_tol=1e-12):
         return 0.000625 if n_particles == 20 else 0.00125, 512, "lda-rms-lattice", 0
     return DEFAULT_DT, DEFAULT_WALKERS, DEFAULT_INITIALIZATION_MODE, DEFAULT_BREATHING_PREBURN_STEPS
-
-
-def _steps_for_tau(tau: float, dt: float) -> int:
-    if tau == 0.0:
-        return 0
-    steps = round(tau / dt)
-    if steps <= 0 or not math.isclose(steps * dt, tau, rel_tol=0.0, abs_tol=1e-12):
-        raise ValueError(f"{tau=} is not representable at {dt=}")
-    return steps

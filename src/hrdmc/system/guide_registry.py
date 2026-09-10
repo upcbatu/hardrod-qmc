@@ -24,8 +24,9 @@ def validate_production_reduced_tg_binding(
     guide_family: str,
     relative_alpha: float | None,
     source: str,
+    allow_unvalidated: bool = False,
 ) -> None:
-    """Require registry-backed optimized widths for finite-diameter production."""
+    """Verify a recorded guide, or permit an explicitly unvalidated research width."""
     if guide_family != "reduced-tg":
         raise ValueError("production supports only the reduced-tg guide family")
     if relative_alpha is None:
@@ -33,6 +34,8 @@ def validate_production_reduced_tg_binding(
             raise ValueError("a guide source without relative_alpha is invalid")
         return
     if source == "explicit":
+        if allow_unvalidated and math.isfinite(relative_alpha) and relative_alpha > 0:
+            return
         raise ValueError("optimized relative_alpha requires a validated guide artifact")
     artifact = load_validated_reduced_tg_guide(Path(source), case=case)
     if float(relative_alpha) != artifact.relative_alpha:

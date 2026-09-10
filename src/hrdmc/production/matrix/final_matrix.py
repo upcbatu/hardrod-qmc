@@ -138,7 +138,7 @@ def _plan_rows(
     for case_id in cases:
         case_output_dir = output_root / case_id
         method = row_method(case_id, guide_validation_root=config.guide_validation_root)
-        grid_plan = _case_grid_plan(config, case_id, method)
+        grid_plan = case_grid_plan(config, case_id, method)
         completed, completion_errors = _verified_completed_row(
             config,
             case_id,
@@ -261,7 +261,7 @@ def _parse_cases(value: str) -> list[str]:
     return cases
 
 
-def _case_grid_plan(
+def case_grid_plan(
     config: FinalMatrixConfig,
     case_id: str,
     method: RowMethod,
@@ -443,7 +443,7 @@ def _discover_completed_rows(
         except ValueError:
             continue
         method = row_method(case_id, guide_validation_root=config.guide_validation_root)
-        grid_plan = _case_grid_plan(config, case_id, method)
+        grid_plan = case_grid_plan(config, case_id, method)
         completed, _errors = _verified_completed_row(
             config,
             case_id,
